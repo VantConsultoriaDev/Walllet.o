@@ -19,7 +19,7 @@ import {
     TableRow,
 } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
-import { Plus, Trash2, Calendar as CalendarIcon, ArrowUpDown, ArrowUp, ArrowDown, Repeat, Search, Check, ChevronsUpDown } from "lucide-react"
+import { Plus, Trash2, Calendar as CalendarIcon, ArrowUpDown, ArrowUp, ArrowDown, Repeat, Search, Check, ChevronsUpDown, Loader2 } from "lucide-react"
 import { format, addMonths } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -28,13 +28,7 @@ import { cn } from "@/lib/utils"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 import { Badge } from "@/components/ui/badge"
 import type { Boleto } from "@/types/agenda" // Import Boleto type
-
-// Mock representations (should ideally come from a shared source or prop)
-const MOCK_REPRESENTACOES = [
-    "Seguradora A",
-    "Associação Protege",
-    "Cooperativa União"
-]
+import { useRepresentations } from "@/hooks/data/useRepresentations"
 
 interface ClientFinanceiroProps {
     client: any
@@ -45,6 +39,8 @@ type SortField = "vencimento" | "valor" | "placas" | "representacao"
 type SortDirection = "asc" | "desc" | null
 
 export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProps) {
+    const { partners, loading: representationsLoading } = useRepresentations()
+
     // Initialize with empty array, assuming data will be fetched here or passed down later
     const [boletos, setBoletos] = useState<Boleto[]>([]) 
     const [isNewBoletoOpen, setIsNewBoletoOpen] = useState(false)
@@ -53,7 +49,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
     const [valor, setValor] = useState("")
     const [vencimento, setVencimento] = useState<Date>()
     const [selectedPlates, setSelectedPlates] = useState<string[]>([])
-    const [representacao, setRepresentacao] = useState("")
+    const [representacaoId, setRepresentacaoId] = useState("") // Changed to ID
     const [isRecurring, setIsRecurring] = useState(false)
     const [recurrenceType, setRecurrenceType] = useState<"indefinite" | "limited">("indefinite")
     const [recurrenceMonths, setRecurrenceMonths] = useState("12")
@@ -137,7 +133,10 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
     }, [boletos, searchTerm, dateFrom, dateTo, sortField, sortDirection])
 
     const handleAddBoleto = () => {
-        if (!valor || !vencimento || selectedPlates.length === 0 || !representacao) return
+        if (!valor || !vencimento || selectedPlates.length === 0 || !representacaoId) return
+
+        const selectedPartner = partners.find(p => p.id === representacaoId)
+        const representacaoNome = selectedPartner?.name || "N/A"
 
         const recurrenceGroupId = isRecurring ? Math.random().toString(36).substr(2, 9) : undefined
         // If indefinite, we generate 24 months as a "preview" but logically it's indefinite.
@@ -153,7 +152,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                 valor: parseFloat(valor),
                 vencimento: addMonths(vencimento, i),
                 placas: selectedPlates,
-                representacao,
+                representacao: representacaoNome, // Use name for display
                 status: "pending",
                 isRecurring,
                 recurrenceType: isRecurring ? recurrenceType : undefined,
@@ -176,7 +175,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
         setValor("")
         setVencimento(undefined)
         setSelectedPlates([])
-        setRepresentacao("")
+        setRepresentacaoId("")
         setIsRecurring(false)
         setRecurrenceType("indefinite")
         setRecurrenceMonths("12")
@@ -214,6 +213,14 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
     }
 
     const hasActiveFilters = searchTerm || dateFrom || dateTo || sortField
+
+    if (representationsLoading) {
+        return (
+            <div className="flex items-center justify-center py-12 text-muted-foreground">
+                <Loader2 className="h-6 w-6 animate-spin mr-2" /> Carregando dados financeiros...
+            </div>
+        )
+    }
 
     return (
         <div className="space-y-4">
@@ -511,14 +518,14 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                         </div>
                         <div className="grid gap-2">
                             <Label>Representação</Label>
-                            <Select value={representacao} onValueChange={setRepresentacao}>
+                            <Select value={representacaoId} onValueChange={setRepresentacaoId}>
                                 <SelectTrigger>
                                     <SelectValue placeholder="Selecione a representação" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {MOCK_REPRESENTACOES.map((rep) => (
-                                        <SelectItem key={rep} value={rep}>
-                                            {rep}
+                                    {partners.map((rep) => (
+                                        <SelectItem key={rep.id} value={rep.id}>
+                                            {rep.name}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
