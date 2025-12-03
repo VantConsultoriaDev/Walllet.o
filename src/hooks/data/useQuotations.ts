@@ -7,8 +7,7 @@ import type { Cotacao, CotacaoHistory, CotacaoStatus, Asset, Commission } from "
 // Helper function to map DB object to Cotacao type
 const mapDbToCotacao = (dbCotacao: any, history: CotacaoHistory[] = []): Cotacao => ({
     id: dbCotacao.id,
-    // Assuming client_id is present in DB but not strictly required in Cotacao type for now
-    // clientId: dbCotacao.client_id, 
+    clientId: dbCotacao.client_id, // Mapped from DB
     clientType: dbCotacao.client_type,
     cpfCnpj: dbCotacao.cpf_cnpj,
     razaoSocialNome: dbCotacao.razao_social_nome,
@@ -27,7 +26,7 @@ const mapDbToCotacao = (dbCotacao: any, history: CotacaoHistory[] = []): Cotacao
 
 // Helper function to map Cotacao type to DB object for insertion/update
 const mapCotacaoToDb = (cotacao: Partial<Cotacao>) => ({
-    client_id: cotacao.clientId, // Assuming clientId exists if client is linked
+    client_id: cotacao.clientId, // Now correctly typed
     client_type: cotacao.clientType,
     cpf_cnpj: cotacao.cpfCnpj,
     razao_social_nome: cotacao.razaoSocialNome,

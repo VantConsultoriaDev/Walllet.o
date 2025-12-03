@@ -192,8 +192,8 @@ export default function Sinistros() {
         addClaim(newClaim)
     }
 
-    const handleAddComment = (claimId: string, text: string) => {
-        addComment(claimId, text)
+    const handleAddComment = async (claimId: string, text: string) => {
+        return addComment(claimId, text)
     }
 
     const filteredClaims = useMemo(() => {

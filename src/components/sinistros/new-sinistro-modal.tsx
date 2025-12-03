@@ -226,7 +226,7 @@ export function NewSinistroModal({ isOpen, onClose, onSubmit }: NewSinistroModal
                                                 }}
                                             >
                                                 {client.name}
-                                                {selectedClient?.id === client.id && <Check className="h-4 w-4 text-primary" />}
+                                                {selectedClient && selectedClient.id === client.id && <Check className="h-4 w-4 text-primary" />}
                                             </div>
                                         ))}
                                     </div>

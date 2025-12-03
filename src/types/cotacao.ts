@@ -64,6 +64,7 @@ export type CotacaoHistory = {
 
 export type Cotacao = {
     id: string
+    clientId?: string // <-- Adicionado para consistência com o mapeamento DB
     // Client info
     clientType: "PF" | "PJ"
     cpfCnpj: string
