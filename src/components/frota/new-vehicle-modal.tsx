@@ -79,10 +79,12 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
         let timeoutId: ReturnType<typeof setTimeout> | undefined = setTimeout(() => controller.abort("Timeout excedido"), 120000);
 
         try {
-            const response = await fetch('https://gateway.apibrasil.io/api/v2/vehicles/base/000/dados', {
+            // Usando o endpoint 001/consulta que parece ser mais confiável
+            const response = await fetch('https://gateway.apibrasil.io/api/v2/vehicles/base/001/consulta', {
                 method: 'POST',
                 headers: {
                     "Content-Type": "application/json",
+                    // Mantendo a chave de autorização existente
                     "Authorization": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwOi8vZ2F0ZXdheS5hcGlicmFzaWwuaW8vYXBpL3YyL2F1dGgvbG9naW4iLCJpYXQiOjE3NjQ3OTQ0NDcsImV4cCI6MTc5NjMzMDQ0NywibmJmIjoxNzY0Nzk0NDQ3LCJqdGkiOiJnWHk5TkFhaDNPOEJnNGp6Iiwic3ViIjoiMTc4NDIiLCJwcnYiOiIyM2JkNWM4OTQ5ZjYwMGFkYjM5ZTcwMWM0MDA4NzJkYjdhNTk3NmY3In0.V6QSWD39KM6TtCk4nJawVJnigT5r2TojKrOR3qy9Lgc"
                 },
                 body: JSON.stringify({
@@ -104,10 +106,11 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
             }
 
             const data = await response.json();
-            console.log("Dados API Brasil:", data);
+            console.log("Dados API Brasil (001/consulta):", data);
 
-            if (data.error || !data.dados) {
-                // Se não encontrar dados, limpa os campos de preenchimento automático
+            if (data.error) {
+                console.error("Erro retornado pela API:", data.message);
+                // Limpa apenas os campos automáticos em caso de erro
                 setFormData(prev => ({
                     ...prev,
                     brand: "",
@@ -122,56 +125,66 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                 return;
             }
 
-            const veiculo = data.dados;
+            // Tenta encontrar o objeto de dados correto (lógica copiada do modal de cotações)
+            const veiculo = data.dados || data.vehicle || data;
 
-            // Helper to safely get string value
-            const safeString = (val: any) => (val !== null && val !== undefined ? String(val) : "");
-            // Helper to safely get number value
-            const safeNumber = (val: any) => (val !== null && val !== undefined ? Number(val) : undefined);
+            if (veiculo) {
+                // Helper to safely get string value
+                const safeString = (val: any) => (val !== null && val !== undefined ? String(val) : "");
+                // Helper to safely get number value
+                const safeNumber = (val: any) => (val !== null && val !== undefined ? Number(val) : undefined);
+                
+                const brand = safeString(veiculo.marca || veiculo.fabricante || veiculo.montadora);
+                const model = safeString(veiculo.modelo || veiculo.modelo_veiculo || veiculo.veiculo);
+                const year = safeNumber(veiculo.ano_modelo || veiculo.ano);
+                const color = safeString(veiculo.cor);
+                const chassi = safeString(veiculo.chassi);
+                const renavam = safeString(veiculo.renavam);
+                const fipeCode = safeString(veiculo.fipe_codigo || veiculo.codigo_fipe);
+                
+                let fipeValue = safeString(veiculo.fipe_valor || veiculo.valor_fipe);
+                // Clean up FIPE value if it contains currency symbols/dots
+                if (fipeValue) {
+                    fipeValue = fipeValue.replace(/[R$\s.]/g, '').replace(',', '.');
+                    if (isNaN(parseFloat(fipeValue))) fipeValue = "";
+                }
 
-            const brand = safeString(veiculo.marca || veiculo.fabricante || veiculo.montadora);
-            const model = safeString(veiculo.modelo || veiculo.modelo_veiculo || veiculo.veiculo);
-            const year = safeNumber(veiculo.ano_modelo || veiculo.ano);
-            const color = safeString(veiculo.cor);
-            const chassi = safeString(veiculo.chassi);
-            const renavam = safeString(veiculo.renavam);
-            const fipeCode = safeString(veiculo.fipe_codigo || veiculo.codigo_fipe);
-            const fipeValue = safeString(veiculo.fipe_valor || veiculo.valor_fipe);
+                // Determine type based on vehicle info (simple heuristic)
+                let detectedType: VehicleType = "CARRO"
+                const vehicleTypeStr = safeString(veiculo.tipo_veiculo).toLowerCase()
 
-            // Determine type based on vehicle info (simple heuristic)
-            let detectedType: VehicleType = "CARRO"
-            const vehicleTypeStr = safeString(veiculo.tipo_veiculo).toLowerCase()
+                if (vehicleTypeStr.includes("moto") || vehicleTypeStr.includes("motocicleta")) {
+                    detectedType = "MOTO"
+                } else if (vehicleTypeStr.includes("caminhao") || vehicleTypeStr.includes("caminhão")) {
+                    detectedType = "TRUCK"
+                } else if (vehicleTypeStr.includes("reboque") || vehicleTypeStr.includes("semi-reboque")) {
+                    detectedType = "CARRETA"
+                } else if (vehicleTypeStr.includes("cavalo")) {
+                    detectedType = "CAVALO"
+                }
 
-            if (vehicleTypeStr.includes("moto") || vehicleTypeStr.includes("motocicleta")) {
-                detectedType = "MOTO"
-            } else if (vehicleTypeStr.includes("caminhao") || vehicleTypeStr.includes("caminhão")) {
-                detectedType = "TRUCK"
-            } else if (vehicleTypeStr.includes("reboque") || vehicleTypeStr.includes("semi-reboque")) {
-                detectedType = "CARRETA"
-            } else if (vehicleTypeStr.includes("cavalo")) {
-                detectedType = "CAVALO"
+                // Update form
+                setType(detectedType)
+                setFormData(prev => ({
+                    ...prev,
+                    brand: brand || prev.brand,
+                    model: model || prev.model,
+                    year: year || prev.year,
+                    color: color || prev.color,
+                    chassi: chassi || prev.chassi,
+                    renavam: renavam || prev.renavam,
+                    fipeCode: fipeCode || prev.fipeCode,
+                    fipeValue: fipeValue || prev.fipeValue,
+                }))
+            } else {
+                console.warn("Estrutura de dados não reconhecida ou vazia.");
             }
-
-            // Update form
-            setType(detectedType)
-            setFormData(prev => ({
-                ...prev,
-                brand: brand || prev.brand,
-                model: model || prev.model,
-                year: year || prev.year,
-                color: color || prev.color,
-                chassi: chassi || prev.chassi,
-                renavam: renavam || prev.renavam,
-                fipeCode: fipeCode || prev.fipeCode,
-                fipeValue: fipeValue || prev.fipeValue,
-            }))
 
         } catch (error) {
             if (timeoutId) {
                 clearTimeout(timeoutId);
             }
             console.error('Erro na requisição:', error);
-            // Optionally show a toast error here if needed
         } finally {
             setLoading(false)
         }
