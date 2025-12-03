@@ -75,6 +75,8 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
     const [comissaoRecorrente, setComissaoRecorrente] = useState("")
     const [comissaoTipo, setComissaoTipo] = useState<"percentual" | "valor">("valor")
     const [openPlateSelect, setOpenPlateSelect] = useState(false)
+    const [plateSearch, setPlateSearch] = useState("")
+    const [isCalendarOpen, setIsCalendarOpen] = useState(false)
 
     // Filter state
     const [searchTerm, setSearchTerm] = useState("")
@@ -418,7 +420,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                         </div>
                         <div className="grid gap-2">
                             <Label>Vencimento</Label>
-                            <Popover>
+                            <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
                                 <PopoverTrigger asChild>
                                     <Button
                                         variant={"outline"}
@@ -435,7 +437,10 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                                     <Calendar
                                         mode="single"
                                         selected={vencimento}
-                                        onSelect={setVencimento}
+                                        onSelect={(date) => {
+                                            setVencimento(date)
+                                            setIsCalendarOpen(false)
+                                        }}
                                         initialFocus
                                     />
                                 </PopoverContent>
@@ -449,7 +454,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                                         variant="outline"
                                         role="combobox"
                                         aria-expanded={openPlateSelect}
-                                        className="justify-between"
+                                        className="justify-between w-full"
                                     >
                                         {selectedPlates.length > 0
                                             ? `${selectedPlates.length} veículo(s) selecionado(s)`
@@ -457,30 +462,46 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                     </Button>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-full p-0">
-                                    <Command>
-                                        <CommandInput placeholder="Buscar placa..." />
-                                        <CommandList>
-                                            <CommandEmpty>Nenhum veículo encontrado.</CommandEmpty>
-                                            <CommandGroup>
-                                                {vehicles.map((vehicle) => (
-                                                    <CommandItem
-                                                        key={vehicle.plate}
-                                                        value={vehicle.plate}
-                                                        onSelect={() => togglePlate(vehicle.plate)}
-                                                    >
-                                                        <Check
-                                                            className={cn(
-                                                                "mr-2 h-4 w-4",
-                                                                selectedPlates.includes(vehicle.plate) ? "opacity-100" : "opacity-0"
-                                                            )}
-                                                        />
-                                                        {vehicle.plate} - {vehicle.model}
-                                                    </CommandItem>
-                                                ))}
-                                            </CommandGroup>
-                                        </CommandList>
-                                    </Command>
+                                <PopoverContent className="w-[300px] p-0 pointer-events-auto z-[100]" align="start">
+                                    <div className="flex items-center border-b px-3">
+                                        <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                                        <input
+                                            className="flex h-11 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                                            placeholder="Buscar placa ou modelo..."
+                                            value={plateSearch}
+                                            onChange={(e) => setPlateSearch(e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="max-h-[300px] overflow-y-auto overflow-x-hidden p-1">
+                                        {vehicles.filter(v =>
+                                            v.plate.toLowerCase().includes(plateSearch.toLowerCase()) ||
+                                            v.model.toLowerCase().includes(plateSearch.toLowerCase())
+                                        ).length === 0 ? (
+                                            <div className="py-6 text-center text-sm">Nenhum veículo encontrado.</div>
+                                        ) : (
+                                            vehicles.filter(v =>
+                                                v.plate.toLowerCase().includes(plateSearch.toLowerCase()) ||
+                                                v.model.toLowerCase().includes(plateSearch.toLowerCase())
+                                            ).map((vehicle) => (
+                                                <div
+                                                    key={vehicle.plate}
+                                                    className={cn(
+                                                        "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground",
+                                                        selectedPlates.includes(vehicle.plate) && "bg-accent text-accent-foreground"
+                                                    )}
+                                                    onClick={() => togglePlate(vehicle.plate)}
+                                                >
+                                                    <Check
+                                                        className={cn(
+                                                            "mr-2 h-4 w-4",
+                                                            selectedPlates.includes(vehicle.plate) ? "opacity-100" : "opacity-0"
+                                                        )}
+                                                    />
+                                                    {vehicle.plate} - {vehicle.model}
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
                                 </PopoverContent>
                             </Popover>
                             {selectedPlates.length > 0 && (
