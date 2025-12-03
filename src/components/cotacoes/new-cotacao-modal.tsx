@@ -140,34 +140,39 @@ export function NewCotacaoModal({ isOpen, onClose, onSubmit }: NewCotacaoModalPr
         setPlaca(value)
         setPlacaError("")
 
-        if (value.length === 7) {
-            setIsLoadingPlaca(true)
+        const placaLimpa = value.replace(/[^A-Z0-9]/gi, '');
+        if (placaLimpa.length !== 7) {
+            setPlacaError('Placa deve ter 7 caracteres.');
+            return;
+        }
 
-            try {
-                const data: PlacaData | null = await consultarPlaca(value);
+        setIsLoadingPlaca(true)
+        setPlacaError('');
 
-                if (data) {
-                    const safeString = (val: any) => (val !== null && val !== undefined ? String(val) : "");
-                    const safeNumber = (val: any) => (val !== null && val !== undefined ? Number(val) : undefined);
+        try {
+            const data: PlacaData | null = await consultarPlaca(placaLimpa);
 
-                    setMarca(data.marca || "");
-                    setModelo(data.modelo || "");
-                    setAno(safeNumber(data.ano) ? safeNumber(data.ano)!.toString() : "");
-                    setCor(data.cor || "");
-                    setChassi(safeString(data.chassi));
-                    setRenavam(safeString(data.renavam));
-                    setCodigoFipe(data.fipe_codigo || "");
-                    setValorFipe(data.valor_fipe || "");
-                } else {
-                    setPlacaError('Placa não encontrada na base de dados externa.');
-                }
+            if (data) {
+                const safeString = (val: any) => (val !== null && val !== undefined ? String(val) : "");
+                const safeNumber = (val: any) => (val !== null && val !== undefined ? Number(val) : undefined);
 
-            } catch (error) {
-                console.error('Erro na requisição:', error);
-                setPlacaError(error instanceof Error ? error.message : 'Falha ao consultar placa.');
-            } finally {
-                setIsLoadingPlaca(false)
+                setMarca(data.marca || "");
+                setModelo(data.modelo || "");
+                setAno(safeNumber(data.ano) ? safeNumber(data.ano)!.toString() : "");
+                setCor(data.cor || "");
+                setChassi(safeString(data.chassi));
+                setRenavam(safeString(data.renavam));
+                setCodigoFipe(data.fipe_codigo || "");
+                setValorFipe(data.valor_fipe || "");
+            } else {
+                setPlacaError('Placa não encontrada na base de dados externa.');
             }
+
+        } catch (error) {
+            console.error('Erro na requisição:', error);
+            setPlacaError(error instanceof Error ? error.message : 'Falha ao consultar placa.');
+        } finally {
+            setIsLoadingPlaca(false)
         }
     }
 

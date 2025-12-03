@@ -78,20 +78,21 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
         }
     }, [open, vehicleToEdit])
 
-    const handleFetchData = useCallback(async (plate: string) => {
-        const cleanPlate = plate.replace(/[^A-Z0-9]/g, "")
-        if (cleanPlate.length !== 7) {
+    // --- CONSULTA API PLACA ---
+    const handlePlacaConsultation = useCallback(async (placa: string) => {
+        const placaLimpa = placa.replace(/[^A-Z0-9]/gi, '');
+        if (placaLimpa.length !== 7) {
             setPlacaError('Placa deve ter 7 caracteres.');
-            return
+            return;
         }
-
-        setLoading(true)
-        setPlacaError('')
-        setPlacaConsultada(false)
+        
+        setLoading(true);
+        setPlacaError('');
+        setPlacaConsultada(false);
 
         try {
-            const data: PlacaData | null = await consultarPlaca(cleanPlate);
-
+            const data: PlacaData | null = await consultarPlaca(placaLimpa);
+            
             if (data) {
                 // Determine type based on vehicle info (simple heuristic)
                 let detectedType: VehicleType = "CARRO"
@@ -114,7 +115,7 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                     model: data.modelo || prev.model,
                     year: data.ano || prev.year,
                     color: data.cor || prev.color,
-                    chassi: forceUpperCase(data.chassi) || prev.chassi,
+                    chassi: data.chassi ? forceUpperCase(data.chassi) : prev.chassi,
                     renavam: data.renavam || prev.renavam,
                     fipeCode: data.fipe_codigo || prev.fipeCode,
                     fipeValue: data.valor_fipe || prev.fipeValue,
@@ -124,10 +125,9 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
             } else {
                 setPlacaError('Placa não encontrada na base de dados externa.');
             }
-
-        } catch (error) {
-            console.error('Erro na requisição:', error);
-            setPlacaError(error instanceof Error ? error.message : 'Falha ao consultar placa. Verifique a conexão ou o token da API.');
+        } catch (err) {
+            console.error('Erro ao consultar placa:', err);
+            setPlacaError(err instanceof Error ? err.message : 'Falha ao consultar placa. Verifique a conexão ou o token da API.');
             // Clear auto-filled fields on error
             setFormData(prev => ({
                 ...prev,
@@ -142,7 +142,7 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                 bodyType: "",
             }))
         } finally {
-            setLoading(false)
+            setLoading(false);
         }
     }, [])
 
@@ -151,14 +151,14 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
         if (formData.plate) {
             const cleanPlate = formData.plate.replace(/[^A-Z0-9]/g, "")
             if (cleanPlate.length === 7 && !placaConsultada) {
-                handleFetchData(cleanPlate)
+                handlePlacaConsultation(cleanPlate)
             }
         }
-    }, [formData.plate, handleFetchData, placaConsultada])
+    }, [formData.plate, handlePlacaConsultation, placaConsultada])
 
     const handleManualFipeUpdate = () => {
         if (formData.plate) {
-            handleFetchData(formData.plate)
+            handlePlacaConsultation(formData.plate)
         }
     }
 
