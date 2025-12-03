@@ -70,64 +70,96 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
     }, [open, vehicleToEdit])
 
     const handleFetchData = async () => {
-        if (!formData.plate) return
+        if (!formData.plate || formData.plate.length < 7) return
 
         setLoading(true)
+        const cleanPlate = formData.plate.replace(/[^A-Z0-9]/g, "")
+
+        const controller = new AbortController();
+        let timeoutId: ReturnType<typeof setTimeout> | undefined = setTimeout(() => controller.abort("Timeout excedido"), 120000);
+
         try {
-            // Using allorigins.win as a CORS proxy
-            const response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(`https://placafipe.com/placa/${formData.plate}`)}`)
-            const data = await response.json()
+            const response = await fetch('https://gateway.apibrasil.io/api/v2/vehicles/base/000/dados', {
+                method: 'POST',
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwOi8vZ2F0ZXdheS5hcGlicmFzaWwuaW8vYXBpL3YyL2F1dGgvbG9naW4iLCJpYXQiOjE3NjQ3OTQ0NDcsImV4cCI6MTc5NjMzMDQ0NywibmJmIjoxNzY0Nzk0NDQ3LCJqdGkiOiJnWHk5TkFhaDNPOEJnNGp6Iiwic3ViIjoiMTc4NDIiLCJwcnYiOiIyM2JkNWM4OTQ5ZjYwMGFkYjM5ZTcwMWM0MDA4NzJkYjdhNTk3NmY3In0.V6QSWD39KM6TtCk4nJawVJnigT5r2TojKrOR3qy9Lgc"
+                },
+                body: JSON.stringify({
+                    "tipo": "fipe",
+                    "placa": cleanPlate,
+                    "homolog": true
+                }),
+                signal: controller.signal,
+                redirect: 'follow',
+                credentials: 'include',
+                cache: 'no-store'
+            });
 
-            if (data.contents) {
-                const parser = new DOMParser()
-                const doc = parser.parseFromString(data.contents, "text/html")
+            clearTimeout(timeoutId);
+            timeoutId = undefined;
 
-                // Extracting data from the table
-                const getTableValue = (label: string) => {
-                    const rows = doc.querySelectorAll("table tr")
-                    for (const row of rows) {
-                        const th = row.querySelector("td:first-child")?.textContent?.trim()
-                        if (th && th.includes(label)) {
-                            return row.querySelector("td:last-child")?.textContent?.trim() || ""
-                        }
-                    }
-                    return ""
-                }
-
-                const brand = getTableValue("Marca")
-                const model = getTableValue("Modelo")
-                const yearStr = getTableValue("Ano") // Usually "2022" or "2022/2023"
-                const color = getTableValue("Cor") // <-- Capturando a cor
-                const chassi = getTableValue("Chassi") // Might not be available publicly, but we try
-
-                // Parse year (take the first 4 digits)
-                const year = yearStr ? parseInt(yearStr.substring(0, 4)) : new Date().getFullYear()
-
-                // Determine type based on vehicle info (simple heuristic)
-                let detectedType: VehicleType = "CARRO"
-                const vehicleTypeStr = getTableValue("Tipo de Veículo") || ""
-
-                if (vehicleTypeStr.toLowerCase().includes("moto") || vehicleTypeStr.toLowerCase().includes("motocicleta")) {
-                    detectedType = "MOTO"
-                } else if (vehicleTypeStr.toLowerCase().includes("caminhao") || vehicleTypeStr.toLowerCase().includes("caminhão")) {
-                    detectedType = "TRUCK"
-                } else if (vehicleTypeStr.toLowerCase().includes("reboque") || vehicleTypeStr.toLowerCase().includes("semi-reboque")) {
-                    detectedType = "CARRETA"
-                }
-
-                // Update form
-                setType(detectedType)
-                setFormData(prev => ({
-                    ...prev,
-                    brand: brand || prev.brand,
-                    model: model || prev.model,
-                    year: year || prev.year,
-                    color: color || prev.color, // <-- Atualizando a cor
-                    chassi: chassi || prev.chassi,
-                }))
+            if (!response.ok) {
+                throw new Error(`Erro HTTP: ${response.status}`);
             }
+
+            const data = await response.json();
+            console.log("Dados API Brasil:", data);
+
+            if (data.error || !data.dados) {
+                throw new Error(data.message || "Dados do veículo não encontrados.");
+            }
+
+            const veiculo = data.dados;
+
+            // Helper to safely get string value
+            const safeString = (val: any) => (val !== null && val !== undefined ? String(val) : "");
+            // Helper to safely get number value
+            const safeNumber = (val: any) => (val !== null && val !== undefined ? Number(val) : undefined);
+
+            const brand = safeString(veiculo.marca || veiculo.fabricante || veiculo.montadora);
+            const model = safeString(veiculo.modelo || veiculo.modelo_veiculo || veiculo.veiculo);
+            const year = safeNumber(veiculo.ano_modelo || veiculo.ano);
+            const color = safeString(veiculo.cor);
+            const chassi = safeString(veiculo.chassi);
+            const renavam = safeString(veiculo.renavam);
+            const fipeCode = safeString(veiculo.fipe_codigo || veiculo.codigo_fipe);
+            const fipeValue = safeString(veiculo.fipe_valor || veiculo.valor_fipe);
+
+            // Determine type based on vehicle info (simple heuristic)
+            let detectedType: VehicleType = "CARRO"
+            const vehicleTypeStr = safeString(veiculo.tipo_veiculo).toLowerCase()
+
+            if (vehicleTypeStr.includes("moto") || vehicleTypeStr.includes("motocicleta")) {
+                detectedType = "MOTO"
+            } else if (vehicleTypeStr.includes("caminhao") || vehicleTypeStr.includes("caminhão")) {
+                detectedType = "TRUCK"
+            } else if (vehicleTypeStr.includes("reboque") || vehicleTypeStr.includes("semi-reboque")) {
+                detectedType = "CARRETA"
+            } else if (vehicleTypeStr.includes("cavalo")) {
+                detectedType = "CAVALO"
+            }
+
+            // Update form
+            setType(detectedType)
+            setFormData(prev => ({
+                ...prev,
+                brand: brand || prev.brand,
+                model: model || prev.model,
+                year: year || prev.year,
+                color: color || prev.color,
+                chassi: chassi || prev.chassi,
+                renavam: renavam || prev.renavam,
+                fipeCode: fipeCode || prev.fipeCode,
+                fipeValue: fipeValue || prev.fipeValue,
+            }))
+
         } catch (error) {
-            console.error("Error fetching vehicle data:", error)
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+            }
+            console.error('Erro na requisição:', error);
+            // Optionally show a toast error here if needed
         } finally {
             setLoading(false)
         }
