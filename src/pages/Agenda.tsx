@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -11,12 +11,12 @@ import { FinanceModal } from "@/components/agenda/finance-modal"
 import { EventModal } from "@/components/agenda/event-modal"
 import { cn } from "@/lib/utils"
 import { useEvents } from "@/hooks/data/useEvents"
-
-// Mock boletos temporarily until a useBoletos hook is created
-const mockBoletos: Boleto[] = []
+import { useBoletos } from "@/hooks/data/useBoletos"
 
 export default function Agenda() {
-    const { events, loading, addEvent, updateEvent, deleteEvent } = useEvents()
+    const { events, loading: eventsLoading, addEvent, updateEvent, deleteEvent } = useEvents()
+    const { boletos: allBoletos, loading: boletosLoading } = useBoletos()
+    
     const [date, setDate] = useState<Date | undefined>(new Date())
     const [currentMonth, setCurrentMonth] = useState(new Date())
     const [isDayModalOpen, setIsDayModalOpen] = useState(false)
@@ -31,13 +31,28 @@ export default function Agenda() {
     const [selectedEvent, setSelectedEvent] = useState<Event | null>(null)
     const [isEventModalOpen, setIsEventModalOpen] = useState(false)
 
+    const loading = eventsLoading || boletosLoading;
+
     // Filter events for the selected date
-    const selectedDateEvents = events.filter(event =>
-        date &&
-        event.date.getDate() === date.getDate() &&
-        event.date.getMonth() === date.getMonth() &&
-        event.date.getFullYear() === date.getFullYear()
-    )
+    const selectedDateEvents = useMemo(() => {
+        return events.filter(event =>
+            date &&
+            event.date.getDate() === date.getDate() &&
+            event.date.getMonth() === date.getMonth() &&
+            event.date.getFullYear() === date.getFullYear()
+        )
+    }, [events, date])
+
+    // Filter boletos for the selected date
+    const selectedDateBoletos = useMemo(() => {
+        return allBoletos.filter(boleto =>
+            date &&
+            boleto.vencimento.getDate() === date.getDate() &&
+            boleto.vencimento.getMonth() === date.getMonth() &&
+            boleto.vencimento.getFullYear() === date.getFullYear()
+        )
+    }, [allBoletos, date])
+
 
     // Filter tasks based on urgency
     const filteredTasks = selectedDateEvents.filter(task =>
@@ -48,14 +63,6 @@ export default function Agenda() {
     const globalFilteredEvents = events.filter(event =>
         event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         event.client.toLowerCase().includes(searchQuery.toLowerCase())
-    )
-
-    // Filter boletos for the selected date (using mock for now)
-    const selectedDateBoletos = mockBoletos.filter(boleto =>
-        date &&
-        boleto.dueDate.getDate() === date.getDate() &&
-        boleto.dueDate.getMonth() === date.getMonth() &&
-        boleto.dueDate.getFullYear() === date.getFullYear()
     )
 
     const handleAddEvent = (newEvent: Omit<Event, "id">) => {
@@ -373,6 +380,13 @@ export default function Agenda() {
                                 const dayEvents = getDayEvents(dayObj.date)
                                 const hasUrgent = dayEvents.some(e => e.urgency === "urgente")
                                 const hasRenovacao = dayEvents.some(e => e.type === "renovacao")
+                                
+                                // Check for boletos on this day
+                                const boletosCount = allBoletos.filter(b => 
+                                    b.vencimento.getDate() === dayObj.date.getDate() &&
+                                    b.vencimento.getMonth() === dayObj.date.getMonth() &&
+                                    b.vencimento.getFullYear() === dayObj.date.getFullYear()
+                                ).length
 
                                 return (
                                     <button
@@ -400,6 +414,9 @@ export default function Agenda() {
                                             )}
                                             {hasRenovacao && (
                                                 <div className="h-1.5 w-1.5 rounded-full bg-purple-500" />
+                                            )}
+                                            {boletosCount > 0 && (
+                                                <div className="h-1.5 w-1.5 rounded-full bg-green-500" />
                                             )}
                                         </div>
                                     </button>

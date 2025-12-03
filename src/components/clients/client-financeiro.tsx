@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -29,6 +29,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Badge } from "@/components/ui/badge"
 import type { Boleto } from "@/types/agenda" // Import Boleto type
 import { useRepresentations } from "@/hooks/data/useRepresentations"
+import { useBoletos } from "@/hooks/data/useBoletos"
 
 interface ClientFinanceiroProps {
     client: any
@@ -40,16 +41,20 @@ type SortDirection = "asc" | "desc" | null
 
 export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProps) {
     const { partners, loading: representationsLoading } = useRepresentations()
+    const { boletos: allBoletos, loading: boletosLoading, fetchBoletos, addBoletos, deleteBoleto } = useBoletos()
 
-    // Initialize with empty array, assuming data will be fetched here or passed down later
-    const [boletos, setBoletos] = useState<Boleto[]>([]) 
     const [isNewBoletoOpen, setIsNewBoletoOpen] = useState(false)
+
+    // Filter boletos specific to this client
+    const clientBoletos = useMemo(() => {
+        return allBoletos.filter(b => b.clientId === client.id)
+    }, [allBoletos, client.id])
 
     // Form state
     const [valor, setValor] = useState("")
     const [vencimento, setVencimento] = useState<Date>()
     const [selectedPlates, setSelectedPlates] = useState<string[]>([])
-    const [representacaoId, setRepresentacaoId] = useState("") // Changed to ID
+    const [representacaoId, setRepresentacaoId] = useState("")
     const [isRecurring, setIsRecurring] = useState(false)
     const [recurrenceType, setRecurrenceType] = useState<"indefinite" | "limited">("indefinite")
     const [recurrenceMonths, setRecurrenceMonths] = useState("12")
@@ -81,7 +86,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
     }
 
     const filteredAndSortedBoletos = useMemo(() => {
-        let result = [...boletos]
+        let result = [...clientBoletos]
 
         // Text search
         if (searchTerm) {
@@ -130,9 +135,9 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
         }
 
         return result
-    }, [boletos, searchTerm, dateFrom, dateTo, sortField, sortDirection])
+    }, [clientBoletos, searchTerm, dateFrom, dateTo, sortField, sortDirection])
 
-    const handleAddBoleto = () => {
+    const handleAddBoleto = async () => {
         if (!valor || !vencimento || selectedPlates.length === 0 || !representacaoId) return
 
         const selectedPartner = partners.find(p => p.id === representacaoId)
@@ -144,15 +149,14 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
             ? (recurrenceType === "indefinite" ? 24 : parseInt(recurrenceMonths))
             : 1
 
-        const newBoletos: Boleto[] = []
+        const boletosToSave: Omit<Boleto, 'id' | 'representacao' | 'dueDate'>[] = []
 
         for (let i = 0; i < monthsToGenerate; i++) {
-            newBoletos.push({
-                id: Math.random().toString(36).substr(2, 9),
+            boletosToSave.push({
                 valor: parseFloat(valor),
                 vencimento: addMonths(vencimento, i),
                 placas: selectedPlates,
-                representacao: representacaoNome, // Use name for display
+                representacaoId: representacaoId, // Save ID
                 status: "pending",
                 isRecurring,
                 recurrenceType: isRecurring ? recurrenceType : undefined,
@@ -160,15 +164,20 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                 recurrenceGroupId,
                 comissaoRecorrente: comissaoRecorrente ? parseFloat(comissaoRecorrente) : undefined,
                 comissaoTipo: comissaoRecorrente ? comissaoTipo : undefined,
-                clientId: client.id, // Use real client ID
-                clientName: client.name, // Use real client name
-                dueDate: addMonths(vencimento, i), // Add dueDate for compatibility with Agenda type
+                clientId: client.id,
+                clientName: client.name,
             })
         }
 
-        setBoletos([...boletos, ...newBoletos])
+        await addBoletos(boletosToSave)
         setIsNewBoletoOpen(false)
         resetForm()
+    }
+
+    const handleDeleteBoleto = async (id: string) => {
+        if (window.confirm("Tem certeza que deseja excluir este boleto?")) {
+            await deleteBoleto(id)
+        }
     }
 
     const resetForm = () => {
@@ -214,7 +223,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
 
     const hasActiveFilters = searchTerm || dateFrom || dateTo || sortField
 
-    if (representationsLoading) {
+    if (representationsLoading || boletosLoading) {
         return (
             <div className="flex items-center justify-center py-12 text-muted-foreground">
                 <Loader2 className="h-6 w-6 animate-spin mr-2" /> Carregando dados financeiros...
@@ -273,7 +282,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                 {hasActiveFilters && (
                     <div className="flex items-center justify-between text-sm">
                         <span className="text-muted-foreground">
-                            Mostrando {filteredAndSortedBoletos.length} de {boletos.length} boletos
+                            Mostrando {filteredAndSortedBoletos.length} de {clientBoletos.length} boletos
                         </span>
                         <Button variant="ghost" size="sm" onClick={clearFilters}>
                             Limpar filtros
@@ -339,7 +348,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                         {filteredAndSortedBoletos.length === 0 ? (
                             <TableRow>
                                 <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                                    {boletos.length === 0 ? "Nenhum boleto registrado" : "Nenhum boleto encontrado com os filtros aplicados"}
+                                    {clientBoletos.length === 0 ? "Nenhum boleto registrado" : "Nenhum boleto encontrado com os filtros aplicados"}
                                 </TableCell>
                             </TableRow>
                         ) : (
@@ -385,7 +394,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                                             <Button
                                                 variant="ghost"
                                                 size="icon"
-                                                onClick={() => setBoletos(boletos.filter(b => b.id !== boleto.id))}
+                                                onClick={() => handleDeleteBoleto(boleto.id)}
                                             >
                                                 <Trash2 className="h-4 w-4 text-destructive" />
                                             </Button>
