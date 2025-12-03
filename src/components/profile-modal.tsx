@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Loader2, Camera, User, Mail } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 
 interface ProfileModalProps {
     isOpen: boolean
@@ -27,9 +28,8 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     const [avatarFile, setAvatarFile] = useState<File | null>(null)
     const [avatarPreview, setAvatarPreview] = useState<string | null>(user?.avatar_url || null)
     const [loading, setLoading] = useState(false)
-    const [error, setError] = useState<string | null>(null)
-    const [success, setSuccess] = useState<string | null>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
+    const { toast } = useToast()
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
@@ -43,20 +43,26 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setLoading(true)
-        setError(null)
-        setSuccess(null)
 
         try {
             // If changing password, verify current password first
             if (newPassword) {
                 if (!currentPassword) {
-                    setError("Digite a senha atual para alterar a senha")
+                    toast({
+                        title: "Erro de Senha",
+                        description: "Digite a senha atual para alterar a senha.",
+                        variant: "destructive",
+                    })
                     setLoading(false)
                     return
                 }
                 const { valid, error: verifyError } = await verifyPassword(currentPassword)
                 if (verifyError || !valid) {
-                    setError("Senha atual incorreta")
+                    toast({
+                        title: "Erro de Autenticação",
+                        description: "Senha atual incorreta.",
+                        variant: "destructive",
+                    })
                     setLoading(false)
                     return
                 }
@@ -73,18 +79,29 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
             })
 
             if (updateError) {
-                setError(updateError.message)
+                toast({
+                    title: "Erro ao Atualizar",
+                    description: updateError.message,
+                    variant: "destructive",
+                })
             } else {
-                setSuccess("Perfil atualizado com sucesso!")
+                toast({
+                    title: "Sucesso!",
+                    description: "Perfil atualizado com sucesso.",
+                    variant: "default",
+                })
                 setCurrentPassword("")
                 setNewPassword("")
                 setTimeout(() => {
                     onClose()
-                    setSuccess(null)
-                }, 1500)
+                }, 500)
             }
         } catch (err) {
-            setError("Ocorreu um erro ao atualizar o perfil")
+            toast({
+                title: "Erro Inesperado",
+                description: "Ocorreu um erro ao atualizar o perfil.",
+                variant: "destructive",
+            })
         } finally {
             setLoading(false)
         }
@@ -106,7 +123,7 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                             <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
                                 <Avatar className="h-24 w-24 border-4 border-slate-100 dark:border-slate-800 shadow-xl">
                                     <AvatarImage src={avatarPreview || ""} className="object-cover" />
-                                    <AvatarFallback className="text-2xl bg-slate-100 dark:bg-slate-800">
+                                    <AvatarFallback className="bg-gradient-primary text-white font-semibold">
                                         {name?.charAt(0) || "U"}
                                     </AvatarFallback>
                                 </Avatar>
@@ -171,17 +188,6 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                                 />
                             </div>
                         </div>
-
-                        {error && (
-                            <p className="text-sm text-red-500 bg-red-50 dark:bg-red-900/20 p-2 rounded border border-red-200 dark:border-red-900/50">
-                                {error}
-                            </p>
-                        )}
-                        {success && (
-                            <p className="text-sm text-green-600 bg-green-50 dark:bg-green-900/20 p-2 rounded border border-green-200 dark:border-green-900/50">
-                                {success}
-                            </p>
-                        )}
                     </div>
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={onClose}>
