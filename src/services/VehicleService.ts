@@ -1,6 +1,7 @@
 import type { PlacaData } from "@/types/vehicle"
 
-const API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwOi8vZ2F0ZXdheS5hcGlicmFzaWwuaW8vYXBpL3YyL2F1dGgvbG9naW4iLCJpYXQiOjE3NjQ3OTQ0NDcsImV4cCI6MTc5NjMzMDQ0NywibmJmIjoxNzY0Nzk0NDQ3LCJqdGkiOiJnWHk5TkFhaDNPOEJnNGp6Iiwic3ViIjoiMTc4NDIiLCJwcnYiOiIyM2JkNWM4OTQ5ZjYwMGFkYjM5ZTcwMWM0MDA4NzJkYjdhNTk3NmY3In0.V6QSWD39KM6TtCk4nJawVJnigT5r2TojKrOR3qy9Lgc"
+// ATENÇÃO: Este token está expirado ou é inválido. Substitua pelo seu token válido da API Brasil.
+const API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwOi8vZ2F0ZXdheS5hcGlicmFzaWwuaW8vYXBpL3YyL2F1dGgvbG9naW4iLCJpYXQiOjE3NjQ3OTQ0NDcsImV4cCI6MTc5NjMzMDQ0NywibmJmIjoxNzY0Nzk0NDQ3LCJqdGkiOiJnWHk5TkFhaDNPOEJnNGp6Iiwic3ViIjoiMTc4NDIiLCJwcnYiOiIyM2JkNWM4OTQ5ZjYwMGFkYjM5ZTcwMWM0MDA4NzJkYjdhNTk3NjY3In0.V6QSWD39KM6TtCk4nJawVJnigT5r2TojKrOR3qy9Lgc"
 const API_URL = 'https://gateway.apibrasil.io/api/v2/consulta/veiculos/credits'
 
 /**
@@ -34,8 +35,13 @@ export async function consultarPlaca(placa: string): Promise<PlacaData | null> {
         timeoutId = undefined;
 
         if (!response.ok) {
-            // Se a resposta não for OK, tentamos ler o corpo para obter mais detalhes do erro da API
             const errorBody = await response.text();
+            
+            // Verifica se o erro é de autenticação (token inválido)
+            if (response.status === 401 || response.status === 403) {
+                throw new Error("Erro de Autenticação (401/403). O token da API Brasil está inválido ou expirado. Por favor, atualize o API_TOKEN em src/services/VehicleService.ts.");
+            }
+            
             console.error(`Erro HTTP ${response.status}:`, errorBody);
             throw new Error(`Erro na consulta de placa: ${response.status} - ${errorBody.substring(0, 100)}...`);
         }
