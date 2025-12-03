@@ -17,7 +17,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
-import { Search, Loader2, Save, X } from "lucide-react"
+import { Search, Loader2, Save, X, RefreshCw } from "lucide-react"
 
 export type VehicleType = "CAVALO" | "TRUCK" | "CARRETA" | "CARRO" | "MOTO"
 
@@ -36,7 +36,7 @@ export type Vehicle = {
     fipeValue?: string
     bodyType?: string // Carroceria (Truck)
     bodyValue?: string // Valor Carroceria (Truck)
-    value?: string // Valor (Carreta)
+    value?: string // Valor Contrato (ou Valor Carreta)
     status: "active" | "inactive" | "maintenance"
 }
 
@@ -88,7 +88,7 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                 body: JSON.stringify({
                     "tipo": "fipe",
                     "placa": cleanPlate,
-                    "homolog": false // Alterado para false para buscar dados reais
+                    "homolog": false
                 }),
                 signal: controller.signal,
                 redirect: 'follow',
@@ -187,6 +187,12 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
         }
     }, [formData.plate, handleFetchData])
 
+    const handleManualFipeUpdate = () => {
+        if (formData.plate) {
+            handleFetchData(formData.plate)
+        }
+    }
+
 
     const handleSubmit = () => {
         if (formData.plate && formData.brand && formData.model && formData.clientId) {
@@ -235,15 +241,46 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
     )
 
     const renderFipeFields = () => (
-        <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-                <Label>Código Fipe</Label>
-                <Input value={formData.fipeCode || ""} onChange={e => setFormData({ ...formData, fipeCode: e.target.value })} />
+        <div className="space-y-4">
+            {/* Valor Contrato */}
+            {type !== "CARRETA" && (
+                <div className="space-y-2">
+                    <Label>Valor Contrato (R$)</Label>
+                    <Input 
+                        value={formData.value || ""} 
+                        onChange={e => setFormData({ ...formData, value: e.target.value })} 
+                        placeholder="0.00"
+                    />
+                </div>
+            )}
+
+            {/* FIPE Fields */}
+            <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                    <Label>Código Fipe</Label>
+                    <Input value={formData.fipeCode || ""} onChange={e => setFormData({ ...formData, fipeCode: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                    <Label>Valor Fipe (R$)</Label>
+                    <Input value={formData.fipeValue || ""} onChange={e => setFormData({ ...formData, fipeValue: e.target.value })} />
+                </div>
             </div>
-            <div className="space-y-2">
-                <Label>Valor Fipe</Label>
-                <Input value={formData.fipeValue || ""} onChange={e => setFormData({ ...formData, fipeValue: e.target.value })} />
-            </div>
+            
+            {/* Update FIPE Button */}
+            <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleManualFipeUpdate} 
+                disabled={loading || !formData.plate || formData.plate.length !== 7}
+                className="w-full gap-2"
+            >
+                {loading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                    <RefreshCw className="h-4 w-4" />
+                )}
+                Atualizar FIPE
+            </Button>
         </div>
     )
 
@@ -318,9 +355,11 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                         )}
 
                         {type === "CARRETA" && (
-                            <div className="space-y-2">
-                                <Label>Valor (Reais)</Label>
-                                <Input value={formData.value || ""} onChange={e => setFormData({ ...formData, value: e.target.value })} />
+                            <div className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label>Valor (Carreta) (R$)</Label>
+                                    <Input value={formData.value || ""} onChange={e => setFormData({ ...formData, value: e.target.value })} />
+                                </div>
                             </div>
                         )}
                     </div>
