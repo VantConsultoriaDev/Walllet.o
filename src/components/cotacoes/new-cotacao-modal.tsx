@@ -32,6 +32,8 @@ import {
 } from "@/types/cotacao"
 import { useRepresentations } from "@/hooks/data/useRepresentations"
 import { fetchCNPJData, formatCNPJ, formatCPF, isValidCNPJ } from "@/lib/cnpj-api"
+import { consultarPlaca } from "@/services/VehicleService"
+import type { PlacaData } from "@/types/vehicle"
 
 interface NewCotacaoModalProps {
     isOpen: boolean
@@ -79,6 +81,7 @@ export function NewCotacaoModal({ isOpen, onClose, onSubmit }: NewCotacaoModalPr
 
     // Veículo fields
     const [isLoadingPlaca, setIsLoadingPlaca] = useState(false)
+    const [placaError, setPlacaError] = useState("")
     const [placa, setPlaca] = useState("")
     const [marca, setMarca] = useState("")
     const [modelo, setModelo] = useState("")
@@ -135,84 +138,33 @@ export function NewCotacaoModal({ isOpen, onClose, onSubmit }: NewCotacaoModalPr
     const handlePlacaChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "")
         setPlaca(value)
+        setPlacaError("")
 
         if (value.length === 7) {
             setIsLoadingPlaca(true)
 
-            const controller = new AbortController();
-            let timeoutId = setTimeout(() => controller.abort("Timeout excedido"), 120000);
-
             try {
-                const response = await fetch('https://gateway.apibrasil.io/api/v2/consulta/veiculos/credits', {
-                    method: 'POST',
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Authorization": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwOi8vZ2F0ZXdheS5hcGlicmFzaWwuaW8vYXBpL3YyL2F1dGgvbG9naW4iLCJpYXQiOjE3NjQ3OTQ0NDcsImV4cCI6MTc5NjMzMDQ0NywibmJmIjoxNzY0Nzk0NDQ3LCJqdGkiOiJnWHk5TkFhaDNPOEJnNGp6Iiwic3ViIjoiMTc4NDIiLCJwcnYiOiIyM2JkNWM4OTQ5ZjYwMGFkYjM5ZTcwMWM0MDA4NzJkYjdhNTk3NmY3In0.V6QSWD39KM6TtCk4nJawVJnigT5r2TojKrOR3qy9Lgc"
-                    },
-                    body: JSON.stringify({
-                        "tipo": "fipe",
-                        "placa": value,
-                        "homolog": false
-                    }),
-                    signal: controller.signal,
-                    redirect: 'follow',
-                    credentials: 'include',
-                    cache: 'no-store'
-                });
+                const data: PlacaData | null = await consultarPlaca(value);
 
-                clearTimeout(timeoutId);
-
-                if (!response.ok) {
-                    throw new Error(`Erro HTTP: ${response.status}`);
-                }
-
-                const data = await response.json()
-                console.log("Dados API Brasil (consulta/veiculos/credits):", data)
-
-                if (data.error || data.status === 'error') {
-                    console.error("Erro retornado pela API:", data.message || data.error);
-                    return;
-                }
-
-                // A API 'credits' retorna os dados dentro de 'dados'
-                const veiculo = data.dados || data;
-
-                if (veiculo) {
-                    // Helper to safely get string value
+                if (data) {
                     const safeString = (val: any) => (val !== null && val !== undefined ? String(val) : "");
-                    // Helper to safely get number value
                     const safeNumber = (val: any) => (val !== null && val !== undefined ? Number(val) : undefined);
 
-                    const marca = safeString(veiculo.marca || veiculo.fabricante || veiculo.montadora);
-                    const modelo = safeString(veiculo.modelo || veiculo.modelo_veiculo || veiculo.veiculo);
-                    const ano = safeNumber(veiculo.ano_modelo || veiculo.ano);
-                    const cor = safeString(veiculo.cor);
-                    const chassi = safeString(veiculo.chassi);
-                    const renavam = safeString(veiculo.renavam);
-                    const fipeCodigo = safeString(veiculo.fipe_codigo || veiculo.codigo_fipe);
-
-                    let fipeValor = safeString(veiculo.fipe_valor || veiculo.valor_fipe);
-                    // Clean up FIPE value if it contains currency symbols/dots
-                    if (fipeValor) {
-                        fipeValor = fipeValor.replace(/[R$\s.]/g, '').replace(',', '.');
-                        if (isNaN(parseFloat(fipeValor))) fipeValor = "";
-                    }
-
-                    setMarca(marca);
-                    setModelo(modelo);
-                    setAno(ano ? ano.toString() : "");
-                    setCor(cor);
-                    setChassi(chassi);
-                    setRenavam(renavam);
-                    setCodigoFipe(fipeCodigo);
-                    setValorFipe(fipeValor);
+                    setMarca(data.marca || "");
+                    setModelo(data.modelo || "");
+                    setAno(safeNumber(data.ano) ? safeNumber(data.ano)!.toString() : "");
+                    setCor(data.cor || "");
+                    setChassi(safeString(data.chassi));
+                    setRenavam(safeString(data.renavam));
+                    setCodigoFipe(data.fipe_codigo || "");
+                    setValorFipe(data.valor_fipe || "");
                 } else {
-                    console.warn("Estrutura de dados não reconhecida:", data);
+                    setPlacaError('Placa não encontrada na base de dados externa.');
                 }
 
             } catch (error) {
-                if (timeoutId) clearTimeout(timeoutId);
                 console.error('Erro na requisição:', error);
+                setPlacaError(error instanceof Error ? error.message : 'Falha ao consultar placa.');
             } finally {
                 setIsLoadingPlaca(false)
             }
@@ -477,6 +429,7 @@ export function NewCotacaoModal({ isOpen, onClose, onSubmit }: NewCotacaoModalPr
                                                 </div>
                                             )}
                                         </div>
+                                        {placaError && <p className="text-xs text-red-500 mt-1">{placaError}</p>}
                                     </div>
                                     <div className="space-y-2">
                                         <Label>Marca *</Label>

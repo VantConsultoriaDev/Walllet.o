@@ -17,7 +17,9 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
-import { Search, Loader2, Save, X, RefreshCw } from "lucide-react"
+import { Loader2, Save, X, RefreshCw } from "lucide-react"
+import { consultarPlaca } from "@/services/VehicleService"
+import type { PlacaData } from "@/types/vehicle"
 
 export type VehicleType = "CAVALO" | "TRUCK" | "CARRETA" | "CARRO" | "MOTO"
 
@@ -47,12 +49,17 @@ type NewVehicleModalProps = {
     vehicleToEdit?: Vehicle
 }
 
+// Utility to force uppercase
+const forceUpperCase = (str: string | undefined) => str ? str.toUpperCase() : undefined;
+
 export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }: NewVehicleModalProps) {
     const [type, setType] = useState<VehicleType>("CARRO")
     const [loading, setLoading] = useState(false)
     const [formData, setFormData] = useState<Partial<Vehicle>>({
         status: "active"
     })
+    const [placaError, setPlacaError] = useState("")
+    const [placaConsultada, setPlacaConsultada] = useState(false)
 
     // Reset form when modal opens/closes
     useEffect(() => {
@@ -64,6 +71,8 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                 setFormData({ status: "active" })
                 setType("CARRO")
             }
+            setPlacaError("")
+            setPlacaConsultada(false)
         } else {
             setLoading(false)
         }
@@ -71,85 +80,22 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
 
     const handleFetchData = useCallback(async (plate: string) => {
         const cleanPlate = plate.replace(/[^A-Z0-9]/g, "")
-        if (cleanPlate.length !== 7) return
+        if (cleanPlate.length !== 7) {
+            setPlacaError('Placa deve ter 7 caracteres.');
+            return
+        }
 
         setLoading(true)
-
-        const controller = new AbortController();
-        let timeoutId: ReturnType<typeof setTimeout> | undefined = setTimeout(() => controller.abort("Timeout excedido"), 120000);
+        setPlacaError('')
+        setPlacaConsultada(false)
 
         try {
-            const response = await fetch('https://gateway.apibrasil.io/api/v2/consulta/veiculos/credits', {
-                method: 'POST',
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwOi8vZ2F0ZXdheS5hcGlicmFzaWwuaW8vYXBpL3YyL2F1dGgvbG9naW4iLCJpYXQiOjE3NjQ3OTQ0NDcsImV4cCI6MTc5NjMzMDQ0NywibmJmIjoxNzY0Nzk0NDQ3LCJqdGkiOiJnWHk5TkFhaDNPOEJnNGp6Iiwic3ViIjoiMTc4NDIiLCJwcnYiOiIyM2JkNWM4OTQ5ZjYwMGFkYjM5ZTcwMWM0MDA4NzJkYjdhNTk3NmY3In0.V6QSWD39KM6TtCk4nJawVJnigT5r2TojKrOR3qy9Lgc"
-                },
-                body: JSON.stringify({
-                    "tipo": "fipe",
-                    "placa": cleanPlate, // Usando a placa dinâmica
-                    "homolog": false // Mantendo false para produção
-                }),
-                signal: controller.signal,
-                redirect: 'follow',
-                credentials: 'include',
-                cache: 'no-store'
-            });
+            const data: PlacaData | null = await consultarPlaca(cleanPlate);
 
-            clearTimeout(timeoutId);
-            timeoutId = undefined;
-
-            if (!response.ok) {
-                throw new Error(`Erro HTTP: ${response.status}`);
-            }
-
-            const data = await response.json();
-            console.log("Dados API Brasil (consulta/veiculos/credits):", data);
-
-            if (data.error || data.status === 'error') {
-                console.error("Erro retornado pela API:", data.message || data.error);
-                // Limpa apenas os campos automáticos em caso de erro
-                setFormData(prev => ({
-                    ...prev,
-                    brand: "",
-                    model: "",
-                    year: undefined,
-                    color: "",
-                    chassi: "",
-                    renavam: "",
-                    fipeCode: "",
-                    fipeValue: "",
-                }))
-                return;
-            }
-
-            // A API 'credits' retorna os dados dentro de 'dados'
-            const veiculo = data.dados || data;
-
-            if (veiculo) {
-                // Helper to safely get string value
-                const safeString = (val: any) => (val !== null && val !== undefined ? String(val) : "");
-                // Helper to safely get number value
-                const safeNumber = (val: any) => (val !== null && val !== undefined ? Number(val) : undefined);
-                
-                const brand = safeString(veiculo.marca || veiculo.fabricante || veiculo.montadora);
-                const model = safeString(veiculo.modelo || veiculo.modelo_veiculo || veiculo.veiculo);
-                const year = safeNumber(veiculo.ano_modelo || veiculo.ano);
-                const color = safeString(veiculo.cor);
-                const chassi = safeString(veiculo.chassi);
-                const renavam = safeString(veiculo.renavam);
-                const fipeCode = safeString(veiculo.fipe_codigo || veiculo.codigo_fipe);
-                
-                let fipeValue = safeString(veiculo.fipe_valor || veiculo.valor_fipe);
-                // Clean up FIPE value if it contains currency symbols/dots
-                if (fipeValue) {
-                    fipeValue = fipeValue.replace(/[R$\s.]/g, '').replace(',', '.');
-                    if (isNaN(parseFloat(fipeValue))) fipeValue = "";
-                }
-
+            if (data) {
                 // Determine type based on vehicle info (simple heuristic)
                 let detectedType: VehicleType = "CARRO"
-                const vehicleTypeStr = safeString(veiculo.tipo_veiculo).toLowerCase()
+                const vehicleTypeStr = data.tipo_veiculo?.toLowerCase() || ""
 
                 if (vehicleTypeStr.includes("moto") || vehicleTypeStr.includes("motocicleta")) {
                     detectedType = "MOTO"
@@ -160,29 +106,41 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                 } else if (vehicleTypeStr.includes("cavalo")) {
                     detectedType = "CAVALO"
                 }
-
-                // Update form
+                
                 setType(detectedType)
                 setFormData(prev => ({
                     ...prev,
-                    brand: brand || prev.brand,
-                    model: model || prev.model,
-                    year: year || prev.year,
-                    color: color || prev.color,
-                    chassi: chassi || prev.chassi,
-                    renavam: renavam || prev.renavam,
-                    fipeCode: fipeCode || prev.fipeCode,
-                    fipeValue: fipeValue || prev.fipeValue,
+                    brand: data.marca || prev.brand,
+                    model: data.modelo || prev.model,
+                    year: data.ano || prev.year,
+                    color: data.cor || prev.color,
+                    chassi: forceUpperCase(data.chassi) || prev.chassi,
+                    renavam: data.renavam || prev.renavam,
+                    fipeCode: data.fipe_codigo || prev.fipeCode,
+                    fipeValue: data.valor_fipe || prev.fipeValue,
+                    bodyType: data.carroceria || prev.bodyType, // Mapeando carroceria
                 }))
+                setPlacaConsultada(true);
             } else {
-                console.warn("Estrutura de dados não reconhecida ou vazia.");
+                setPlacaError('Placa não encontrada na base de dados externa.');
             }
 
         } catch (error) {
-            if (timeoutId) {
-                clearTimeout(timeoutId);
-            }
             console.error('Erro na requisição:', error);
+            setPlacaError(error instanceof Error ? error.message : 'Falha ao consultar placa. Verifique a conexão ou o token da API.');
+            // Clear auto-filled fields on error
+            setFormData(prev => ({
+                ...prev,
+                brand: "",
+                model: "",
+                year: undefined,
+                color: "",
+                chassi: "",
+                renavam: "",
+                fipeCode: "",
+                fipeValue: "",
+                bodyType: "",
+            }))
         } finally {
             setLoading(false)
         }
@@ -192,11 +150,11 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
     useEffect(() => {
         if (formData.plate) {
             const cleanPlate = formData.plate.replace(/[^A-Z0-9]/g, "")
-            if (cleanPlate.length === 7) {
+            if (cleanPlate.length === 7 && !placaConsultada) {
                 handleFetchData(cleanPlate)
             }
         }
-    }, [formData.plate, handleFetchData])
+    }, [formData.plate, handleFetchData, placaConsultada])
 
     const handleManualFipeUpdate = () => {
         if (formData.plate) {
@@ -329,7 +287,11 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                         <div className="relative">
                             <Input
                                 value={formData.plate || ""}
-                                onChange={e => setFormData({ ...formData, plate: e.target.value.toUpperCase() })}
+                                onChange={e => {
+                                    setFormData({ ...formData, plate: e.target.value.toUpperCase() })
+                                    setPlacaConsultada(false) // Reset consultation status on change
+                                    setPlacaError("")
+                                }}
                                 placeholder="ABC-1234"
                                 className="text-lg font-bold uppercase"
                                 maxLength={8}
@@ -338,6 +300,7 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                                 <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-primary" />
                             )}
                         </div>
+                        {placaError && <p className="text-sm text-red-500 mt-1">{placaError}</p>}
                     </div>
 
                     {/* Dynamic Fields */}
