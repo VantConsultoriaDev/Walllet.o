@@ -12,6 +12,7 @@ const mapDbToVehicle = (dbVehicle: any): Vehicle => ({
     brand: dbVehicle.brand,
     model: dbVehicle.model,
     year: dbVehicle.year,
+    color: dbVehicle.color, // <-- Mapeando 'color'
     renavam: dbVehicle.renavam,
     chassi: dbVehicle.chassi,
     fipeCode: dbVehicle.fipe_code,
@@ -30,6 +31,7 @@ const mapVehicleToDb = (vehicle: Partial<Vehicle>) => ({
     brand: vehicle.brand,
     model: vehicle.model,
     year: vehicle.year,
+    color: vehicle.color, // <-- Mapeando 'color'
     renavam: vehicle.renavam,
     chassi: vehicle.chassi,
     fipe_code: vehicle.fipeCode,
@@ -81,6 +83,11 @@ export function useVehicles() {
     const addVehicle = async (newVehicleData: Omit<Vehicle, 'id'>) => {
         if (!user) return { error: { message: "Usuário não autenticado" } }
 
+        // Ensure required fields are present before mapping
+        if (!newVehicleData.clientId || !newVehicleData.plate || !newVehicleData.brand || !newVehicleData.model) {
+             return { error: { message: "Dados obrigatórios do veículo ausentes." } }
+        }
+
         const dbData = mapVehicleToDb({ ...newVehicleData, status: 'active' })
 
         const { data, error } = await supabase
@@ -93,7 +100,7 @@ export function useVehicles() {
             .single()
 
         if (error) {
-            toast({ title: "Erro", description: "Falha ao adicionar veículo.", variant: "destructive" })
+            toast({ title: "Erro", description: `Falha ao adicionar veículo: ${error.message}`, variant: "destructive" })
             return { error }
         }
 
@@ -116,7 +123,7 @@ export function useVehicles() {
             .select()
 
         if (error) {
-            toast({ title: "Erro", description: "Falha ao atualizar veículo.", variant: "destructive" })
+            toast({ title: "Erro", description: `Falha ao atualizar veículo: ${error.message}`, variant: "destructive" })
             return { error }
         }
 
@@ -125,5 +132,23 @@ export function useVehicles() {
         return { data: updatedVehicle }
     }
 
-    return { vehicles, loading, fetchVehicles, addVehicle, updateVehicle }
+    const deleteVehicle = async (id: string) => {
+        if (!user) return { error: { message: "Usuário não autenticado" } }
+
+        const { error } = await supabase
+            .from('vehicles')
+            .delete()
+            .eq('id', id)
+
+        if (error) {
+            toast({ title: "Erro", description: `Falha ao excluir veículo: ${error.message}`, variant: "destructive" })
+            return { error }
+        }
+
+        setVehicles(prev => prev.filter(v => v.id !== id))
+        toast({ title: "Sucesso", description: "Veículo excluído com sucesso." })
+        return { data: true }
+    }
+
+    return { vehicles, loading, fetchVehicles, addVehicle, updateVehicle, deleteVehicle }
 }

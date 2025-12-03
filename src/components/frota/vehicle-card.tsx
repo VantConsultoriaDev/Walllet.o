@@ -7,7 +7,7 @@ type VehicleCardProps = Vehicle & {
     onClick?: () => void
 }
 
-export function VehicleCard({ type, plate, brand, model, year, status, onClick }: VehicleCardProps) {
+export function VehicleCard({ type, plate, brand, model, year, status, color, onClick }: VehicleCardProps) {
     const getIcon = (type: VehicleType) => {
         switch (type) {
             case "MOTO": return <Bike className="h-6 w-6" />
@@ -46,8 +46,14 @@ export function VehicleCard({ type, plate, brand, model, year, status, onClick }
                 </div>
                 <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
                     <span>{type}</span>
-                    <span>{year}</span>
+                    <span className="font-medium text-foreground">{year}</span>
                 </div>
+                {color && (
+                    <div className="mt-2 pt-2 border-t border-border/50 flex justify-between text-sm text-muted-foreground">
+                        <span>Cor:</span>
+                        <span className="font-medium text-foreground">{color}</span>
+                    </div>
+                )}
             </CardContent>
         </Card>
     )

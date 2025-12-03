@@ -46,7 +46,8 @@ export function ClientDetails({ client, onBack, onStatusChange, onSave, onSaveVe
             (vehicle.model?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
             (vehicle.year?.toString() || "").includes(searchTerm) ||
             (vehicle.renavam?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
-            (vehicle.chassi?.toLowerCase() || "").includes(searchTerm.toLowerCase())
+            (vehicle.chassi?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
+            (vehicle.color?.toLowerCase() || "").includes(searchTerm.toLowerCase()) // <-- Incluindo busca por cor
 
         const matchesType = typeFilter === "ALL" || vehicle.type === typeFilter
 
@@ -356,7 +357,7 @@ export function ClientDetails({ client, onBack, onStatusChange, onSave, onSaveVe
                             <div className="relative flex-1">
                                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                                 <Input
-                                    placeholder="Buscar por placa, modelo, marca, chassi..."
+                                    placeholder="Buscar por placa, modelo, marca, chassi, cor..."
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
                                     className="pl-8"

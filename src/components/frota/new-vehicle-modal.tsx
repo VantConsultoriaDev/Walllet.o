@@ -29,6 +29,7 @@ export type Vehicle = {
     brand: string
     model: string
     year: number
+    color?: string // <-- Novo campo
     renavam?: string
     chassi?: string
     fipeCode?: string
@@ -96,7 +97,7 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                 const brand = getTableValue("Marca")
                 const model = getTableValue("Modelo")
                 const yearStr = getTableValue("Ano") // Usually "2022" or "2022/2023"
-                const color = getTableValue("Cor")
+                const color = getTableValue("Cor") // <-- Capturando a cor
                 const chassi = getTableValue("Chassi") // Might not be available publicly, but we try
 
                 // Parse year (take the first 4 digits)
@@ -121,6 +122,7 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                     brand: brand || prev.brand,
                     model: model || prev.model,
                     year: year || prev.year,
+                    color: color || prev.color, // <-- Atualizando a cor
                     chassi: chassi || prev.chassi,
                 }))
             }
@@ -160,12 +162,18 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                     <Input type="number" value={formData.year || ""} onChange={e => setFormData({ ...formData, year: parseInt(e.target.value) })} />
                 </div>
                 <div className="space-y-2">
-                    <Label>Renavam</Label>
-                    <Input value={formData.renavam || ""} onChange={e => setFormData({ ...formData, renavam: e.target.value })} />
+                    <Label>Cor</Label>
+                    <Input value={formData.color || ""} onChange={e => setFormData({ ...formData, color: e.target.value })} />
                 </div>
                 <div className="space-y-2">
                     <Label>Chassi</Label>
                     <Input value={formData.chassi || ""} onChange={e => setFormData({ ...formData, chassi: e.target.value })} />
+                </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                    <Label>Renavam</Label>
+                    <Input value={formData.renavam || ""} onChange={e => setFormData({ ...formData, renavam: e.target.value })} />
                 </div>
             </div>
         </>
