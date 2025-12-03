@@ -30,11 +30,11 @@ const mapDbToBoleto = (dbBoleto: any): Boleto => ({
 const mapBoletoToDb = (boleto: Partial<Boleto>, userId: string) => ({
     user_id: userId,
     client_id: boleto.clientId,
-    title: boleto.title,
+    title: boleto.title || `Boleto ${boleto.clientName}`, // Ensure title exists
     valor: boleto.valor?.toFixed(2),
     vencimento: boleto.vencimento?.toISOString().split('T')[0],
     placas: boleto.placas,
-    representacao_id: boleto.representacaoId,
+    representacao_id: boleto.representacaoId, // This must be present
     status: boleto.status,
     data_pagamento: boleto.dataPagamento?.toISOString().split('T')[0],
     is_recurring: boleto.isRecurring,
@@ -105,7 +105,7 @@ export function useBoletos() {
             .select()
 
         if (error) {
-            toast({ title: "Erro", description: "Falha ao adicionar boletos.", variant: "destructive" })
+            toast({ title: "Erro", description: error.message || "Falha ao adicionar boletos.", variant: "destructive" })
             return { error }
         }
 

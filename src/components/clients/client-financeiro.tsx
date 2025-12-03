@@ -41,7 +41,7 @@ type SortDirection = "asc" | "desc" | null
 
 export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProps) {
     const { partners, loading: representationsLoading } = useRepresentations()
-    const { boletos: allBoletos, loading: boletosLoading, fetchBoletos, addBoletos, deleteBoleto } = useBoletos()
+    const { boletos: allBoletos, loading: boletosLoading, addBoletos, deleteBoleto } = useBoletos()
 
     const [isNewBoletoOpen, setIsNewBoletoOpen] = useState(false)
 
@@ -166,6 +166,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                 comissaoTipo: comissaoRecorrente ? comissaoTipo : undefined,
                 clientId: client.id,
                 clientName: client.name,
+                title: `${client.name} - ${representacaoNome}`, // Add title for DB
             })
         }
 
