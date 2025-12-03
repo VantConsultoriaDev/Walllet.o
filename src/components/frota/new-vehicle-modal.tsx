@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import {
     Dialog,
     DialogContent,
@@ -69,11 +69,11 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
         }
     }, [open, vehicleToEdit])
 
-    const handleFetchData = async () => {
-        if (!formData.plate || formData.plate.length < 7) return
+    const handleFetchData = useCallback(async (plate: string) => {
+        const cleanPlate = plate.replace(/[^A-Z0-9]/g, "")
+        if (cleanPlate.length !== 7) return
 
         setLoading(true)
-        const cleanPlate = formData.plate.replace(/[^A-Z0-9]/g, "")
 
         const controller = new AbortController();
         let timeoutId: ReturnType<typeof setTimeout> | undefined = setTimeout(() => controller.abort("Timeout excedido"), 120000);
@@ -107,7 +107,8 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
             console.log("Dados API Brasil:", data);
 
             if (data.error || !data.dados) {
-                throw new Error(data.message || "Dados do veículo não encontrados.");
+                // If data is not found, we don't throw an error, just stop loading and allow manual input
+                return;
             }
 
             const veiculo = data.dados;
@@ -163,13 +164,22 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
         } finally {
             setLoading(false)
         }
-    }
+    }, [])
+
+    // Effect to trigger data fetch when plate changes
+    useEffect(() => {
+        if (formData.plate) {
+            const cleanPlate = formData.plate.replace(/[^A-Z0-9]/g, "")
+            if (cleanPlate.length === 7) {
+                handleFetchData(cleanPlate)
+            }
+        }
+    }, [formData.plate, handleFetchData])
+
 
     const handleSubmit = () => {
         if (formData.plate && formData.brand && formData.model && formData.clientId) {
             onSubmit({
-                // If editing, use existing ID. If creating new, ID should be undefined/null 
-                // so useVehicles knows to call addVehicle.
                 id: vehicleToEdit?.id, 
                 type,
                 ...formData
@@ -254,10 +264,10 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                         </Select>
                     </div>
 
-                    {/* Plate Search */}
-                    <div className="flex gap-2 items-end">
-                        <div className="space-y-2 flex-1">
-                            <Label>Placa (Obrigatório)</Label>
+                    {/* Plate Input */}
+                    <div className="space-y-2">
+                        <Label>Placa (Obrigatório)</Label>
+                        <div className="relative">
                             <Input
                                 value={formData.plate || ""}
                                 onChange={e => setFormData({ ...formData, plate: e.target.value.toUpperCase() })}
@@ -265,11 +275,10 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                                 className="text-lg font-bold uppercase"
                                 maxLength={8}
                             />
+                            {loading && (
+                                <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-primary" />
+                            )}
                         </div>
-                        <Button onClick={handleFetchData} disabled={!formData.plate || loading}>
-                            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
-                            Buscar Dados
-                        </Button>
                     </div>
 
                     {/* Dynamic Fields */}
@@ -311,7 +320,7 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                         <X className="mr-2 h-4 w-4" />
                         Cancelar
                     </Button>
-                    <Button onClick={handleSubmit} disabled={!formData.plate || !formData.brand}>
+                    <Button onClick={handleSubmit} disabled={!formData.plate || !formData.brand || loading}>
                         <Save className="mr-2 h-4 w-4" />
                         Salvar Veículo
                     </Button>
