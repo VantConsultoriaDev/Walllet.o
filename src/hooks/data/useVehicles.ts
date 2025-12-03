@@ -37,7 +37,7 @@ const mapVehicleToDb = (vehicle: Partial<Vehicle>) => ({
     fipe_code: vehicle.fipeCode,
     fipe_value: vehicle.fipeValue,
     body_type: vehicle.bodyType,
-    body_value: vehicle.bodyValue,
+    body_value: vehicle.body_value,
     value: vehicle.value,
     status: vehicle.status,
     client_id: vehicle.clientId,
@@ -88,6 +88,7 @@ export function useVehicles() {
              return { error: { message: "Dados obrigatórios do veículo ausentes." } }
         }
 
+        // Note: We explicitly omit 'id' here as it's Omit<Vehicle, 'id'>
         const dbData = mapVehicleToDb({ ...newVehicleData, status: 'active' })
 
         const { data, error } = await supabase
@@ -113,6 +114,11 @@ export function useVehicles() {
 
     const updateVehicle = async (updatedVehicle: Vehicle) => {
         if (!user) return { error: { message: "Usuário não autenticado" } }
+        
+        // CRITICAL FIX: Ensure ID exists before attempting update
+        if (!updatedVehicle.id) {
+            return { error: { message: "ID do veículo ausente para atualização." } }
+        }
 
         const dbData = mapVehicleToDb(updatedVehicle)
 

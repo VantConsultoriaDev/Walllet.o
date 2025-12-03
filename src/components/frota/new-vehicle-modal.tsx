@@ -136,7 +136,9 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
     const handleSubmit = () => {
         if (formData.plate && formData.brand && formData.model && formData.clientId) {
             onSubmit({
-                id: vehicleToEdit?.id || Math.random().toString(36).substr(2, 9),
+                // If editing, use existing ID. If creating new, ID should be undefined/null 
+                // so useVehicles knows to call addVehicle.
+                id: vehicleToEdit?.id, 
                 type,
                 ...formData
             } as Vehicle)
