@@ -18,8 +18,9 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { Loader2, Save, X, RefreshCw } from "lucide-react"
-import { consultarPlaca } from "@/services/VehicleService"
+import { VehicleService } from "@/services/VehicleService"
 import type { PlacaData } from "@/types/vehicle"
+import { useToast } from "@/hooks/use-toast"
 
 export type VehicleType = "CAVALO" | "TRUCK" | "CARRETA" | "CARRO" | "MOTO"
 
@@ -53,6 +54,7 @@ type NewVehicleModalProps = {
 const forceUpperCase = (str: string | undefined) => str ? str.toUpperCase() : undefined;
 
 export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }: NewVehicleModalProps) {
+    const { toast } = useToast()
     const [type, setType] = useState<VehicleType>("CARRO")
     const [loading, setLoading] = useState(false)
     const [formData, setFormData] = useState<Partial<Vehicle>>({
@@ -81,8 +83,8 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
     // --- CONSULTA API PLACA ---
     const handlePlacaConsultation = useCallback(async (placa: string) => {
         const placaLimpa = placa.replace(/[^A-Z0-9]/gi, '');
-        if (placaLimpa.length !== 7) {
-            setPlacaError('Placa deve ter 7 caracteres.');
+        if (!VehicleService.validarPlaca(placaLimpa)) {
+            setPlacaError('Placa inválida.');
             return;
         }
         
@@ -91,12 +93,12 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
         setPlacaConsultada(false);
 
         try {
-            const data: PlacaData | null = await consultarPlaca(placaLimpa);
+            const data: PlacaData | null = await VehicleService.consultarPlaca(placaLimpa);
             
             if (data) {
                 // Determine type based on vehicle info (simple heuristic)
                 let detectedType: VehicleType = "CARRO"
-                const vehicleTypeStr = data.tipo_veiculo?.toLowerCase() || ""
+                const vehicleTypeStr = data.categoria?.toLowerCase() || ""
 
                 if (vehicleTypeStr.includes("moto") || vehicleTypeStr.includes("motocicleta")) {
                     detectedType = "MOTO"
@@ -113,21 +115,24 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                     ...prev,
                     brand: data.marca || prev.brand,
                     model: data.modelo || prev.model,
-                    year: data.ano || prev.year,
+                    year: parseInt(data.ano) || prev.year,
                     color: data.cor || prev.color,
                     chassi: data.chassi ? forceUpperCase(data.chassi) : prev.chassi,
                     renavam: data.renavam || prev.renavam,
-                    fipeCode: data.fipe_codigo || prev.fipeCode,
-                    fipeValue: data.valor_fipe || prev.fipeValue,
-                    bodyType: data.carroceria || prev.bodyType, // Mapeando carroceria
+                    // FIPE fields are not directly available in this endpoint, keeping them empty or previous values
+                    fipeCode: prev.fipeCode,
+                    fipeValue: prev.fipeValue,
+                    bodyType: data.categoria?.includes("CAMINHAO") ? data.categoria : prev.bodyType, // Using categoria as bodyType for trucks
                 }))
                 setPlacaConsultada(true);
+                toast({ title: "Sucesso", description: "Dados da placa carregados automaticamente." })
             } else {
-                setPlacaError('Placa não encontrada na base de dados externa.');
+                setPlacaError('Placa não encontrada na base de dados externa. Preencha manualmente.');
             }
         } catch (err) {
-            console.error('Erro ao consultar placa:', err);
-            setPlacaError(err instanceof Error ? err.message : 'Falha ao consultar placa. Verifique a conexão ou o token da API.');
+            const errorMessage = err instanceof Error ? err.message : 'Falha ao consultar placa. Verifique a configuração da API.';
+            setPlacaError(errorMessage);
+            toast({ title: "Erro na Consulta", description: errorMessage, variant: "destructive" })
             // Clear auto-filled fields on error
             setFormData(prev => ({
                 ...prev,
@@ -144,13 +149,13 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
         } finally {
             setLoading(false);
         }
-    }, [])
+    }, [toast])
 
     // Effect to trigger data fetch when plate changes
     useEffect(() => {
         if (formData.plate) {
             const cleanPlate = formData.plate.replace(/[^A-Z0-9]/g, "")
-            if (cleanPlate.length === 7 && !placaConsultada) {
+            if (VehicleService.validarPlaca(cleanPlate) && !placaConsultada) {
                 handlePlacaConsultation(cleanPlate)
             }
         }
@@ -178,18 +183,18 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
         <>
             <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                    <Label>Marca</Label>
-                    <Input value={formData.brand || ""} onChange={e => setFormData({ ...formData, brand: e.target.value })} />
+                    <Label>Marca *</Label>
+                    <Input value={formData.brand || ""} onChange={e => setFormData({ ...formData, brand: e.target.value })} required />
                 </div>
                 <div className="space-y-2">
-                    <Label>Modelo</Label>
-                    <Input value={formData.model || ""} onChange={e => setFormData({ ...formData, model: e.target.value })} />
+                    <Label>Modelo *</Label>
+                    <Input value={formData.model || ""} onChange={e => setFormData({ ...formData, model: e.target.value })} required />
                 </div>
             </div>
             <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
-                    <Label>Ano</Label>
-                    <Input type="number" value={formData.year || ""} onChange={e => setFormData({ ...formData, year: parseInt(e.target.value) })} />
+                    <Label>Ano *</Label>
+                    <Input type="number" value={formData.year || ""} onChange={e => setFormData({ ...formData, year: parseInt(e.target.value) })} required />
                 </div>
                 <div className="space-y-2">
                     <Label>Cor</Label>
@@ -223,7 +228,7 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                 </div>
             )}
 
-            {/* FIPE Fields */}
+            {/* FIPE Fields (Kept for manual entry/future FIPE API integration) */}
             <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                     <Label>Código Fipe</Label>
@@ -240,7 +245,7 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                 variant="outline" 
                 size="sm" 
                 onClick={handleManualFipeUpdate} 
-                disabled={loading || !formData.plate || formData.plate.length !== 7}
+                disabled={loading || !formData.plate || !VehicleService.validarPlaca(formData.plate)}
                 className="w-full gap-2"
             >
                 {loading ? (
@@ -248,7 +253,7 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                 ) : (
                     <RefreshCw className="h-4 w-4" />
                 )}
-                Atualizar FIPE
+                Consultar Placa Novamente
             </Button>
         </div>
     )
@@ -288,13 +293,13 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                             <Input
                                 value={formData.plate || ""}
                                 onChange={e => {
-                                    setFormData({ ...formData, plate: e.target.value.toUpperCase() })
+                                    setFormData({ ...formData, plate: VehicleService.formatarPlaca(e.target.value) })
                                     setPlacaConsultada(false) // Reset consultation status on change
                                     setPlacaError("")
                                 }}
-                                placeholder="ABC-1234"
+                                placeholder="ABC1234"
                                 className="text-lg font-bold uppercase"
-                                maxLength={8}
+                                maxLength={7}
                             />
                             {loading && (
                                 <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-primary" />
@@ -344,7 +349,7 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                         <X className="mr-2 h-4 w-4" />
                         Cancelar
                     </Button>
-                    <Button onClick={handleSubmit} disabled={!formData.plate || !formData.brand || loading}>
+                    <Button onClick={handleSubmit} disabled={!formData.plate || !formData.brand || !formData.model || loading}>
                         <Save className="mr-2 h-4 w-4" />
                         Salvar Veículo
                     </Button>

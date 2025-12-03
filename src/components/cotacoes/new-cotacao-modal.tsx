@@ -32,8 +32,9 @@ import {
 } from "@/types/cotacao"
 import { useRepresentations } from "@/hooks/data/useRepresentations"
 import { fetchCNPJData, formatCNPJ, formatCPF, isValidCNPJ } from "@/lib/cnpj-api"
-import { consultarPlaca } from "@/services/VehicleService"
+import { VehicleService } from "@/services/VehicleService"
 import type { PlacaData } from "@/types/vehicle"
+import { useToast } from "@/hooks/use-toast"
 
 interface NewCotacaoModalProps {
     isOpen: boolean
@@ -59,7 +60,7 @@ export type NewCotacaoFormData = {
 // Mock clients for CPF/CNPJ lookup (kept for API simulation)
 const mockClients = [
     { cpfCnpj: "12345678901", type: "PF" as const, nome: "João Silva" },
-    { cpfCnpj: "98765432100", type: "PF" as const, nome: "Maria Oliveira" },
+    { cpfCpf: "98765432100", type: "PF" as const, nome: "Maria Oliveira" },
     {
         cpfCnpj: "12345678000190",
         type: "PJ" as const,
@@ -70,6 +71,7 @@ const mockClients = [
 
 export function NewCotacaoModal({ isOpen, onClose, onSubmit }: NewCotacaoModalProps) {
     const { partners } = useRepresentations()
+    const { toast } = useToast()
 
     const [clientType, setClientType] = useState<"PF" | "PJ">("PF")
     const [cpfCnpj, setCpfCnpj] = useState("")
@@ -136,13 +138,12 @@ export function NewCotacaoModal({ isOpen, onClose, onSubmit }: NewCotacaoModalPr
     }, [cpfCnpj])
 
     const handlePlacaChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "")
+        const value = VehicleService.formatarPlaca(e.target.value)
         setPlaca(value)
         setPlacaError("")
 
-        const placaLimpa = value.replace(/[^A-Z0-9]/gi, '');
-        if (placaLimpa.length !== 7) {
-            setPlacaError('Placa deve ter 7 caracteres.');
+        if (!VehicleService.validarPlaca(value)) {
+            setPlacaError('Placa inválida.');
             return;
         }
 
@@ -150,7 +151,7 @@ export function NewCotacaoModal({ isOpen, onClose, onSubmit }: NewCotacaoModalPr
         setPlacaError('');
 
         try {
-            const data: PlacaData | null = await consultarPlaca(placaLimpa);
+            const data: PlacaData | null = await VehicleService.consultarPlaca(value);
 
             if (data) {
                 const safeString = (val: any) => (val !== null && val !== undefined ? String(val) : "");
@@ -162,15 +163,19 @@ export function NewCotacaoModal({ isOpen, onClose, onSubmit }: NewCotacaoModalPr
                 setCor(data.cor || "");
                 setChassi(safeString(data.chassi));
                 setRenavam(safeString(data.renavam));
-                setCodigoFipe(data.fipe_codigo || "");
-                setValorFipe(data.valor_fipe || "");
+                // FIPE fields are not available in this endpoint, keeping them empty
+                setCodigoFipe("");
+                setValorFipe("");
+                toast({ title: "Sucesso", description: "Dados do veículo carregados." })
             } else {
-                setPlacaError('Placa não encontrada na base de dados externa.');
+                setPlacaError('Placa não encontrada na base de dados externa. Preencha manualmente.');
             }
 
         } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Falha ao consultar placa.';
             console.error('Erro na requisição:', error);
-            setPlacaError(error instanceof Error ? error.message : 'Falha ao consultar placa.');
+            setPlacaError(errorMessage);
+            toast({ title: "Erro na Consulta", description: errorMessage, variant: "destructive" })
         } finally {
             setIsLoadingPlaca(false)
         }
