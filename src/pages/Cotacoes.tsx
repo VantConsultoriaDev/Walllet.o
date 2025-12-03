@@ -144,7 +144,7 @@ export default function Cotacoes() {
 
     const handleCardClick = (cotacao: Cotacao) => {
         setSelectedCotacao(cotacao)
-        setIsCotacaoModalOpen(true)
+        setIsNewCotacaoModalOpen(true) // Corrected function name
     }
 
     const handleNewCotacao = (formData: NewCotacaoFormData) => {

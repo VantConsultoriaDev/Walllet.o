@@ -30,7 +30,7 @@ type ClientDetailsModalProps = {
     open: boolean
     onOpenChange: (open: boolean) => void
     onViewFleet?: (client: Client) => void
-    onStatusChange?: (clientId: string, newStatus: "active" | "inactive" | "pending") => void
+    onStatusChange?: (clientId: string, newStatus: "active" | "inactive" | "blocked") => void
     onSave?: (updatedClient: Client) => void
 }
 
@@ -92,12 +92,12 @@ export function ClientDetailsModal({ client, open, onOpenChange, onViewFleet, on
 
     const statusVariant =
         client.status === "active" ? "default" :
-            client.status === "pending" ? "secondary" :
-                "destructive"
+            client.status === "blocked" ? "destructive" :
+                "secondary"
 
     const statusLabel =
         client.status === "active" ? "Ativo" :
-            client.status === "pending" ? "Pendente" :
+            client.status === "blocked" ? "Bloqueado" :
                 "Inativo"
 
     return (
@@ -134,7 +134,7 @@ export function ClientDetailsModal({ client, open, onOpenChange, onViewFleet, on
                             {!isEditing && onStatusChange && (
                                 <Select
                                     value={client.status}
-                                    onValueChange={(value) => onStatusChange(client.id, value as "active" | "inactive" | "pending")}
+                                    onValueChange={(value) => onStatusChange(client.id, value as "active" | "inactive" | "blocked")}
                                 >
                                     <SelectTrigger className="w-[140px]">
                                         <SelectValue />
@@ -142,7 +142,7 @@ export function ClientDetailsModal({ client, open, onOpenChange, onViewFleet, on
                                     <SelectContent>
                                         <SelectItem value="active">Ativo</SelectItem>
                                         <SelectItem value="inactive">Inativo</SelectItem>
-                                        <SelectItem value="pending">Bloqueado</SelectItem>
+                                        <SelectItem value="blocked">Bloqueado</SelectItem>
                                     </SelectContent>
                                 </Select>
                             )}

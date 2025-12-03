@@ -57,7 +57,7 @@ export function FinanceModal({ isOpen, onClose, date, boletos }: FinanceModalPro
                                             <span>{boleto.clientName}</span>
                                         </div>
                                         <span className="font-semibold text-slate-700 dark:text-slate-200">
-                                            {boleto.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                            {boleto.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                                         </span>
                                     </div>
                                 </AccordionTrigger>

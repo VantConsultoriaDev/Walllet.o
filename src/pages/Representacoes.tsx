@@ -26,9 +26,9 @@ export default function Representacoes() {
         } else {
             // Create new partner
             await addPartner({
-                nome: formData.nome,
-                tipo: formData.tipo,
-                site: formData.site,
+                name: formData.nome, // Corrected property name from 'nome' to 'name'
+                type: formData.tipo,
+                website: formData.site,
                 logo: formData.logo,
             })
         }

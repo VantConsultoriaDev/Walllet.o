@@ -88,7 +88,7 @@ export function useEvents() {
             .update({
                 ...eventData,
                 client_name: client,
-                date: client.date.toISOString().split('T')[0],
+                date: updatedEvent.date.toISOString().split('T')[0],
             })
             .eq('id', updatedEvent.id)
             .select()

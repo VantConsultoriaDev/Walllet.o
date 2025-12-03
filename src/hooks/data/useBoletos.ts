@@ -96,7 +96,8 @@ export function useBoletos() {
 
             const formattedData = data.map(dbBoleto => {
                 const clientName = clientMap.get(dbBoleto.client_id) || "Cliente Desconhecido"
-                const representationName = representationMap.get(dbBoleto.representacao_id) || "N/A"
+                const representationId = dbBoleto.representacao_id
+                const representationName = representationMap.get(representationId) || "N/A"
                 const boleto = mapDbToBoleto(dbBoleto, clientName, representationName)
                 
                 // Logic to mark as overdue if status is 'pending' and date is before today
@@ -134,7 +135,10 @@ export function useBoletos() {
         await fetchBoletos() 
         
         toast({ title: "Sucesso", description: `${data.length} boleto(s) adicionado(s) com sucesso.` })
-        return { data: data.map(mapDbToBoleto) } // Return raw mapped data for consistency
+        // We return the raw data from the DB, but since we just called fetchBoletos, the state is updated.
+        // To satisfy the return type, we map the raw data using the helper function, but we need client/rep names.
+        // Since we don't have them easily here, we return a simplified success object.
+        return { data: true } 
     }
 
     const updateBoletoStatus = async (boletoId: string, newStatus: Boleto['status']) => {

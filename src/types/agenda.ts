@@ -24,6 +24,7 @@ export interface Boleto {
     clientName: string
     placas: string[]
     representacao: string
+    representacaoId?: string // <-- Adicionado para mapeamento DB
     status: "pending" | "paid" | "overdue"
     dataPagamento?: Date
     isRecurring: boolean

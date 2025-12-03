@@ -22,7 +22,7 @@ interface SinistroModalProps {
     claim: Claim | null
     isOpen: boolean
     onClose: () => void
-    onAddComment: (claimId: string, text: string) => void
+    onAddComment: (claimId: string, text: string) => Promise<{ data: any; error: any }>
 }
 
 export function SinistroModal({ claim, isOpen, onClose, onAddComment }: SinistroModalProps) {

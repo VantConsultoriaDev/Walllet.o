@@ -37,7 +37,7 @@ const mapVehicleToDb = (vehicle: Partial<Vehicle>) => ({
     fipe_code: vehicle.fipeCode,
     fipe_value: vehicle.fipeValue,
     body_type: vehicle.bodyType,
-    body_value: vehicle.body_value,
+    body_value: vehicle.bodyValue,
     value: vehicle.value,
     status: vehicle.status,
     client_id: vehicle.clientId,
