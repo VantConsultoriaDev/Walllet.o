@@ -22,9 +22,7 @@ import {
 } from "@/types/sinistro"
 import { NewSinistroFormData } from "@/components/sinistros/new-sinistro-modal"
 import { ColumnDef } from "@tanstack/react-table"
-
-// REMOVED MOCK DATA - Claims should be fetched from Supabase later
-const mockClaims: Claim[] = []
+import { useClaims } from "@/hooks/data/useClaims"
 
 const COLUMNS: { status: ClaimStatus; title: string; color: string }[] = [
     { status: "aberto", title: "Aberto", color: "bg-red-100 dark:bg-red-900/20" },
@@ -35,7 +33,7 @@ const COLUMNS: { status: ClaimStatus; title: string; color: string }[] = [
 ]
 
 export default function Sinistros() {
-    const [claims, setClaims] = useState<Claim[]>(mockClaims)
+    const { claims, loading, addClaim, updateClaimStatus, addComment } = useClaims()
     const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban")
     const [selectedClaim, setSelectedClaim] = useState<Claim | null>(null)
 
@@ -163,30 +161,7 @@ export default function Sinistros() {
     const [dateTo, setDateTo] = useState<Date>()
 
     const handleDrop = (claimId: string, newStatus: ClaimStatus) => {
-        setClaims((prevClaims) => {
-            return prevClaims.map((claim) => {
-                if (claim.id === claimId && claim.status !== newStatus) {
-                    const newHistory = [
-                        {
-                            id: `h-${Date.now()}`,
-                            date: new Date(),
-                            fromStatus: claim.status,
-                            toStatus: newStatus,
-                            updatedBy: "Usuário",
-                            notes: `Status alterado de ${CLAIM_STATUS_LABELS[claim.status]} para ${CLAIM_STATUS_LABELS[newStatus]}`
-                        },
-                        ...claim.history
-                    ]
-                    return {
-                        ...claim,
-                        status: newStatus,
-                        history: newHistory,
-                        updatedAt: new Date()
-                    }
-                }
-                return claim
-            })
-        })
+        updateClaimStatus(claimId, newStatus)
     }
 
     const handleCardClick = (claim: Claim) => {
@@ -200,51 +175,25 @@ export default function Sinistros() {
     }
 
     const handleNewSinistro = (formData: NewSinistroFormData) => {
-        const newClaim: Claim = {
-            id: `SIN-${String(claims.length + 1).padStart(3, "0")}`,
+        const newClaim: Omit<Claim, 'id' | 'history' | 'comments' | 'createdAt' | 'updatedAt' | 'thirdPartyName' | 'thirdPartyPlate'> = {
             clientId: formData.clientId,
             clientName: formData.clientName,
             clientPlate: formData.vehiclePlate,
             driverName: formData.driverName,
             driverCpf: formData.driverCpf,
             thirdParties: formData.thirdParties,
-            // Legacy fields for backward compatibility
-            thirdPartyName: formData.thirdParties[0]?.name,
-            thirdPartyPlate: formData.thirdParties[0]?.asset.type === "vehicle" ? formData.thirdParties[0]?.asset.plate : undefined,
             type: formData.type,
             date: formData.date,
             time: formData.time,
             status: "aberto",
             description: formData.description,
-            history: [],
-            comments: [],
-            createdAt: new Date(),
-            updatedAt: new Date()
         }
 
-        setClaims([newClaim, ...claims])
+        addClaim(newClaim)
     }
 
     const handleAddComment = (claimId: string, text: string) => {
-        setClaims(prev => prev.map(claim => {
-            if (claim.id === claimId) {
-                const newComment = {
-                    id: `c-${Date.now()}`,
-                    text,
-                    createdAt: new Date(),
-                    createdBy: "Usuário"
-                }
-                const updatedClaim = {
-                    ...claim,
-                    comments: [newComment, ...(claim.comments || [])]
-                }
-                if (selectedClaim?.id === claimId) {
-                    setSelectedClaim(updatedClaim)
-                }
-                return updatedClaim
-            }
-            return claim
-        }))
+        addComment(claimId, text)
     }
 
     const filteredClaims = useMemo(() => {
@@ -266,6 +215,14 @@ export default function Sinistros() {
             return acc
         }, {} as Record<ClaimStatus, Claim[]>)
     }, [filteredClaims])
+
+    if (loading) {
+        return (
+            <div className="flex-1 flex items-center justify-center h-full">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        )
+    }
 
     return (
         <div className="flex-1 flex flex-col h-full p-4 pt-6 md:p-8 animate-in fade-in duration-500">
@@ -354,7 +311,7 @@ export default function Sinistros() {
 
             <SinistroModal
                 claim={selectedClaim}
-                isOpen={isModalOpen}
+                isOpen={selectedClaim !== null}
                 onClose={handleCloseModal}
                 onAddComment={handleAddComment}
             />

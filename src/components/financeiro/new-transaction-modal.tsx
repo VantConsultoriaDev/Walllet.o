@@ -29,6 +29,7 @@ import {
     PopoverTrigger,
 } from "@/components/ui/popover"
 import { RecurrenceActionDialog } from "./recurrence-action-dialog"
+import { useRepresentations } from "@/hooks/data/useRepresentations"
 
 export type TransactionType = "income" | "expense"
 
@@ -55,6 +56,8 @@ type NewTransactionModalProps = {
 }
 
 export function NewTransactionModal({ open, onOpenChange, onSubmit, onDelete, transactionToEdit }: NewTransactionModalProps) {
+    const { partners } = useRepresentations()
+
     const [type, setType] = useState<TransactionType>("income")
     const [description, setDescription] = useState("")
     const [amount, setAmount] = useState("")
@@ -126,12 +129,7 @@ export function NewTransactionModal({ open, onOpenChange, onSubmit, onDelete, tr
     }
 
     const submitTransaction = (scope?: "this" | "all") => {
-        // Mock representações
-        const mockRepresentacoes = [
-            { id: "1", nome: "Seguradora A" },
-            { id: "2", nome: "Associação Protege" },
-            { id: "3", nome: "Cooperativa União" },
-        ]
+        const representacaoNome = representacaoId ? partners.find(r => r.id === representacaoId)?.name : undefined
 
         const newTransaction: Transaction = {
             id: transactionToEdit?.id || Math.random().toString(36).substr(2, 9),
@@ -144,7 +142,7 @@ export function NewTransactionModal({ open, onOpenChange, onSubmit, onDelete, tr
             installments: isRecurrent && installments ? parseInt(installments) : undefined,
             recurrenceId: transactionToEdit?.recurrenceId,
             representacaoId: representacaoId || undefined,
-            representacaoNome: representacaoId ? mockRepresentacoes.find(r => r.id === representacaoId)?.nome : undefined,
+            representacaoNome: representacaoNome,
         }
 
         onSubmit(newTransaction, scope)
@@ -233,9 +231,11 @@ export function NewTransactionModal({ open, onOpenChange, onSubmit, onDelete, tr
                                             <SelectValue placeholder="Selecione uma representação" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="1">Seguradora A</SelectItem>
-                                            <SelectItem value="2">Associação Protege</SelectItem>
-                                            <SelectItem value="3">Cooperativa União</SelectItem>
+                                            {partners.map(rep => (
+                                                <SelectItem key={rep.id} value={rep.id}>
+                                                    {rep.name}
+                                                </SelectItem>
+                                            ))}
                                         </SelectContent>
                                     </Select>
                                 </div>

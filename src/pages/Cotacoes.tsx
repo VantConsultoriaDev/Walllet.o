@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Plus, LayoutGrid, List } from "lucide-react"
+import { Plus, LayoutGrid, List, Loader2 } from "lucide-react"
 import { CotacaoColumn } from "@/components/cotacoes/cotacao-column"
 import { CotacaoModal } from "@/components/cotacoes/cotacao-modal"
 import { NewCotacaoModal } from "@/components/cotacoes/new-cotacao-modal"
@@ -18,9 +18,7 @@ import {
 } from "@/types/cotacao"
 import { NewCotacaoFormData } from "@/components/cotacoes/new-cotacao-modal"
 import { ColumnDef } from "@tanstack/react-table"
-
-// REMOVED MOCK DATA - Cotacoes should be fetched from Supabase later
-const mockCotacoes: Cotacao[] = []
+import { useQuotations } from "@/hooks/data/useQuotations"
 
 const COLUMNS: { status: CotacaoStatus; title: string; color: string }[] = [
     { status: "cotacao", title: "Cotação", color: "bg-blue-100 dark:bg-blue-900/20" },
@@ -30,9 +28,10 @@ const COLUMNS: { status: CotacaoStatus; title: string; color: string }[] = [
 ]
 
 export default function Cotacoes() {
-    const [cotacoes, setCotacoes] = useState<Cotacao[]>(mockCotacoes)
+    const { quotations, loading, addQuotation, updateQuotationStatus } = useQuotations()
     const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban")
     const [selectedCotacao, setSelectedCotacao] = useState<Cotacao | null>(null)
+    const [isNewCotacaoModalOpen, setIsNewCotacaoModalOpen] = useState(false)
 
     const filters: DataTableFilterConfig[] = [
         {
@@ -139,34 +138,8 @@ export default function Cotacoes() {
         },
     ]
 
-    const [isCotacaoModalOpen, setIsCotacaoModalOpen] = useState(false)
-    const [isNewCotacaoModalOpen, setIsNewCotacaoModalOpen] = useState(false)
-
     const handleDrop = (cotacaoId: string, newStatus: CotacaoStatus) => {
-        setCotacoes((prevCotacoes) => {
-            return prevCotacoes.map((cotacao) => {
-                if (cotacao.id === cotacaoId && cotacao.status !== newStatus) {
-                    const newHistory = [
-                        {
-                            id: `h-${Date.now()}`,
-                            date: new Date(),
-                            fromStatus: cotacao.status,
-                            toStatus: newStatus,
-                            updatedBy: "Usuário",
-                            notes: `Status alterado de ${COTACAO_STATUS_LABELS[cotacao.status]} para ${COTACAO_STATUS_LABELS[newStatus]}`,
-                        },
-                        ...cotacao.history,
-                    ]
-                    return {
-                        ...cotacao,
-                        status: newStatus,
-                        history: newHistory,
-                        updatedAt: new Date(),
-                    }
-                }
-                return cotacao
-            })
-        })
+        updateQuotationStatus(cotacaoId, newStatus)
     }
 
     const handleCardClick = (cotacao: Cotacao) => {
@@ -175,8 +148,7 @@ export default function Cotacoes() {
     }
 
     const handleNewCotacao = (formData: NewCotacaoFormData) => {
-        const newCotacao: Cotacao = {
-            id: `COT-${String(cotacoes.length + 1).padStart(3, "0")}`,
+        const newQuotation: Omit<Cotacao, 'id' | 'history' | 'createdAt' | 'updatedAt'> = {
             clientType: formData.clientType,
             cpfCnpj: formData.cpfCnpj,
             razaoSocialNome: formData.razaoSocialNome,
@@ -192,20 +164,25 @@ export default function Cotacoes() {
                 installments: formData.comissaoInstallments,
             },
             status: "cotacao",
-            history: [],
-            createdAt: new Date(),
-            updatedAt: new Date(),
         }
 
-        setCotacoes([newCotacao, ...cotacoes])
+        addQuotation(newQuotation)
     }
 
     const cotacoesByStatus = useMemo(() => {
         return COLUMNS.reduce((acc, column) => {
-            acc[column.status] = cotacoes.filter((cotacao) => cotacao.status === column.status)
+            acc[column.status] = quotations.filter((cotacao) => cotacao.status === column.status)
             return acc
         }, {} as Record<CotacaoStatus, Cotacao[]>)
-    }, [cotacoes])
+    }, [quotations])
+
+    if (loading) {
+        return (
+            <div className="flex-1 flex items-center justify-center h-full">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        )
+    }
 
     return (
         <div className="flex-1 flex flex-col h-full p-4 pt-6 md:p-8 animate-in fade-in duration-500">
@@ -257,7 +234,7 @@ export default function Cotacoes() {
                     </div>
                 </div>
             ) : (
-                <DataTable columns={columns} data={cotacoes} filters={filters} onRowClick={handleCardClick} />
+                <DataTable columns={columns} data={quotations} filters={filters} onRowClick={handleCardClick} />
             )}
 
             <NewCotacaoModal
@@ -268,9 +245,8 @@ export default function Cotacoes() {
 
             <CotacaoModal
                 cotacao={selectedCotacao}
-                isOpen={isCotacaoModalOpen}
+                isOpen={selectedCotacao !== null}
                 onClose={() => {
-                    setIsCotacaoModalOpen(false)
                     setSelectedCotacao(null)
                 }}
             />

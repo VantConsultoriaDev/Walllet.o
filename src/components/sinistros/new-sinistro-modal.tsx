@@ -23,11 +23,13 @@ import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
-import { CalendarIcon, Plus, X, Save, Car, Building2 } from "lucide-react"
+import { CalendarIcon, Plus, X, Save, Car, Building2, Check } from "lucide-react"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { cn } from "@/lib/utils"
 import { ClaimType, ThirdParty, ThirdPartyAssetType, CLAIM_TYPE_LABELS } from "@/types/sinistro"
+import { useClients, type Client } from "@/hooks/data/useClients"
+import type { Vehicle } from "@/components/frota/new-vehicle-modal"
 
 interface NewSinistroModalProps {
     isOpen: boolean
@@ -49,30 +51,15 @@ export type NewSinistroFormData = {
     description: string
 }
 
-// Mock data for autocomplete
-const mockClients = [
-    { id: "1", name: "João Silva" },
-    { id: "2", name: "Maria Oliveira" },
-    { id: "3", name: "Carlos Santos" },
-    { id: "4", name: "Ana Paula" },
-    { id: "5", name: "Roberto Alves" },
-]
-
-const mockVehicles = [
-    { plate: "ABC-1234", brand: "Toyota", model: "Corolla" },
-    { plate: "DEF-5678", brand: "Honda", model: "Civic" },
-    { plate: "GHI-9012", brand: "Ford", model: "Focus" },
-    { plate: "JKL-3456", brand: "Chevrolet", model: "Onix" },
-    { plate: "MNO-7890", brand: "Volkswagen", model: "Gol" },
-]
-
 export function NewSinistroModal({ isOpen, onClose, onSubmit }: NewSinistroModalProps) {
+    const { clients, loading: clientsLoading } = useClients()
+
     const [clientSearch, setClientSearch] = useState("")
-    const [selectedClient, setSelectedClient] = useState<{ id: string; name: string } | null>(null)
+    const [selectedClient, setSelectedClient] = useState<Client | null>(null)
     const [showClientDropdown, setShowClientDropdown] = useState(false)
 
     const [vehicleSearch, setVehicleSearch] = useState("")
-    const [selectedVehicle, setSelectedVehicle] = useState<string>("")
+    const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null)
     const [showVehicleDropdown, setShowVehicleDropdown] = useState(false)
 
     const [driverName, setDriverName] = useState("")
@@ -85,21 +72,27 @@ export function NewSinistroModal({ isOpen, onClose, onSubmit }: NewSinistroModal
     const [description, setDescription] = useState("")
 
     const filteredClients = useMemo(() => {
-        if (!clientSearch) return mockClients
-        return mockClients.filter((client) =>
-            client.name.toLowerCase().includes(clientSearch.toLowerCase())
+        if (!clientSearch) return clients
+        return clients.filter((client) =>
+            client.name.toLowerCase().includes(clientSearch.toLowerCase()) ||
+            client.cpf?.includes(clientSearch) ||
+            client.cnpj?.includes(clientSearch)
         )
-    }, [clientSearch])
+    }, [clientSearch, clients])
+
+    const clientVehicles = useMemo(() => {
+        return selectedClient ? selectedClient.vehicles : []
+    }, [selectedClient])
 
     const filteredVehicles = useMemo(() => {
-        if (!vehicleSearch) return mockVehicles
-        return mockVehicles.filter(
+        if (!vehicleSearch) return clientVehicles
+        return clientVehicles.filter(
             (vehicle) =>
                 vehicle.plate.toLowerCase().includes(vehicleSearch.toLowerCase()) ||
-                vehicle.brand.toLowerCase().includes(vehicleSearch.toLowerCase()) ||
-                vehicle.model.toLowerCase().includes(vehicleSearch.toLowerCase())
+                vehicle.brand?.toLowerCase().includes(vehicleSearch.toLowerCase()) ||
+                vehicle.model?.toLowerCase().includes(vehicleSearch.toLowerCase())
         )
-    }, [vehicleSearch])
+    }, [vehicleSearch, clientVehicles])
 
     const handleAddThirdParty = () => {
         const newThirdParty: ThirdParty = {
@@ -162,7 +155,7 @@ export function NewSinistroModal({ isOpen, onClose, onSubmit }: NewSinistroModal
         const formData: NewSinistroFormData = {
             clientId: selectedClient.id,
             clientName: selectedClient.name,
-            vehiclePlate: selectedVehicle,
+            vehiclePlate: selectedVehicle.plate,
             driverName,
             driverCpf,
             type: claimType,
@@ -181,7 +174,7 @@ export function NewSinistroModal({ isOpen, onClose, onSubmit }: NewSinistroModal
         setClientSearch("")
         setSelectedClient(null)
         setVehicleSearch("")
-        setSelectedVehicle("")
+        setSelectedVehicle(null)
         setDriverName("")
         setDriverCpf("")
         setClaimType("colisao_tombamento")
@@ -216,6 +209,7 @@ export function NewSinistroModal({ isOpen, onClose, onSubmit }: NewSinistroModal
                                     onChange={(e) => {
                                         setClientSearch(e.target.value)
                                         setSelectedClient(null)
+                                        setSelectedVehicle(null)
                                         setShowClientDropdown(e.target.value.length > 0)
                                     }}
                                 />
@@ -224,7 +218,7 @@ export function NewSinistroModal({ isOpen, onClose, onSubmit }: NewSinistroModal
                                         {filteredClients.map((client) => (
                                             <div
                                                 key={client.id}
-                                                className="px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer text-sm"
+                                                className="px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer text-sm flex items-center justify-between"
                                                 onClick={() => {
                                                     setSelectedClient(client)
                                                     setClientSearch(client.name)
@@ -232,6 +226,7 @@ export function NewSinistroModal({ isOpen, onClose, onSubmit }: NewSinistroModal
                                                 }}
                                             >
                                                 {client.name}
+                                                {selectedClient?.id === client.id && <Check className="h-4 w-4 text-primary" />}
                                             </div>
                                         ))}
                                     </div>
@@ -245,13 +240,14 @@ export function NewSinistroModal({ isOpen, onClose, onSubmit }: NewSinistroModal
                             <div className="relative">
                                 <Input
                                     id="vehicle"
-                                    placeholder="Digite placa, marca ou modelo..."
-                                    value={selectedVehicle || vehicleSearch}
+                                    placeholder={selectedClient ? "Digite placa, marca ou modelo..." : "Selecione um cliente primeiro"}
+                                    value={selectedVehicle ? `${selectedVehicle.plate} - ${selectedVehicle.brand} ${selectedVehicle.model}` : vehicleSearch}
                                     onChange={(e) => {
                                         setVehicleSearch(e.target.value)
-                                        setSelectedVehicle("")
-                                        setShowVehicleDropdown(e.target.value.length > 0)
+                                        setSelectedVehicle(null)
+                                        setShowVehicleDropdown(e.target.value.length > 0 && !!selectedClient)
                                     }}
+                                    disabled={!selectedClient}
                                 />
                                 {showVehicleDropdown && filteredVehicles.length > 0 && !selectedVehicle && (
                                     <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-950 border rounded-md shadow-lg max-h-48 overflow-auto">
@@ -260,7 +256,7 @@ export function NewSinistroModal({ isOpen, onClose, onSubmit }: NewSinistroModal
                                                 key={vehicle.plate}
                                                 className="px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer text-sm"
                                                 onClick={() => {
-                                                    setSelectedVehicle(vehicle.plate)
+                                                    setSelectedVehicle(vehicle)
                                                     setVehicleSearch(`${vehicle.plate} - ${vehicle.brand} ${vehicle.model}`)
                                                     setShowVehicleDropdown(false)
                                                 }}
@@ -274,6 +270,7 @@ export function NewSinistroModal({ isOpen, onClose, onSubmit }: NewSinistroModal
                                     </div>
                                 )}
                             </div>
+                            {!selectedClient && <p className="text-xs text-red-500">Selecione um cliente para ver os veículos disponíveis.</p>}
                         </div>
 
                         {/* Motorista */}

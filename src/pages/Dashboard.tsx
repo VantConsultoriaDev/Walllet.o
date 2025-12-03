@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import {
     Users,
     FileText,
@@ -6,98 +6,16 @@ import {
     DollarSign,
     TrendingUp,
     Car,
+    Loader2,
 } from "lucide-react"
 import { KpiCard } from "@/components/dashboard/kpi-card"
 import { DashboardChart } from "@/components/dashboard/dashboard-chart"
 import { motion } from "framer-motion"
-
-// Mock data for different metrics
-const chartData = {
-    vendas: [
-        { name: "Jan", value: 12 },
-        { name: "Fev", value: 15 },
-        { name: "Mar", value: 18 },
-        { name: "Abr", value: 14 },
-        { name: "Mai", value: 22 },
-        { name: "Jun", value: 25 },
-        { name: "Jul", value: 28 },
-        { name: "Ago", value: 32 },
-        { name: "Set", value: 30 },
-        { name: "Out", value: 35 },
-        { name: "Nov", value: 40 },
-        { name: "Dez", value: 45 },
-    ],
-    clientes: [
-        { name: "Jan", value: 5 },
-        { name: "Fev", value: 8 },
-        { name: "Mar", value: 12 },
-        { name: "Abr", value: 10 },
-        { name: "Mai", value: 15 },
-        { name: "Jun", value: 18 },
-        { name: "Jul", value: 20 },
-        { name: "Ago", value: 22 },
-        { name: "Set", value: 25 },
-        { name: "Out", value: 28 },
-        { name: "Nov", value: 30 },
-        { name: "Dez", value: 35 },
-    ],
-    placas: [
-        { name: "Jan", value: 8 },
-        { name: "Fev", value: 12 },
-        { name: "Mar", value: 15 },
-        { name: "Abr", value: 18 },
-        { name: "Mai", value: 25 },
-        { name: "Jun", value: 28 },
-        { name: "Jul", value: 32 },
-        { name: "Ago", value: 35 },
-        { name: "Set", value: 38 },
-        { name: "Out", value: 42 },
-        { name: "Nov", value: 45 },
-        { name: "Dez", value: 50 },
-    ],
-    faturamento: [
-        { name: "Jan", value: 15000 },
-        { name: "Fev", value: 18000 },
-        { name: "Mar", value: 22000 },
-        { name: "Abr", value: 20000 },
-        { name: "Mai", value: 28000 },
-        { name: "Jun", value: 32000 },
-        { name: "Jul", value: 35000 },
-        { name: "Ago", value: 38000 },
-        { name: "Set", value: 42000 },
-        { name: "Out", value: 45000 },
-        { name: "Nov", value: 50000 },
-        { name: "Dez", value: 55000 },
-    ],
-    comissao: [
-        { name: "Jan", value: 3000 },
-        { name: "Fev", value: 3600 },
-        { name: "Mar", value: 4400 },
-        { name: "Abr", value: 4000 },
-        { name: "Mai", value: 5600 },
-        { name: "Jun", value: 6400 },
-        { name: "Jul", value: 7000 },
-        { name: "Ago", value: 7600 },
-        { name: "Set", value: 8400 },
-        { name: "Out", value: 9000 },
-        { name: "Nov", value: 10000 },
-        { name: "Dez", value: 11000 },
-    ],
-    patrimonio: [
-        { name: "Jan", value: 500000 },
-        { name: "Fev", value: 550000 },
-        { name: "Mar", value: 600000 },
-        { name: "Abr", value: 650000 },
-        { name: "Mai", value: 750000 },
-        { name: "Jun", value: 800000 },
-        { name: "Jul", value: 900000 },
-        { name: "Ago", value: 950000 },
-        { name: "Set", value: 1000000 },
-        { name: "Out", value: 1100000 },
-        { name: "Nov", value: 1150000 },
-        { name: "Dez", value: 1200000 },
-    ],
-}
+import { useClients } from "@/hooks/data/useClients"
+import { useTransactions } from "@/hooks/data/useTransactions"
+import { useQuotations } from "@/hooks/data/useQuotations"
+import { format } from "date-fns"
+import { ptBR } from "date-fns/locale"
 
 const metricTitles = {
     vendas: "Vendas Mensais",
@@ -108,8 +26,134 @@ const metricTitles = {
     patrimonio: "Patrimônio Protegido",
 }
 
+const MONTHS = [
+    "Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
+    "Jul", "Ago", "Set", "Out", "Nov", "Dez"
+]
+
 export default function Dashboard() {
+    const { clients, loading: clientsLoading } = useClients()
+    const { transactions, loading: transactionsLoading } = useTransactions()
+    const { quotations, loading: quotationsLoading } = useQuotations()
     const [currentMetric, setCurrentMetric] = useState("vendas")
+
+    const loading = clientsLoading || transactionsLoading || quotationsLoading
+
+    const { kpis, chartData } = useMemo(() => {
+        if (loading) return { kpis: {}, chartData: {} }
+
+        const currentYear = new Date().getFullYear()
+        const currentMonthIndex = new Date().getMonth()
+
+        // --- KPI Calculations ---
+        const totalClients = clients.length
+        const totalVehicles = clients.reduce((sum, client) => sum + client.vehicles.length, 0)
+        const newClientsThisMonth = clients.filter(c => c.status === 'active' && c.created_at && new Date(c.created_at).getMonth() === currentMonthIndex).length
+        
+        const totalBilling = transactions
+            .filter(t => t.type === 'income')
+            .reduce((sum, t) => sum + t.amount, 0)
+        
+        const totalCommission = transactions
+            .filter(t => t.type === 'income' && t.category === 'Comissão')
+            .reduce((sum, t) => sum + t.amount, 0)
+
+        const totalPatrimony = quotations.reduce((sum, q) => {
+            if (q.status === 'cliente') {
+                if (q.asset.type === 'veiculo') return sum + q.asset.valorFipe
+                if (q.asset.type === 'residencial') return sum + q.asset.valorPatrimonio
+                if (q.asset.type === 'carga') return sum + q.asset.valorTotal
+                if (q.asset.type === 'outros') return sum + q.asset.valorSegurado
+            }
+            return sum
+        }, 0)
+
+        const activeQuotations = quotations.filter(q => q.status === 'cotacao' || q.status === 'contrato_vistoria').length
+        
+        // --- Chart Data Aggregation ---
+        const monthlyData = MONTHS.map((name, monthIndex) => {
+            const monthClients = clients.filter(c => new Date(c.created_at).getFullYear() === currentYear && new Date(c.created_at).getMonth() === monthIndex)
+            const monthTransactions = transactions.filter(t => t.date.getFullYear() === currentYear && t.date.getMonth() === monthIndex)
+            const monthQuotations = quotations.filter(q => q.createdAt.getFullYear() === currentYear && q.createdAt.getMonth() === monthIndex)
+
+            const sales = monthQuotations.filter(q => q.status === 'cliente').length
+            const newClients = monthClients.length
+            const newPlates = monthClients.reduce((sum, c) => sum + c.vehicles.length, 0)
+            const faturamento = monthTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0)
+            const comissao = monthTransactions.filter(t => t.type === 'income' && t.category === 'Comissão').reduce((sum, t) => sum + t.amount, 0)
+            
+            // Simplified patrimony calculation for the chart (total value of new contracts this month)
+            const patrimonio = monthQuotations.filter(q => q.status === 'cliente').reduce((sum, q) => {
+                if (q.asset.type === 'veiculo') return sum + q.asset.valorFipe
+                return sum
+            }, 0)
+
+            return {
+                name,
+                vendas: sales,
+                clientes: newClients,
+                placas: newPlates,
+                faturamento: faturamento,
+                comissao: comissao,
+                patrimonio: patrimonio,
+            }
+        })
+
+        const formatCurrency = (value: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value)
+        const formatNumber = (value: number) => value.toLocaleString("pt-BR")
+
+        const kpis = {
+            vendasMensais: {
+                value: formatNumber(monthlyData[currentMonthIndex]?.vendas || 0),
+                description: "novos contratos este mês",
+                totalValue: formatNumber(quotations.filter(q => q.status === 'cliente').length),
+                totalLabel: "Total de Contratos",
+            },
+            novosClientes: {
+                value: formatNumber(newClientsThisMonth),
+                description: "cadastrados este mês",
+                totalValue: formatNumber(totalClients),
+                totalLabel: "Total de Clientes",
+            },
+            novasPlacas: {
+                value: formatNumber(monthlyData[currentMonthIndex]?.placas || 0),
+                description: "veículos adicionados",
+                totalValue: formatNumber(totalVehicles),
+                totalLabel: "Total de Placas",
+            },
+            faturamento: {
+                value: formatCurrency(monthlyData[currentMonthIndex]?.faturamento || 0),
+                description: "total este mês",
+            },
+            comissionamento: {
+                value: formatCurrency(totalCommission),
+                description: "total acumulado",
+            },
+            patrimonioProtegido: {
+                value: formatCurrency(totalPatrimony),
+                description: "Valor total assegurado",
+            },
+            contratosVencidos: {
+                value: formatNumber(activeQuotations), // Using active quotations as a proxy for urgent attention
+                description: "Cotações em andamento",
+            }
+        }
+
+        return { kpis, chartData: monthlyData }
+    }, [clients, transactions, quotations, loading])
+
+    if (loading) {
+        return (
+            <div className="flex-1 flex items-center justify-center h-full">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        )
+    }
+
+    const currentChartData = chartData.map((item: any) => ({
+        name: item.name,
+        value: item[currentMetric as keyof typeof item]
+    }))
 
     return (
         <div className="flex-1 space-y-6">
@@ -127,45 +171,45 @@ export default function Dashboard() {
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <KpiCard
                     title="Vendas Mensais"
-                    value="45"
-                    description="novos contratos"
+                    value={kpis.vendasMensais.value}
+                    description={kpis.vendasMensais.description}
                     icon={FileText}
                     trend="up"
-                    trendValue="+12%"
+                    trendValue="+12%" // Mocked trend
                     gradient="from-purple-500 to-pink-500"
                     index={0}
                 />
                 <KpiCard
                     title="Novos Clientes"
-                    value="35"
-                    description="cadastrados"
+                    value={kpis.novosClientes.value}
+                    description={kpis.novosClientes.description}
                     icon={Users}
                     trend="up"
-                    trendValue="+8%"
+                    trendValue="+8%" // Mocked trend
                     gradient="from-blue-500 to-cyan-500"
                     index={1}
-                    totalValue="1.250"
-                    totalLabel="Total de Clientes"
+                    totalValue={kpis.novosClientes.totalValue}
+                    totalLabel={kpis.novosClientes.totalLabel}
                 />
                 <KpiCard
                     title="Novas Placas"
-                    value="50"
-                    description="veículos"
+                    value={kpis.novasPlacas.value}
+                    description={kpis.novasPlacas.description}
                     icon={Car}
                     trend="up"
-                    trendValue="+15%"
+                    trendValue="+15%" // Mocked trend
                     gradient="from-orange-500 to-red-500"
                     index={2}
-                    totalValue="850"
-                    totalLabel="Total de Placas"
+                    totalValue={kpis.novasPlacas.totalValue}
+                    totalLabel={kpis.novasPlacas.totalLabel}
                 />
                 <KpiCard
                     title="Faturamento"
-                    value="R$ 55k"
-                    description="total mês"
+                    value={kpis.faturamento.value}
+                    description={kpis.faturamento.description}
                     icon={DollarSign}
                     trend="up"
-                    trendValue="+20%"
+                    trendValue="+20%" // Mocked trend
                     gradient="from-green-500 to-emerald-500"
                     index={3}
                 />
@@ -173,7 +217,7 @@ export default function Dashboard() {
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
                 <DashboardChart
-                    data={chartData[currentMetric as keyof typeof chartData]}
+                    data={currentChartData}
                     dataKey="value"
                     title={metricTitles[currentMetric as keyof typeof metricTitles]}
                     onMetricChange={setCurrentMetric}
@@ -187,29 +231,29 @@ export default function Dashboard() {
                 >
                     <KpiCard
                         title="Comissionamento"
-                        value="R$ 11k"
-                        description="recorrente + pontual"
+                        value={kpis.comissionamento.value}
+                        description={kpis.comissionamento.description}
                         icon={TrendingUp}
                         trend="up"
-                        trendValue="+18%"
+                        trendValue="+18%" // Mocked trend
                         gradient="from-indigo-500 to-violet-500"
                     />
                     <KpiCard
                         title="Patrimônio Protegido"
-                        value="R$ 1.2M"
-                        description="Valor total assegurado"
+                        value={kpis.patrimonioProtegido.value}
+                        description={kpis.patrimonioProtegido.description}
                         icon={DollarSign}
                         trend="up"
-                        trendValue="+5%"
+                        trendValue="+5%" // Mocked trend
                         gradient="from-teal-500 to-green-500"
                     />
                     <KpiCard
-                        title="Contratos Vencidos"
-                        value="7"
-                        description="Necessitam atenção urgente"
+                        title="Cotações em Andamento"
+                        value={kpis.contratosVencidos.value}
+                        description={kpis.contratosVencidos.description}
                         icon={AlertTriangle}
                         trend="down"
-                        trendValue="+2"
+                        trendValue="+2" // Mocked trend
                         gradient="from-yellow-500 to-orange-500"
                     />
                 </motion.div>

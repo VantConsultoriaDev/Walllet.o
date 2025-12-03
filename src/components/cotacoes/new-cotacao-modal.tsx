@@ -30,6 +30,8 @@ import {
     ASSET_TYPE_LABELS,
     COMMISSION_TYPE_LABELS,
 } from "@/types/cotacao"
+import { useRepresentations } from "@/hooks/data/useRepresentations"
+import { fetchCNPJData, formatCNPJ, formatCPF, isValidCNPJ } from "@/lib/cnpj-api"
 
 interface NewCotacaoModalProps {
     isOpen: boolean
@@ -52,7 +54,7 @@ export type NewCotacaoFormData = {
     comissaoInstallments?: number
 }
 
-// Mock clients for CPF/CNPJ lookup
+// Mock clients for CPF/CNPJ lookup (kept for API simulation)
 const mockClients = [
     { cpfCnpj: "12345678901", type: "PF" as const, nome: "João Silva" },
     { cpfCnpj: "98765432100", type: "PF" as const, nome: "Maria Oliveira" },
@@ -64,14 +66,9 @@ const mockClients = [
     },
 ]
 
-// Mock representações
-const mockRepresentacoes = [
-    { id: "1", nome: "Seguradora A" },
-    { id: "2", nome: "Associação Protege" },
-    { id: "3", nome: "Cooperativa União" },
-]
-
 export function NewCotacaoModal({ isOpen, onClose, onSubmit }: NewCotacaoModalProps) {
+    const { partners } = useRepresentations()
+
     const [clientType, setClientType] = useState<"PF" | "PJ">("PF")
     const [cpfCnpj, setCpfCnpj] = useState("")
     const [razaoSocialNome, setRazaoSocialNome] = useState("")
@@ -151,7 +148,7 @@ export function NewCotacaoModal({ isOpen, onClose, onSubmit }: NewCotacaoModalPr
                     method: 'POST',
                     headers: {
                         "Content-Type": "application/json",
-                        "Authorization": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwOi8vZ2F0ZXdheS5hcGlicmFzaWwuaW8vYXBpL3YyL2F1dGgvbG9naW4iLCJpYXQiOjE3NjI3OTQ1OTUsImV4cCI6MTc5NDMzMDU5NSwibmJmIjoxNzYyNzk0NTk1LCJqdGkiOiI5ZWtGN0huTVBkWGFaT2hTIiwic3ViIjoiMTc4NDIiLCJwcnYiOiIyM2JkNWM4OTQ5ZjYwMGFkYjM5ZTcwMWM0MDA4NzJkYjdhNTk3NmY3In0.zMHjM--QqTrHf30hWq5K9ILzhRuOLkhYEkm89E7tb5U"
+                        "Authorization": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwOi8vZ2F0ZXdheS5hcGlicmFzaWwuaW8vYXBpL3YyL2F1dGgvbG9naW4iLCJpYXQiOjE3NjI3OTQ1OTUsImV4cCI6MTc5NDMzMDU5NSwibmJmIjoxNzYyNzk0NTk1LCJqdGkiOiI5ZWtGN0huTVBkWGFaT2hTIiwic3ViIjoiMTc4NDIiLCJwcnY6IjIzYmQ1Yzg5NDlmNjAwYWRiMzllNzAxYzQwMDg3MmRiN2E1OTc2Zjci.zMHjM--QqTrHf30hWq5K9ILzhRuOLkhYEkm89E7tb5U"
                     },
                     body: JSON.stringify({
                         "tipo": "fipe",
@@ -267,13 +264,15 @@ export function NewCotacaoModal({ isOpen, onClose, onSubmit }: NewCotacaoModalPr
                 break
         }
 
+        const selectedPartner = partners.find(r => r.id === representacaoId)
+
         const formData: NewCotacaoFormData = {
             clientType,
             cpfCnpj,
             razaoSocialNome,
             nomeFantasia: nomeFantasia || undefined,
             representacaoId: representacaoId || undefined,
-            representacaoNome: mockRepresentacoes.find(r => r.id === representacaoId)?.nome,
+            representacaoNome: selectedPartner?.name,
             asset,
             anuidade: parseFloat(anuidade),
             parcelas,
@@ -418,9 +417,9 @@ export function NewCotacaoModal({ isOpen, onClose, onSubmit }: NewCotacaoModalPr
                                     <SelectValue placeholder="Selecione uma representação" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {mockRepresentacoes.map((rep) => (
+                                    {partners.map((rep) => (
                                         <SelectItem key={rep.id} value={rep.id}>
-                                            {rep.nome}
+                                            {rep.name}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>

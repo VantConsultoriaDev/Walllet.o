@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
     Dialog,
     DialogContent,
@@ -27,12 +27,23 @@ interface SinistroModalProps {
 
 export function SinistroModal({ claim, isOpen, onClose, onAddComment }: SinistroModalProps) {
     const [newComment, setNewComment] = useState("")
+    const [localClaim, setLocalClaim] = useState<Claim | null>(claim)
 
-    if (!claim) return null
+    // Update local state when prop changes (e.g., after status update or comment addition in parent)
+    useEffect(() => {
+        setLocalClaim(claim)
+    }, [claim])
 
-    const handleSendComment = () => {
+    if (!localClaim) return null
+
+    const handleSendComment = async () => {
         if (!newComment.trim()) return
-        onAddComment(claim.id, newComment)
+        
+        // Call parent handler (which updates Supabase and the global state)
+        const { data: newCommentData } = await onAddComment(localClaim.id, newComment)
+
+        // Since the parent hook updates the global state, and the global state updates the 'claim' prop,
+        // the useEffect above will handle the update. We just clear the input.
         setNewComment("")
     }
 
@@ -54,13 +65,13 @@ export function SinistroModal({ claim, isOpen, onClose, onAddComment }: Sinistro
                     <div className="flex items-start justify-between">
                         <div className="flex-1">
                             <DialogTitle className="text-2xl flex items-center gap-2">
-                                Sinistro #{claim.id}
-                                <Badge className={cn("text-xs", statusColor(claim.status))}>
-                                    {CLAIM_STATUS_LABELS[claim.status]}
+                                Sinistro #{localClaim.id}
+                                <Badge className={cn("text-xs", statusColor(localClaim.status))}>
+                                    {CLAIM_STATUS_LABELS[localClaim.status]}
                                 </Badge>
                             </DialogTitle>
                             <DialogDescription className="mt-2">
-                                {CLAIM_TYPE_LABELS[claim.type]} • {format(claim.date, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                                {CLAIM_TYPE_LABELS[localClaim.type]} • {format(localClaim.date, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
                             </DialogDescription>
                         </div>
                     </div>
@@ -87,40 +98,48 @@ export function SinistroModal({ claim, isOpen, onClose, onAddComment }: Sinistro
                                     <div className="grid grid-cols-2 gap-4 p-4 rounded-lg bg-slate-50 dark:bg-slate-900/50 border">
                                         <div>
                                             <p className="text-xs text-muted-foreground">Nome</p>
-                                            <p className="font-medium">{claim.clientName}</p>
+                                            <p className="font-medium">{localClaim.clientName}</p>
                                         </div>
                                         <div>
                                             <p className="text-xs text-muted-foreground">Placa</p>
                                             <div className="flex items-center gap-1.5">
                                                 <Car className="h-3.5 w-3.5 text-muted-foreground" />
-                                                <p className="font-medium font-mono">{claim.clientPlate}</p>
+                                                <p className="font-medium font-mono">{localClaim.clientPlate}</p>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* Terceiro Envolvido */}
-                                {claim.thirdPartyName && (
+                                {/* Terceiro Envolvido (Using thirdParties array) */}
+                                {localClaim.thirdParties && localClaim.thirdParties.length > 0 && (
                                     <div className="space-y-3">
                                         <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
                                             <User className="h-4 w-4" />
-                                            Terceiro Envolvido
+                                            Terceiros Envolvidos
                                         </h3>
-                                        <div className="grid grid-cols-2 gap-4 p-4 rounded-lg bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30">
-                                            <div>
-                                                <p className="text-xs text-muted-foreground">Nome</p>
-                                                <p className="font-medium">{claim.thirdPartyName}</p>
-                                            </div>
-                                            {claim.thirdPartyPlate && (
-                                                <div>
-                                                    <p className="text-xs text-muted-foreground">Placa</p>
-                                                    <div className="flex items-center gap-1.5">
-                                                        <Car className="h-3.5 w-3.5 text-muted-foreground" />
-                                                        <p className="font-medium font-mono">{claim.thirdPartyPlate}</p>
-                                                    </div>
+                                        {localClaim.thirdParties.map((tp, index) => (
+                                            <div key={tp.id} className="grid grid-cols-2 gap-4 p-4 rounded-lg bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30">
+                                                <div className="col-span-2">
+                                                    <p className="text-xs text-muted-foreground">Nome do Terceiro #{index + 1}</p>
+                                                    <p className="font-medium">{tp.name}</p>
                                                 </div>
-                                            )}
-                                        </div>
+                                                {tp.asset.type === 'vehicle' && tp.asset.plate && (
+                                                    <div>
+                                                        <p className="text-xs text-muted-foreground">Placa</p>
+                                                        <div className="flex items-center gap-1.5">
+                                                            <Car className="h-3.5 w-3.5 text-muted-foreground" />
+                                                            <p className="font-medium font-mono">{tp.asset.plate}</p>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                {tp.asset.type === 'property' && tp.asset.description && (
+                                                    <div className="col-span-2">
+                                                        <p className="text-xs text-muted-foreground">Descrição do Patrimônio</p>
+                                                        <p className="font-medium">{tp.asset.description}</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
                                     </div>
                                 )}
 
@@ -131,7 +150,7 @@ export function SinistroModal({ claim, isOpen, onClose, onAddComment }: Sinistro
                                         Descrição
                                     </h3>
                                     <div className="p-4 rounded-lg bg-slate-50 dark:bg-slate-900/50 border">
-                                        <p className="text-sm leading-relaxed">{claim.description}</p>
+                                        <p className="text-sm leading-relaxed">{localClaim.description}</p>
                                     </div>
                                 </div>
 
@@ -143,11 +162,11 @@ export function SinistroModal({ claim, isOpen, onClose, onAddComment }: Sinistro
                                     <div className="grid grid-cols-2 gap-4 p-4 rounded-lg bg-slate-50 dark:bg-slate-900/50 border text-sm">
                                         <div>
                                             <p className="text-xs text-muted-foreground">Criado em</p>
-                                            <p className="font-medium">{format(claim.createdAt, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</p>
+                                            <p className="font-medium">{format(localClaim.createdAt, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</p>
                                         </div>
                                         <div>
                                             <p className="text-xs text-muted-foreground">Última atualização</p>
-                                            <p className="font-medium">{format(claim.updatedAt, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</p>
+                                            <p className="font-medium">{format(localClaim.updatedAt, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</p>
                                         </div>
                                     </div>
                                 </div>
@@ -158,14 +177,14 @@ export function SinistroModal({ claim, isOpen, onClose, onAddComment }: Sinistro
                     <TabsContent value="historico" className="px-6 pb-6 mt-4">
                         <ScrollArea className="h-[400px] pr-4">
                             <div className="space-y-4">
-                                {claim.history.length === 0 ? (
+                                {localClaim.history.length === 0 ? (
                                     <div className="h-32 flex items-center justify-center border-2 border-dashed rounded-lg">
                                         <p className="text-sm text-muted-foreground">Nenhuma movimentação registrada</p>
                                     </div>
                                 ) : (
-                                    claim.history.map((entry, index) => (
+                                    localClaim.history.map((entry, index) => (
                                         <div key={entry.id} className="relative">
-                                            {index !== claim.history.length - 1 && (
+                                            {index !== localClaim.history.length - 1 && (
                                                 <div className="absolute left-[15px] top-10 bottom-0 w-0.5 bg-slate-200 dark:bg-slate-800" />
                                             )}
                                             <div className="flex gap-4">
@@ -205,12 +224,12 @@ export function SinistroModal({ claim, isOpen, onClose, onAddComment }: Sinistro
                         <div className="flex flex-col h-[400px]">
                             <ScrollArea className="flex-1 pr-4 mb-4">
                                 <div className="space-y-4">
-                                    {(!claim.comments || claim.comments.length === 0) ? (
+                                    {(!localClaim.comments || localClaim.comments.length === 0) ? (
                                         <div className="h-32 flex items-center justify-center border-2 border-dashed rounded-lg">
                                             <p className="text-sm text-muted-foreground">Nenhum comentário registrado</p>
                                         </div>
                                     ) : (
-                                        claim.comments.map((comment) => (
+                                        localClaim.comments.map((comment) => (
                                             <div key={comment.id} className="flex gap-3">
                                                 <div className="h-8 w-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
                                                     <User className="h-4 w-4 text-slate-500" />

@@ -1,28 +1,16 @@
 import { useState } from "react"
 import { Card, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Plus, ExternalLink } from "lucide-react"
-import { NewRepresentacaoModal, type NewRepresentacaoFormData } from "@/components/representacoes/new-representacao-modal"
-
-type Partner = {
-    id: string
-    name: string
-    type: string
-    contact: string
-    email: string
-    website: string
-    logo?: string
-}
-
-// REMOVED MOCK DATA - Partners should be fetched from Supabase later
-const mockPartners: Partner[] = []
+import { Plus, ExternalLink, Loader2 } from "lucide-react"
+import { NewRepresentacaoModal, type NewRepresentacaoFormData, type Partner } from "@/components/representacoes/new-representacao-modal"
+import { useRepresentations } from "@/hooks/data/useRepresentations"
 
 export default function Representacoes() {
-    const [partners, setPartners] = useState<Partner[]>(mockPartners)
+    const { partners, loading, addPartner, updatePartner } = useRepresentations()
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [editingPartner, setEditingPartner] = useState<Partner | null>(null)
 
-    const handleNewRepresentacao = (formData: NewRepresentacaoFormData) => {
+    const handleNewRepresentacao = async (formData: NewRepresentacaoFormData) => {
         if (editingPartner) {
             // Update existing partner
             const updatedPartner: Partner = {
@@ -30,22 +18,19 @@ export default function Representacoes() {
                 name: formData.nome,
                 type: formData.tipo,
                 website: formData.site,
+                // NOTE: Logo handling needs proper Supabase Storage implementation later
                 logo: formData.logo ? URL.createObjectURL(formData.logo) : editingPartner.logo,
             }
-            setPartners(partners.map(p => p.id === editingPartner.id ? updatedPartner : p))
+            await updatePartner(updatedPartner)
             setEditingPartner(null)
         } else {
             // Create new partner
-            const newPartner: Partner = {
-                id: String(partners.length + 1),
-                name: formData.nome,
-                type: formData.tipo,
-                contact: "",
-                email: "",
-                website: formData.site,
-                logo: formData.logo ? URL.createObjectURL(formData.logo) : undefined,
-            }
-            setPartners([newPartner, ...partners])
+            await addPartner({
+                nome: formData.nome,
+                tipo: formData.tipo,
+                site: formData.site,
+                logo: formData.logo,
+            })
         }
     }
 
@@ -62,6 +47,14 @@ export default function Representacoes() {
     const handleNewClick = () => {
         setEditingPartner(null)
         setIsModalOpen(true)
+    }
+
+    if (loading) {
+        return (
+            <div className="flex-1 flex items-center justify-center h-full">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        )
     }
 
     return (
