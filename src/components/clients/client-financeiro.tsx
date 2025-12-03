@@ -31,6 +31,7 @@ import type { Boleto } from "@/types/agenda" // Import Boleto type
 import { useRepresentations } from "@/hooks/data/useRepresentations"
 import { useBoletos } from "@/hooks/data/useBoletos"
 import { RecurrenceActionDialog } from "../financeiro/recurrence-action-dialog"
+import { v4 as uuidv4 } from 'uuid' // <-- Adicionando importação
 
 interface ClientFinanceiroProps {
     client: any
