@@ -30,6 +30,7 @@ import { Badge } from "@/components/ui/badge"
 import type { Boleto } from "@/types/agenda" // Import Boleto type
 import { useRepresentations } from "@/hooks/data/useRepresentations"
 import { useBoletos } from "@/hooks/data/useBoletos"
+import { v4 as uuidv4 } from 'uuid'
 
 interface ClientFinanceiroProps {
     client: any
@@ -55,9 +56,6 @@ const formatCurrencyInput = (value: string): string => {
         cleanValue = cleanValue.substring(1)
     }
 
-    // 4. Format using BRL locale for display (this is complex for real-time input, 
-    // so we'll stick to simple string manipulation for now to allow user input flow)
-    
     // Simple BRL formatting simulation: 
     // Remove all non-digits, treat as cents, then format.
     const digits = cleanValue.replace(/\D/g, '')
@@ -198,7 +196,8 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
 
         if (floatValor <= 0) return // Prevent saving zero value
 
-        const recurrenceGroupId = isRecurring ? Math.random().toString(36).substr(2, 9) : undefined
+        // Generate a valid UUID for the recurrence group if needed
+        const recurrenceGroupId = isRecurring ? uuidv4() : undefined
         
         const monthsToGenerate = isRecurring
             ? (recurrenceType === "indefinite" ? 24 : parseInt(recurrenceMonths))
