@@ -15,14 +15,16 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Calendar, Car, User, FileText, Clock, ArrowRight, X } from "lucide-react"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
-import { Claim, CLAIM_STATUS_LABELS, CLAIM_TYPE_LABELS } from "@/types/sinistro"
+import { Claim, CLAIM_STATUS_LABELS, CLAIM_TYPE_LABELS, ClaimComment } from "@/types/sinistro"
 import { cn } from "@/lib/utils"
+import { PostgrestError } from "@supabase/supabase-js"
 
 interface SinistroModalProps {
     claim: Claim | null
     isOpen: boolean
     onClose: () => void
-    onAddComment: (claimId: string, text: string) => Promise<{ data: any; error: any }>
+    // Updated type to match the specific return structure from useClaims.ts
+    onAddComment: (claimId: string, text: string) => Promise<{ error: { message: string; } | PostgrestError; data?: undefined; } | { data: ClaimComment; error?: undefined; }>
 }
 
 export function SinistroModal({ claim, isOpen, onClose, onAddComment }: SinistroModalProps) {
