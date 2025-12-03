@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
 import type { Boleto } from "@/types/agenda"
-import { addMonths } from "date-fns"
+import { addMonths, isBefore, subMonths } from "date-fns"
+import { v4 as uuidv4 } from 'uuid'
 
 // Helper function to map DB object to Boleto type
 const mapDbToBoleto = (dbBoleto: any): Boleto => ({
@@ -51,7 +52,7 @@ export function useBoletos() {
     const [boletos, setBoletos] = useState<Boleto[]>([])
     const [loading, setLoading] = useState(true)
 
-    const fetchBoletos = async (clientId?: string) => {
+    const fetchBoletos = useCallback(async (clientId?: string) => {
         if (!user) {
             setLoading(false)
             return
@@ -82,12 +83,7 @@ export function useBoletos() {
             setBoletos(formattedData)
         }
         setLoading(false)
-    }
-
-    // Fetch all boletos on mount
-    useEffect(() => {
-        fetchBoletos()
-    }, [user])
+    }, [user, toast])
 
     const addBoletos = async (newBoletosData: Omit<Boleto, 'id' | 'representacao' | 'dueDate'>[]) => {
         if (!user) return { error: { message: "Usuário não autenticado" } }
@@ -96,7 +92,7 @@ export function useBoletos() {
         const dbData = newBoletosData.map(b => mapBoletoToDb({
             ...b,
             status: b.status || 'pending',
-            representacaoId: b.representacaoId, // Ensure ID is passed
+            representacaoId: b.representacaoId,
         }, user.id))
 
         const { data, error } = await supabase
@@ -112,7 +108,7 @@ export function useBoletos() {
         const addedBoletos = data.map(mapDbToBoleto)
 
         // Update local state by adding new boletos
-        setBoletos(prev => [...addedBoletos, ...prev].sort((a, b) => a.vencimento.getTime() - b.vencimento.getTime()))
+        setBoletos(prev => [...prev, ...addedBoletos].sort((a, b) => a.vencimento.getTime() - b.vencimento.getTime()))
         toast({ title: "Sucesso", description: `${addedBoletos.length} boleto(s) adicionado(s) com sucesso.` })
         return { data: addedBoletos }
     }
@@ -134,6 +130,85 @@ export function useBoletos() {
         toast({ title: "Sucesso", description: "Boleto excluído com sucesso." })
         return { data: true }
     }
+
+    // --- Recurrence Monitoring Logic ---
+    const generateNextRecurrenceBatch = useCallback(async (groupBoletos: Boleto[]) => {
+        if (!user || groupBoletos.length === 0) return
+
+        const group = groupBoletos[0]
+        const lastBoleto = groupBoletos[groupBoletos.length - 1]
+        const nextVencimento = addMonths(lastBoleto.vencimento, 1)
+        
+        // Generate 12 more months
+        const newBoletosData: Omit<Boleto, 'id' | 'representacao' | 'dueDate'>[] = []
+        const batchSize = 12;
+
+        for (let i = 0; i < batchSize; i++) {
+            newBoletosData.push({
+                valor: group.valor,
+                vencimento: addMonths(nextVencimento, i),
+                placas: group.placas,
+                representacaoId: group.representacaoId,
+                status: "pending",
+                isRecurring: true,
+                recurrenceType: "indefinite",
+                recurrenceMonths: undefined,
+                recurrenceGroupId: group.recurrenceGroupId,
+                comissaoRecorrente: group.comissaoRecorrente,
+                comissaoTipo: group.comissaoTipo,
+                clientId: group.clientId,
+                clientName: group.clientName,
+                title: group.title,
+            })
+        }
+
+        const { error } = await addBoletos(newBoletosData)
+        if (!error) {
+            toast({
+                title: "Recorrência Estendida",
+                description: `Gerado novo lote de ${batchSize} boletos para o grupo ${group.title}.`,
+                variant: "default",
+            })
+        }
+    }, [user, addBoletos, toast])
+
+
+    useEffect(() => {
+        if (!loading && boletos.length > 0) {
+            const today = new Date()
+            const threeMonthsFromNow = addMonths(today, 3)
+
+            // Group boletos by recurrenceGroupId
+            const recurringGroups = boletos.filter(b => b.isRecurring && b.recurrenceType === 'indefinite')
+                .reduce((acc, boleto) => {
+                    if (boleto.recurrenceGroupId) {
+                        if (!acc[boleto.recurrenceGroupId]) {
+                            acc[boleto.recurrenceGroupId] = []
+                        }
+                        acc[boleto.recurrenceGroupId].push(boleto)
+                    }
+                    return acc
+                }, {} as Record<string, Boleto[]>)
+
+            Object.values(recurringGroups).forEach(groupBoletos => {
+                // Sort to find the last one
+                groupBoletos.sort((a, b) => a.vencimento.getTime() - b.vencimento.getTime())
+                const lastBoleto = groupBoletos[groupBoletos.length - 1]
+
+                // Check if the last generated boleto is due within the next 3 months
+                if (isBefore(lastBoleto.vencimento, threeMonthsFromNow)) {
+                    // Trigger generation of the next batch
+                    generateNextRecurrenceBatch(groupBoletos)
+                }
+            })
+        }
+    }, [loading, boletos, generateNextRecurrenceBatch])
+
+
+    // Fetch all boletos on mount
+    useEffect(() => {
+        fetchBoletos()
+    }, [user, fetchBoletos])
 
     return { boletos, loading, fetchBoletos, addBoletos, deleteBoleto }
 }

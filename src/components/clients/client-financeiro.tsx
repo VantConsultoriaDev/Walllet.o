@@ -30,7 +30,7 @@ import { Badge } from "@/components/ui/badge"
 import type { Boleto } from "@/types/agenda" // Import Boleto type
 import { useRepresentations } from "@/hooks/data/useRepresentations"
 import { useBoletos } from "@/hooks/data/useBoletos"
-import { v4 as uuidv4 } from 'uuid'
+// Removed: import { v4 as uuidv4 } from 'uuid'
 
 interface ClientFinanceiroProps {
     client: any
@@ -197,6 +197,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
         if (floatValor <= 0) return // Prevent saving zero value
 
         // Generate a valid UUID for the recurrence group if needed
+        // NOTE: We generate the UUID here for the first batch. Subsequent batches will reuse this ID.
         const recurrenceGroupId = isRecurring ? uuidv4() : undefined
         
         const monthsToGenerate = isRecurring
