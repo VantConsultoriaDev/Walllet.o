@@ -1,0 +1,470 @@
+import { useState, useEffect } from "react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Plus, ArrowDownCircle, DollarSign, Search, Wallet, TrendingUp, ArrowUpDown } from "lucide-react"
+import { NewTransactionModal, type Transaction } from "@/components/financeiro/new-transaction-modal"
+import { format, isWithinInterval, startOfMonth, endOfMonth } from "date-fns"
+import { ptBR } from "date-fns/locale"
+import {
+    ColumnDef,
+    flexRender,
+    getCoreRowModel,
+    getFilteredRowModel,
+    getPaginationRowModel,
+    getSortedRowModel,
+    useReactTable,
+    type SortingState,
+    type ColumnFiltersState,
+    type FilterFn,
+} from "@tanstack/react-table"
+import { DatePickerWithRange } from "@/components/ui/date-range-picker"
+import type { DateRange } from "react-day-picker"
+
+// Initial mock data
+const initialTransactions: Transaction[] = [
+    {
+        id: "1",
+        description: "Comissão - João Silva",
+        amount: 1500.0,
+        type: "income",
+        date: new Date("2023-10-25"),
+        category: "Comissão",
+        isRecurrent: false
+    },
+    {
+        id: "2",
+        description: "Aluguel Escritório",
+        amount: 800.0,
+        type: "expense",
+        date: new Date("2023-10-05"),
+        category: "Operacional",
+        isRecurrent: true,
+        installments: 12,
+        recurrenceId: "rec-1"
+    },
+    {
+        id: "3",
+        description: "Venda - Seguro Auto",
+        amount: 3500.0,
+        type: "income",
+        date: new Date("2023-10-20"),
+        category: "Venda",
+        isRecurrent: false
+    },
+    {
+        id: "4",
+        description: "Internet",
+        amount: 120.0,
+        type: "expense",
+        date: new Date("2023-10-10"),
+        category: "Operacional",
+        isRecurrent: true,
+        recurrenceId: "rec-2"
+    },
+]
+
+// Custom filter for date range
+const dateRangeFilter: FilterFn<Transaction> = (row, columnId, value: DateRange | undefined) => {
+    if (!value?.from) return true
+    const rowDate = row.getValue(columnId) as Date
+    if (!value.to) {
+        return rowDate.getTime() >= value.from.getTime()
+    }
+    return isWithinInterval(rowDate, { start: value.from, end: value.to })
+}
+
+export default function Financeiro() {
+    const [transactions, setTransactions] = useState<Transaction[]>(initialTransactions)
+    const [isModalOpen, setIsModalOpen] = useState(false)
+    const [editingTransaction, setEditingTransaction] = useState<Transaction | undefined>(undefined)
+
+    // Table State
+    const [sorting, setSorting] = useState<SortingState>([])
+    const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
+    const [globalFilter, setGlobalFilter] = useState("")
+    const [dateRange, setDateRange] = useState<DateRange | undefined>({
+        from: startOfMonth(new Date()),
+        to: endOfMonth(new Date()),
+    })
+
+    const handleSaveTransaction = (transaction: Transaction, scope?: "this" | "all") => {
+        if (editingTransaction) {
+            // Edit mode
+            if (scope === "all" && transaction.recurrenceId) {
+                // Update all transactions with same recurrenceId
+                setTransactions(transactions.map(t =>
+                    t.recurrenceId === transaction.recurrenceId ? { ...transaction, id: t.id, date: t.date } : t
+                ))
+            } else {
+                // Update only this transaction
+                setTransactions(transactions.map(t => t.id === transaction.id ? transaction : t))
+            }
+            setEditingTransaction(undefined)
+        } else {
+            // Create mode
+            if (transaction.isRecurrent) {
+                const recurrenceId = Math.random().toString(36).substr(2, 9)
+                const newTransactions: Transaction[] = []
+                const count = transaction.installments || 24
+
+                for (let i = 0; i < count; i++) {
+                    const date = new Date(transaction.date)
+                    date.setMonth(date.getMonth() + i)
+                    newTransactions.push({
+                        ...transaction,
+                        id: Math.random().toString(36).substr(2, 9),
+                        date,
+                        recurrenceId,
+                        installments: transaction.installments
+                    })
+                }
+                setTransactions([...newTransactions, ...transactions])
+            } else {
+                setTransactions([transaction, ...transactions])
+            }
+        }
+    }
+
+    const handleDeleteTransaction = (transaction: Transaction, scope?: "this" | "all") => {
+        if (scope === "all" && transaction.recurrenceId) {
+            setTransactions(transactions.filter(t => t.recurrenceId !== transaction.recurrenceId))
+        } else {
+            setTransactions(transactions.filter(t => t.id !== transaction.id))
+        }
+        setEditingTransaction(undefined)
+    }
+
+    const openEditModal = (transaction: Transaction) => {
+        setEditingTransaction(transaction)
+        setIsModalOpen(true)
+    }
+
+    const formatCurrency = (value: number) => {
+        return new Intl.NumberFormat("pt-BR", {
+            style: "currency",
+            currency: "BRL",
+        }).format(value)
+    }
+
+    const columns: ColumnDef<Transaction>[] = [
+        {
+            accessorKey: "description",
+            header: ({ column }) => {
+                return (
+                    <Button
+                        variant="ghost"
+                        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+                        className="text-xs font-semibold text-muted-foreground uppercase tracking-wider pl-0 hover:bg-transparent"
+                    >
+                        Descrição
+                        <ArrowUpDown className="ml-2 h-3 w-3" />
+                    </Button>
+                )
+            },
+            cell: ({ row }) => (
+                <div className="flex flex-col">
+                    <span className="font-medium">{row.getValue("description")}</span>
+                    {row.original.isRecurrent && (
+                        <span className="text-xs text-muted-foreground">
+                            Recorrente {row.original.installments ? `(${row.original.installments}x)` : '(Indeterminado)'}
+                        </span>
+                    )}
+                </div>
+            ),
+        },
+        {
+            accessorKey: "category",
+            header: ({ column }) => {
+                return (
+                    <Button
+                        variant="ghost"
+                        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+                        className="text-xs font-semibold text-muted-foreground uppercase tracking-wider pl-0 hover:bg-transparent"
+                    >
+                        Categoria
+                        <ArrowUpDown className="ml-2 h-3 w-3" />
+                    </Button>
+                )
+            },
+        },
+        {
+            accessorKey: "date",
+            header: ({ column }) => {
+                return (
+                    <Button
+                        variant="ghost"
+                        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+                        className="text-xs font-semibold text-muted-foreground uppercase tracking-wider pl-0 hover:bg-transparent"
+                    >
+                        Data
+                        <ArrowUpDown className="ml-2 h-3 w-3" />
+                    </Button>
+                )
+            },
+            cell: ({ row }) => format(row.getValue("date"), "dd/MM/yyyy", { locale: ptBR }),
+            filterFn: dateRangeFilter,
+        },
+        {
+            accessorKey: "type",
+            header: ({ column }) => {
+                return (
+                    <Button
+                        variant="ghost"
+                        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+                        className="text-xs font-semibold text-muted-foreground uppercase tracking-wider pl-0 hover:bg-transparent"
+                    >
+                        Tipo
+                        <ArrowUpDown className="ml-2 h-3 w-3" />
+                    </Button>
+                )
+            },
+            cell: ({ row }) => (
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${row.getValue("type") === 'income' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                    }`}>
+                    {row.getValue("type") === 'income' ? 'Receita' : 'Despesa'}
+                </span>
+            ),
+        },
+        {
+            accessorKey: "amount",
+            header: ({ column }) => {
+                return (
+                    <div className="text-right">
+                        <Button
+                            variant="ghost"
+                            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+                            className="text-xs font-semibold text-muted-foreground uppercase tracking-wider pr-0 hover:bg-transparent"
+                        >
+                            Valor
+                            <ArrowUpDown className="ml-2 h-3 w-3" />
+                        </Button>
+                    </div>
+                )
+            },
+            cell: ({ row }) => {
+                const amount = parseFloat(row.getValue("amount"))
+                const type = row.original.type
+                return (
+                    <div className={`text-right font-bold ${type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
+                        {type === 'income' ? '+' : '-'} {formatCurrency(amount)}
+                    </div>
+                )
+            },
+        },
+    ]
+
+    const table = useReactTable({
+        data: transactions,
+        columns,
+        getCoreRowModel: getCoreRowModel(),
+        getPaginationRowModel: getPaginationRowModel(),
+        getSortedRowModel: getSortedRowModel(),
+        getFilteredRowModel: getFilteredRowModel(),
+        onSortingChange: setSorting,
+        onColumnFiltersChange: setColumnFilters,
+        onGlobalFilterChange: setGlobalFilter,
+        state: {
+            sorting,
+            columnFilters,
+            globalFilter,
+        },
+        initialState: {
+            pagination: {
+                pageSize: 10,
+            },
+        },
+    })
+
+    // Apply date filter when dateRange changes
+    useEffect(() => {
+        table.getColumn("date")?.setFilterValue(dateRange)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [dateRange])
+
+    // Calculate summaries based on FILTERED rows
+    const filteredRows = table.getFilteredRowModel().rows
+
+    const monthlyBilling = filteredRows
+        .filter(row => row.original.type === "income")
+        .reduce((acc, row) => acc + row.original.amount, 0)
+
+    const monthlyCommission = filteredRows
+        .filter(row => row.original.type === "income" && row.original.category === "Comissão")
+        .reduce((acc, row) => acc + row.original.amount, 0)
+
+    const monthlyExpenses = filteredRows
+        .filter(row => row.original.type === "expense")
+        .reduce((acc, row) => acc + row.original.amount, 0)
+
+    const netProfit = monthlyCommission - monthlyExpenses
+
+    return (
+        <div className="flex-1 space-y-4 p-4 pt-6 md:p-8 animate-in fade-in duration-500">
+            <div className="flex items-center justify-between space-y-2">
+                <h2 className="text-3xl font-bold tracking-tight">Financeiro</h2>
+                <div className="flex items-center space-x-2">
+                    <Button
+                        className="group transition-all duration-300 hover:scale-105 hover:shadow-lg"
+                        onClick={() => {
+                            setEditingTransaction(undefined)
+                            setIsModalOpen(true)
+                        }}
+                    >
+                        <Plus className="mr-2 h-4 w-4 transition-transform group-hover:rotate-90" />
+                        Nova Movimentação
+                    </Button>
+                </div>
+            </div>
+
+            {/* Summary Cards */}
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <Card className="shadow-sm hover:shadow-md transition-shadow">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Faturamento (Filtrado)</CardTitle>
+                        <TrendingUp className="h-4 w-4 text-blue-500" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold text-blue-600">{formatCurrency(monthlyBilling)}</div>
+                        <p className="text-xs text-muted-foreground">Receitas no período selecionado</p>
+                    </CardContent>
+                </Card>
+                <Card className="shadow-sm hover:shadow-md transition-shadow">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Comissionamento</CardTitle>
+                        <Wallet className="h-4 w-4 text-green-500" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold text-green-600">{formatCurrency(monthlyCommission)}</div>
+                        <p className="text-xs text-muted-foreground">Comissões no período</p>
+                    </CardContent>
+                </Card>
+                <Card className="shadow-sm hover:shadow-md transition-shadow">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Despesas</CardTitle>
+                        <ArrowDownCircle className="h-4 w-4 text-red-500" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold text-red-600">{formatCurrency(monthlyExpenses)}</div>
+                        <p className="text-xs text-muted-foreground">Saídas no período</p>
+                    </CardContent>
+                </Card>
+                <Card className="shadow-sm hover:shadow-md transition-shadow">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Lucro Líquido</CardTitle>
+                        <DollarSign className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className={`text-2xl font-bold ${netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {formatCurrency(netProfit)}
+                        </div>
+                        <p className="text-xs text-muted-foreground">Comissões - Despesas</p>
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* Transactions List */}
+            <Card className="col-span-4">
+                <CardHeader>
+                    <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+                        <CardTitle>Transações</CardTitle>
+                        <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto">
+                            <DatePickerWithRange date={dateRange} setDate={setDateRange} />
+                            <div className="relative w-full md:w-64">
+                                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    placeholder="Buscar transações..."
+                                    value={globalFilter}
+                                    onChange={(e) => setGlobalFilter(e.target.value)}
+                                    className="pl-8"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <div className="rounded-md border">
+                        <Table>
+                            <TableHeader>
+                                {table.getHeaderGroups().map((headerGroup) => (
+                                    <TableRow key={headerGroup.id} className="hover:bg-transparent border-b border-border">
+                                        {headerGroup.headers.map((header) => {
+                                            return (
+                                                <TableHead key={header.id}>
+                                                    {header.isPlaceholder
+                                                        ? null
+                                                        : flexRender(
+                                                            header.column.columnDef.header,
+                                                            header.getContext()
+                                                        )}
+                                                </TableHead>
+                                            )
+                                        })}
+                                    </TableRow>
+                                ))}
+                            </TableHeader>
+                            <TableBody>
+                                {table.getRowModel().rows?.length ? (
+                                    table.getRowModel().rows.map((row) => (
+                                        <TableRow
+                                            key={row.id}
+                                            data-state={row.getIsSelected() && "selected"}
+                                            className="cursor-pointer hover:bg-muted/50 h-16"
+                                            onClick={() => openEditModal(row.original)}
+                                        >
+                                            {row.getVisibleCells().map((cell) => (
+                                                <TableCell key={cell.id}>
+                                                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                                </TableCell>
+                                            ))}
+                                        </TableRow>
+                                    ))
+                                ) : (
+                                    <TableRow>
+                                        <TableCell colSpan={columns.length} className="h-24 text-center">
+                                            Nenhuma transação encontrada.
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
+                    <div className="flex items-center justify-end space-x-2 py-4">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => table.previousPage()}
+                            disabled={!table.getCanPreviousPage()}
+                        >
+                            Anterior
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => table.nextPage()}
+                            disabled={!table.getCanNextPage()}
+                        >
+                            Próximo
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
+
+            <NewTransactionModal
+                open={isModalOpen}
+                onOpenChange={setIsModalOpen}
+                onSubmit={handleSaveTransaction}
+                onDelete={handleDeleteTransaction}
+                transactionToEdit={editingTransaction}
+            />
+        </div>
+    )
+}
