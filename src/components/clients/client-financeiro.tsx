@@ -41,19 +41,32 @@ type SortDirection = "asc" | "desc" | null
 
 // Utility function to format currency input
 const formatCurrencyInput = (value: string): string => {
-    // 1. Remove all non-digit characters except comma/dot
+    // 1. Remove all non-digit characters except comma
     let cleanValue = value.replace(/[^\d,]/g, '')
     
-    // 2. Replace comma with dot for internal float parsing
-    cleanValue = cleanValue.replace(',', '.')
+    // 2. Ensure only one comma is present
+    const parts = cleanValue.split(',')
+    if (parts.length > 2) {
+        cleanValue = parts[0] + ',' + parts.slice(1).join('')
+    }
 
-    // 3. Parse to float
-    const num = parseFloat(cleanValue)
+    // 3. Remove leading zeros unless it's "0," or just "0"
+    if (cleanValue.length > 1 && cleanValue.startsWith('0') && !cleanValue.startsWith('0,')) {
+        cleanValue = cleanValue.substring(1)
+    }
 
-    if (isNaN(num)) return ""
+    // 4. Format using BRL locale for display (this is complex for real-time input, 
+    // so we'll stick to simple string manipulation for now to allow user input flow)
+    
+    // Simple BRL formatting simulation: 
+    // Remove all non-digits, treat as cents, then format.
+    const digits = cleanValue.replace(/\D/g, '')
+    if (digits.length === 0) return ""
 
-    // 4. Format back to BRL string (R$ 1.000,00)
-    return num.toLocaleString('pt-BR', {
+    // Treat as cents
+    let number = parseInt(digits, 10) / 100
+    
+    return number.toLocaleString('pt-BR', {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
         useGrouping: true,
@@ -169,14 +182,11 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
         return result
     }, [clientBoletos, searchTerm, dateFrom, dateTo, sortField, sortDirection])
 
-    const handleValorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleInputValorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const rawValue = e.target.value
-        // Only allow digits and comma
-        const cleanInput = rawValue.replace(/[^\d,]/g, '')
-        
-        // Convert to float, then format back to string for display
-        const floatValue = parseCurrencyToFloat(cleanInput)
-        setValor(formatCurrencyInput(floatValue.toString()))
+        // Apply formatting logic
+        const formattedValue = formatCurrencyInput(rawValue)
+        setValor(formattedValue)
     }
 
     const handleAddBoleto = async () => {
@@ -185,6 +195,8 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
         const selectedPartner = partners.find(p => p.id === representacaoId)
         const representacaoNome = selectedPartner?.name || "N/A"
         const floatValor = parseCurrencyToFloat(valor)
+
+        if (floatValor <= 0) return // Prevent saving zero value
 
         const recurrenceGroupId = isRecurring ? Math.random().toString(36).substr(2, 9) : undefined
         
@@ -462,7 +474,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                             <Input
                                 placeholder="0,00"
                                 value={valor}
-                                onChange={handleValorChange}
+                                onChange={handleInputValorChange}
                                 // Ensure input type is text to allow custom formatting
                                 type="text" 
                             />
