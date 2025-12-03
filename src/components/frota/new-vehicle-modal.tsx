@@ -88,7 +88,7 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                 body: JSON.stringify({
                     "tipo": "fipe",
                     "placa": cleanPlate,
-                    "homolog": true
+                    "homolog": false // Alterado para false para buscar dados reais
                 }),
                 signal: controller.signal,
                 redirect: 'follow',
@@ -107,7 +107,18 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
             console.log("Dados API Brasil:", data);
 
             if (data.error || !data.dados) {
-                // If data is not found, we don't throw an error, just stop loading and allow manual input
+                // Se não encontrar dados, limpa os campos de preenchimento automático
+                setFormData(prev => ({
+                    ...prev,
+                    brand: "",
+                    model: "",
+                    year: undefined,
+                    color: "",
+                    chassi: "",
+                    renavam: "",
+                    fipeCode: "",
+                    fipeValue: "",
+                }))
                 return;
             }
 
