@@ -15,16 +15,17 @@ import { Loader2, TrendingUp, DollarSign, Sun, Moon } from "lucide-react"
 import { motion } from "framer-motion"
 import { Logo } from "@/components/Logo"
 import { useTheme } from "@/components/theme-provider"
+import { useToast } from "@/hooks/use-toast"
 
 export default function Login() {
     const [email, setEmail] = useState("")
     const [password, setPassword] = useState("")
     const [loading, setLoading] = useState(false)
-    const [error, setError] = useState<string | null>(null)
     const { signIn } = useAuth()
     const navigate = useNavigate()
     const { theme, setTheme } = useTheme()
     const [mounted, setMounted] = useState(false)
+    const { toast } = useToast()
 
     useEffect(() => {
         setMounted(true)
@@ -33,12 +34,15 @@ export default function Login() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setLoading(true)
-        setError(null)
 
         const { error } = await signIn(email, password)
 
         if (error) {
-            setError(error.message)
+            toast({
+                title: "Erro de Login",
+                description: error.message || "Credenciais inválidas. Tente novamente.",
+                variant: "destructive",
+            })
             setLoading(false)
         } else {
             navigate("/")
@@ -149,15 +153,6 @@ export default function Login() {
                                     className="bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus:border-blue-500 focus:ring-blue-500 transition-all h-11"
                                 />
                             </div>
-                            {error && (
-                                <motion.p
-                                    initial={{ opacity: 0, y: -10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3 font-medium"
-                                >
-                                    {error}
-                                </motion.p>
-                            )}
                         </CardContent>
                         <CardFooter className="flex flex-col gap-4 pt-4">
                             <Button

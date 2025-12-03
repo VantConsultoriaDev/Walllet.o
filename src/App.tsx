@@ -11,6 +11,7 @@ import Sinistros from "@/pages/Sinistros"
 import Cotacoes from "@/pages/Cotacoes"
 import Representacoes from "@/pages/Representacoes"
 import Login from "@/pages/Login"
+import { Toaster } from "@/components/ui/toaster"
 
 function App() {
   console.log('App component rendering...');
@@ -36,6 +37,7 @@ function App() {
           </Routes>
         </BrowserRouter>
       </AuthProvider>
+      <Toaster />
     </ThemeProvider>
   )
 }
