@@ -215,20 +215,23 @@ export function NewSinistroModal({ isOpen, onClose, onSubmit }: NewSinistroModal
                                 />
                                 {showClientDropdown && filteredClients.length > 0 && !selectedClient && clientSearch.length > 0 && (
                                     <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-950 border rounded-md shadow-lg max-h-48 overflow-auto">
-                                        {filteredClients.map((client) => (
-                                            <div
-                                                key={client.id}
-                                                className="px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer text-sm flex items-center justify-between"
-                                                onClick={() => {
-                                                    setSelectedClient(client)
-                                                    setClientSearch(client.name)
-                                                    setShowClientDropdown(false)
-                                                }}
-                                            >
-                                                {client.name}
-                                                {selectedClient && selectedClient.id === client.id && <Check className="h-4 w-4 text-primary" />}
-                                            </div>
-                                        ))}
+                                        {filteredClients.map((client) => {
+                                            const isSelected = selectedClient?.id === client.id;
+                                            return (
+                                                <div
+                                                    key={client.id}
+                                                    className="px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer text-sm flex items-center justify-between"
+                                                    onClick={() => {
+                                                        setSelectedClient(client)
+                                                        setClientSearch(client.name)
+                                                        setShowClientDropdown(false)
+                                                    }}
+                                                >
+                                                    {client.name}
+                                                    {isSelected && <Check className="h-4 w-4 text-primary" />}
+                                                </div>
+                                            )
+                                        })}
                                     </div>
                                 )}
                             </div>
