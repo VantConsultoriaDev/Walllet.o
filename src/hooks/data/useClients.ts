@@ -22,6 +22,44 @@ export type Client = {
     vehicles: Vehicle[] // Assuming vehicles are fetched separately or denormalized
 }
 
+// Helper function to map DB object to Client type
+const mapDbToClient = (dbClient: any): Client => ({
+    id: dbClient.id,
+    clientType: dbClient.client_type,
+    name: dbClient.name,
+    email: dbClient.email,
+    phone: dbClient.phone,
+    status: dbClient.status,
+    address: dbClient.address,
+    cpf: dbClient.cpf,
+    cnpj: dbClient.cnpj,
+    nomeFantasia: dbClient.nome_fantasia,
+    razaoSocial: dbClient.razao_social,
+    responsavel: dbClient.responsavel,
+    contatoResponsavel: dbClient.contato_responsavel,
+    vehicles: [
+        // Mocking vehicles data for now, as vehicle fetching is not implemented yet
+        { id: "v1", type: "CARRO", plate: "ABC-1234", brand: "Honda", model: "Civic", year: 2022, status: "active" },
+    ] as Vehicle[]
+})
+
+// Helper function to map Client type to DB object
+const mapClientToDb = (client: Partial<Client>) => ({
+    client_type: client.clientType,
+    name: client.name,
+    email: client.email,
+    phone: client.phone,
+    status: client.status,
+    address: client.address,
+    cpf: client.cpf,
+    cnpj: client.cnpj,
+    nome_fantasia: client.nomeFantasia,
+    razao_social: client.razaoSocial,
+    responsavel: client.responsavel,
+    contato_responsavel: client.contatoResponsavel,
+})
+
+
 export function useClients() {
     const { user } = useAuth()
     const { toast } = useToast()
@@ -49,15 +87,8 @@ export function useClients() {
             })
             setClients([])
         } else {
-            // Mocking vehicles data since the schema doesn't include a direct join for the list view
-            // In a real app, we'd fetch vehicles separately or use RLS policies for joins.
-            const clientsWithMockVehicles = data.map(client => ({
-                ...client,
-                vehicles: [
-                    { id: "v1", type: "CARRO", plate: "ABC-1234", brand: "Honda", model: "Civic", year: 2022, status: "active" },
-                ] as Vehicle[]
-            })) as Client[]
-            setClients(clientsWithMockVehicles)
+            const formattedClients = data.map(mapDbToClient)
+            setClients(formattedClients)
         }
         setLoading(false)
     }
@@ -69,12 +100,13 @@ export function useClients() {
     const addClient = async (newClientData: Omit<Client, 'id' | 'status' | 'vehicles'>) => {
         if (!user) return { error: { message: "Usuário não autenticado" } }
 
+        const dbData = mapClientToDb({ ...newClientData, status: 'active' })
+
         const { data, error } = await supabase
             .from('clients')
             .insert({
-                ...newClientData,
+                ...dbData,
                 user_id: user.id,
-                status: 'active',
             })
             .select()
             .single()
@@ -84,10 +116,7 @@ export function useClients() {
             return { error }
         }
 
-        const addedClient: Client = {
-            ...data,
-            vehicles: [] as Vehicle[] // Initialize empty vehicles array
-        }
+        const addedClient = mapDbToClient(data)
 
         setClients(prev => [addedClient, ...prev])
         toast({ title: "Sucesso", description: "Cliente adicionado com sucesso." })
@@ -97,11 +126,11 @@ export function useClients() {
     const updateClient = async (updatedClient: Client) => {
         if (!user) return { error: { message: "Usuário não autenticado" } }
 
-        const { vehicles, ...clientData } = updatedClient;
+        const dbData = mapClientToDb(updatedClient)
 
         const { error } = await supabase
             .from('clients')
-            .update(clientData)
+            .update(dbData)
             .eq('id', updatedClient.id)
             .select()
 
