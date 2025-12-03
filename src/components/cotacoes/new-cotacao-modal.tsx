@@ -143,12 +143,11 @@ export function NewCotacaoModal({ isOpen, onClose, onSubmit }: NewCotacaoModalPr
             let timeoutId = setTimeout(() => controller.abort("Timeout excedido"), 120000);
 
             try {
-                console.log("Iniciando busca de placa:", value);
-                const response = await fetch('https://gateway.apibrasil.io/api/v2/vehicles/base/001/consulta', {
+                const response = await fetch('https://gateway.apibrasil.io/api/v2/consulta/veiculos/credits', {
                     method: 'POST',
                     headers: {
                         "Content-Type": "application/json",
-                        "Authorization": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwOi8vZ2F0ZXdheS5hcGlicmFzaWwuaW8vYXBpL3YyL2F1dGgvbG9naW4iLCJpYXQiOjE3NjI3OTQ1OTUsImV4cCI6MTc5NDMzMDU5NSwibmJmIjoxNzYyNzk0NTk1LCJqdGkiOiI5ZWtGN0huTVBkWGFaT2hTIiwic3ViIjoiMTc4NDIiLCJwcnY6IjIzYmQ1Yzg5NDlmNjAwYWRiMzllNzAxYzQwMDg3MmRiN2E1OTc2Zjci.zMHjM--QqTrHf30hWq5K9ILzhRuOLkhYEkm89E7tb5U"
+                        "Authorization": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwOi8vZ2F0ZXdheS5hcGlicmFzaWwuaW8vYXBpL3YyL2F1dGgvbG9naW4iLCJpYXQiOjE3NjQ3OTQ0NDcsImV4cCI6MTc5NjMzMDQ0NywibmJmIjoxNzY0Nzk0NDQ3LCJqdGkiOiJnWHk5TkFhaDNPOEJnNGp6Iiwic3ViIjoiMTc4NDIiLCJwcnYiOiIyM2JkNWM4OTQ5ZjYwMGFkYjM5ZTcwMWM0MDA4NzJkYjdhNTk3NmY3In0.V6QSWD39KM6TtCk4nJawVJnigT5r2TojKrOR3qy9Lgc"
                     },
                     body: JSON.stringify({
                         "tipo": "fipe",
@@ -168,40 +167,45 @@ export function NewCotacaoModal({ isOpen, onClose, onSubmit }: NewCotacaoModalPr
                 }
 
                 const data = await response.json()
-                console.log("Dados brutos da API:", data)
+                console.log("Dados API Brasil (consulta/veiculos/credits):", data)
 
-                if (data.error) {
-                    console.error("Erro retornado pela API:", data.message);
+                if (data.error || data.status === 'error') {
+                    console.error("Erro retornado pela API:", data.message || data.error);
                     return;
                 }
 
-                // Tenta encontrar o objeto de dados correto
-                const veiculo = data.dados || data.vehicle || data;
+                // A API 'credits' retorna os dados dentro de 'dados'
+                const veiculo = data.dados || data;
 
                 if (veiculo) {
-                    const marca = veiculo.marca || veiculo.fabricante || veiculo.montadora || "";
-                    const modelo = veiculo.modelo || veiculo.modelo_veiculo || veiculo.veiculo || "";
-                    const ano = veiculo.ano || veiculo.ano_modelo || veiculo.ano_fabricacao || "";
-                    const cor = veiculo.cor || "";
-                    const chassi = veiculo.chassi || "";
-                    const renavam = veiculo.renavam || "";
+                    // Helper to safely get string value
+                    const safeString = (val: any) => (val !== null && val !== undefined ? String(val) : "");
+                    // Helper to safely get number value
+                    const safeNumber = (val: any) => (val !== null && val !== undefined ? Number(val) : undefined);
+
+                    const marca = safeString(veiculo.marca || veiculo.fabricante || veiculo.montadora);
+                    const modelo = safeString(veiculo.modelo || veiculo.modelo_veiculo || veiculo.veiculo);
+                    const ano = safeNumber(veiculo.ano_modelo || veiculo.ano);
+                    const cor = safeString(veiculo.cor);
+                    const chassi = safeString(veiculo.chassi);
+                    const renavam = safeString(veiculo.renavam);
+                    const fipeCodigo = safeString(veiculo.fipe_codigo || veiculo.codigo_fipe);
+
+                    let fipeValor = safeString(veiculo.fipe_valor || veiculo.valor_fipe);
+                    // Clean up FIPE value if it contains currency symbols/dots
+                    if (fipeValor) {
+                        fipeValor = fipeValor.replace(/[R$\s.]/g, '').replace(',', '.');
+                        if (isNaN(parseFloat(fipeValor))) fipeValor = "";
+                    }
 
                     setMarca(marca);
                     setModelo(modelo);
-                    setAno(ano.toString());
+                    setAno(ano ? ano.toString() : "");
                     setCor(cor);
                     setChassi(chassi);
                     setRenavam(renavam);
-
-                    const fipeCodigo = veiculo.fipe_codigo || veiculo.codigo_fipe || "";
-                    if (fipeCodigo) setCodigoFipe(fipeCodigo);
-
-                    const fipeValor = veiculo.fipe_valor || veiculo.valor || veiculo.valor_fipe || "";
-                    if (fipeValor) {
-                        const valorStr = String(fipeValor);
-                        const valor = parseFloat(valorStr.replace(/[^\d,.-]/g, '').replace('.', '').replace(',', '.'));
-                        if (!isNaN(valor)) setValorFipe(valor.toString());
-                    }
+                    setCodigoFipe(fipeCodigo);
+                    setValorFipe(fipeValor);
                 } else {
                     console.warn("Estrutura de dados não reconhecida:", data);
                 }
@@ -276,10 +280,12 @@ export function NewCotacaoModal({ isOpen, onClose, onSubmit }: NewCotacaoModalPr
             asset,
             anuidade: parseFloat(anuidade),
             parcelas,
-            comissaoType,
-            comissaoValue: parseFloat(comissaoValue),
-            comissaoInstallments:
-                comissaoType === "recorrente_determinada" ? parseInt(comissaoInstallments) : undefined,
+            comissao: {
+                type: comissaoType,
+                value: parseFloat(comissaoValue),
+                installments:
+                    comissaoType === "recorrente_determinada" ? parseInt(comissaoInstallments) : undefined,
+            },
         }
 
         onSubmit(formData)

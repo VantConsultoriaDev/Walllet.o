@@ -79,18 +79,16 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
         let timeoutId: ReturnType<typeof setTimeout> | undefined = setTimeout(() => controller.abort("Timeout excedido"), 120000);
 
         try {
-            // Usando o endpoint 001/consulta que parece ser mais confiável
-            const response = await fetch('https://gateway.apibrasil.io/api/v2/vehicles/base/001/consulta', {
+            const response = await fetch('https://gateway.apibrasil.io/api/v2/consulta/veiculos/credits', {
                 method: 'POST',
                 headers: {
                     "Content-Type": "application/json",
-                    // TOKEN ATUALIZADO
                     "Authorization": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwOi8vZ2F0ZXdheS5hcGlicmFzaWwuaW8vYXBpL3YyL2F1dGgvbG9naW4iLCJpYXQiOjE3NjQ3OTQ0NDcsImV4cCI6MTc5NjMzMDQ0NywibmJmIjoxNzY0Nzk0NDQ3LCJqdGkiOiJnWHk5TkFhaDNPOEJnNGp6Iiwic3ViIjoiMTc4NDIiLCJwcnYiOiIyM2JkNWM4OTQ5ZjYwMGFkYjM5ZTcwMWM0MDA4NzJkYjdhNTk3NmY3In0.V6QSWD39KM6TtCk4nJawVJnigT5r2TojKrOR3qy9Lgc"
                 },
                 body: JSON.stringify({
                     "tipo": "fipe",
-                    "placa": cleanPlate,
-                    "homolog": false
+                    "placa": cleanPlate, // Usando a placa dinâmica
+                    "homolog": false // Mantendo false para produção
                 }),
                 signal: controller.signal,
                 redirect: 'follow',
@@ -106,10 +104,10 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
             }
 
             const data = await response.json();
-            console.log("Dados API Brasil (001/consulta):", data);
+            console.log("Dados API Brasil (consulta/veiculos/credits):", data);
 
-            if (data.error) {
-                console.error("Erro retornado pela API:", data.message);
+            if (data.error || data.status === 'error') {
+                console.error("Erro retornado pela API:", data.message || data.error);
                 // Limpa apenas os campos automáticos em caso de erro
                 setFormData(prev => ({
                     ...prev,
@@ -125,8 +123,8 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                 return;
             }
 
-            // Tenta encontrar o objeto de dados correto (lógica copiada do modal de cotações)
-            const veiculo = data.dados || data.vehicle || data;
+            // A API 'credits' retorna os dados dentro de 'dados'
+            const veiculo = data.dados || data;
 
             if (veiculo) {
                 // Helper to safely get string value
