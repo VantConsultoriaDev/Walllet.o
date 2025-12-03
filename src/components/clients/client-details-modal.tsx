@@ -22,29 +22,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Building2, User, Phone, Mail, MapPin, Car, FileText, Pencil, Save, X, Plus, Trash2 } from "lucide-react"
 import { ClientFinanceiro } from "./client-financeiro"
-
-type Vehicle = {
-    plate: string
-    model: string
-    year: number
-}
-
-type Client = {
-    id: string
-    clientType: "PF" | "PJ"
-    name: string
-    email: string
-    phone: string
-    status: "active" | "inactive" | "pending"
-    cpf?: string
-    cnpj?: string
-    nomeFantasia?: string
-    razaoSocial?: string
-    responsavel?: string
-    contatoResponsavel?: string
-    address: string
-    vehicles: Vehicle[]
-}
+import type { Vehicle } from "@/components/frota/new-vehicle-modal"
+import type { Client } from "@/hooks/data/useClients" // Import Client type from hook
 
 type ClientDetailsModalProps = {
     client: Client | null
@@ -58,7 +37,7 @@ type ClientDetailsModalProps = {
 export function ClientDetailsModal({ client, open, onOpenChange, onViewFleet, onStatusChange, onSave }: ClientDetailsModalProps) {
     const [isEditing, setIsEditing] = useState(false)
     const [editedClient, setEditedClient] = useState<Client | null>(null)
-    const [newVehicle, setNewVehicle] = useState<Vehicle>({ plate: "", model: "", year: new Date().getFullYear() })
+    const [newVehicle, setNewVehicle] = useState<Vehicle>({ plate: "", model: "", year: new Date().getFullYear() } as Vehicle)
     const [isAddingVehicle, setIsAddingVehicle] = useState(false)
     const [activeTab, setActiveTab] = useState("dados")
 
@@ -97,7 +76,7 @@ export function ClientDetailsModal({ client, open, onOpenChange, onViewFleet, on
                 ...editedClient,
                 vehicles: [...editedClient.vehicles, newVehicle]
             })
-            setNewVehicle({ plate: "", model: "", year: new Date().getFullYear() })
+            setNewVehicle({ plate: "", model: "", year: new Date().getFullYear() } as Vehicle)
             setIsAddingVehicle(false)
         }
     }
@@ -433,16 +412,14 @@ export function ClientDetailsModal({ client, open, onOpenChange, onViewFleet, on
                                     {(isEditing ? editedClient.vehicles : client.vehicles.slice(0, 3)).map((vehicle, index) => (
                                         <div
                                             key={index}
-                                            className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
+                                            className="flex items-center gap-3 p-3 rounded-lg bg-muted/50"
                                         >
-                                            <div className="flex items-center gap-3">
-                                                <Car className="h-4 w-4 text-muted-foreground" />
-                                                <div>
-                                                    <p className="font-medium">{vehicle.plate}</p>
-                                                    <p className="text-sm text-muted-foreground">
-                                                        {vehicle.model} • {vehicle.year}
-                                                    </p>
-                                                </div>
+                                            <Car className="h-4 w-4 text-muted-foreground" />
+                                            <div className="flex-1">
+                                                <p className="font-medium">{vehicle.plate}</p>
+                                                <p className="text-sm text-muted-foreground">
+                                                    {vehicle.model} • {vehicle.year}
+                                                </p>
                                             </div>
                                             {isEditing && (
                                                 <Button

@@ -14,32 +14,8 @@ type Partner = {
     logo?: string
 }
 
-const mockPartners: Partner[] = [
-    {
-        id: "1",
-        name: "Seguradora A",
-        type: "Seguradora",
-        contact: "Roberto",
-        email: "roberto@seguradoraa.com.br",
-        website: "https://seguradoraa.com.br",
-    },
-    {
-        id: "2",
-        name: "Associação Protege",
-        type: "Associação",
-        contact: "Fernanda",
-        email: "fernanda@protege.com.br",
-        website: "https://protege.com.br",
-    },
-    {
-        id: "3",
-        name: "Cooperativa União",
-        type: "Cooperativa",
-        contact: "Ricardo",
-        email: "ricardo@uniao.com.br",
-        website: "https://uniao.com.br",
-    },
-]
+// REMOVED MOCK DATA - Partners should be fetched from Supabase later
+const mockPartners: Partner[] = []
 
 export default function Representacoes() {
     const [partners, setPartners] = useState<Partner[]>(mockPartners)

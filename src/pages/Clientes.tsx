@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Plus, LayoutGrid, List } from "lucide-react"
+import { Plus, LayoutGrid, List, Loader2 } from "lucide-react"
 import { ClientCard } from "@/components/clients/client-card"
 import { NewClientModal } from "@/components/clients/new-client-modal"
 import { ClientDetails } from "@/components/clients/client-details"
@@ -10,103 +10,13 @@ import { ColumnDef } from "@tanstack/react-table"
 import { DataTableColumnHeader } from "@/components/ui/data-table-column-header"
 import { DataTableFilterConfig } from "@/components/ui/data-table-toolbar"
 import { normalizeString } from "@/lib/utils"
-
-import type { Vehicle } from "@/components/frota/new-vehicle-modal"
-
-type Client = {
-    id: string
-    clientType: "PF" | "PJ"
-    name: string
-    email: string
-    phone: string
-    status: "active" | "inactive" | "blocked"
-
-    // PF fields
-    cpf?: string
-
-    // PJ fields
-    cnpj?: string
-    nomeFantasia?: string
-    razaoSocial?: string
-    responsavel?: string
-    contatoResponsavel?: string
-
-    // Common fields
-    address: string
-    vehicles: Vehicle[]
-}
-
-const mockClients: Client[] = [
-    {
-        id: "1",
-        clientType: "PF",
-        name: "João Silva",
-        cpf: "123.456.789-00",
-        email: "joao@email.com",
-        phone: "(11) 99999-9999",
-        status: "active",
-        address: "Rua das Flores, 123 - São Paulo, SP",
-        vehicles: [
-            { id: "v1", type: "CARRO", plate: "ABC-1234", brand: "Honda", model: "Civic", year: 2022, status: "active" },
-            { id: "v2", type: "CARRO", plate: "DEF-5678", brand: "Toyota", model: "Corolla", year: 2021, status: "active" }
-        ]
-    },
-    {
-        id: "2",
-        clientType: "PJ",
-        name: "Tech Solutions Ltda",
-        cnpj: "12.345.678/0001-90",
-        nomeFantasia: "Tech Solutions",
-        razaoSocial: "Tech Solutions Tecnologia Ltda",
-        email: "contato@techsolutions.com",
-        phone: "(11) 98888-8888",
-        responsavel: "Maria Oliveira",
-        contatoResponsavel: "(11) 97777-7777",
-        status: "blocked",
-        address: "Av. Paulista, 1000 - São Paulo, SP",
-        vehicles: [
-            { id: "v3", type: "TRUCK", plate: "GHI-9012", brand: "Fiat", model: "Toro", year: 2023, status: "active" },
-            { id: "v4", type: "TRUCK", plate: "JKL-3456", brand: "VW", model: "Amarok", year: 2022, status: "active" },
-            { id: "v5", type: "TRUCK", plate: "MNO-7890", brand: "Chevrolet", model: "S10", year: 2021, status: "active" }
-        ]
-    },
-    {
-        id: "3",
-        clientType: "PF",
-        name: "Carlos Santos",
-        cpf: "987.654.321-00",
-        email: "carlos@email.com",
-        phone: "(11) 97777-7777",
-        status: "inactive",
-        address: "Rua dos Pinheiros, 456 - São Paulo, SP",
-        vehicles: [
-            { id: "v6", type: "CARRO", plate: "PQR-1122", brand: "Ford", model: "Ka", year: 2020, status: "active" }
-        ]
-    },
-    {
-        id: "4",
-        clientType: "PJ",
-        name: "Logística Express S.A.",
-        cnpj: "98.765.432/0001-10",
-        nomeFantasia: "Logística Express",
-        razaoSocial: "Logística Express Transportes S.A.",
-        email: "contato@logisticaexpress.com",
-        phone: "(11) 95555-5555",
-        contatoResponsavel: "(11) 95555-5555",
-        status: "active",
-        address: "Rodovia dos Bandeirantes, Km 25 - Barueri, SP",
-        vehicles: [
-            { id: "v7", type: "TRUCK", plate: "STU-3344", brand: "Mercedes", model: "Sprinter", year: 2023, status: "active" },
-            { id: "v8", type: "TRUCK", plate: "VWX-5566", brand: "Iveco", model: "Daily", year: 2022, status: "active" }
-        ]
-    }
-]
+import { useClients, type Client } from "@/hooks/data/useClients"
 
 export default function Clientes() {
+    const { clients, loading, addClient, updateClient } = useClients()
     const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
     const [selectedClient, setSelectedClient] = useState<Client | null>(null)
     const [newClientModalOpen, setNewClientModalOpen] = useState(false)
-    const [clients, setClients] = useState<Client[]>(mockClients)
 
     const filters: DataTableFilterConfig[] = [
         {
@@ -225,21 +135,46 @@ export default function Clientes() {
         },
     ]
 
-    const handleNewClient = (newClient: Client) => {
-        setClients(prev => [...prev, newClient])
+    const handleNewClient = async (newClientData: any) => {
+        // Map NewClientModal data structure to Client type structure
+        const clientToSave = {
+            clientType: newClientData.clientType,
+            name: newClientData.clientType === "PF" ? newClientData.name : newClientData.razaoSocial,
+            email: newClientData.email,
+            phone: newClientData.phone,
+            address: newClientData.address,
+            cpf: newClientData.cpf || undefined,
+            cnpj: newClientData.cnpj || undefined,
+            nomeFantasia: newClientData.nomeFantasia || undefined,
+            razaoSocial: newClientData.razaoSocial || undefined,
+            responsavel: newClientData.responsavel || undefined,
+            contatoResponsavel: newClientData.contatoResponsavel || undefined,
+        }
+
+        const { data } = await addClient(clientToSave)
+        if (data) {
+            setSelectedClient(data)
+        }
     }
 
-    const handleStatusChange = (clientId: string, newStatus: "active" | "inactive" | "blocked") => {
-        setClients(prev => prev.map(client =>
-            client.id === clientId ? { ...client, status: newStatus } : client
-        ))
+    const handleStatusChange = async (clientId: string, newStatus: "active" | "inactive" | "blocked") => {
+        const clientToUpdate = clients.find(c => c.id === clientId)
+        if (clientToUpdate) {
+            await updateClient({ ...clientToUpdate, status: newStatus })
+        }
     }
 
-    const handleUpdateClient = (updatedClient: Client) => {
-        setClients(prev => prev.map(client =>
-            client.id === updatedClient.id ? updatedClient : client
-        ))
+    const handleUpdateClient = async (updatedClient: Client) => {
+        await updateClient(updatedClient)
         setSelectedClient(updatedClient)
+    }
+
+    if (loading) {
+        return (
+            <div className="flex-1 flex items-center justify-center h-full">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        )
     }
 
     return (

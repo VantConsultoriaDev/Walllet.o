@@ -16,10 +16,20 @@ export interface Event {
 
 export interface Boleto {
     id: string
-    title: string
-    value: number
-    dueDate: Date
+    title?: string // Added title as optional, as it wasn't in the DB schema but was in mock
+    valor: number
+    vencimento: Date
+    dueDate: Date // Kept for compatibility with old mock structure/Agenda page
     clientId: string
     clientName: string
+    placas: string[]
+    representacao: string
     status: "pending" | "paid" | "overdue"
+    dataPagamento?: Date
+    isRecurring: boolean
+    recurrenceType?: "indefinite" | "limited"
+    recurrenceMonths?: number
+    recurrenceGroupId?: string
+    comissaoRecorrente?: number
+    comissaoTipo?: "percentual" | "valor"
 }

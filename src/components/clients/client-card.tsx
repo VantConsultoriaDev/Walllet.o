@@ -1,24 +1,9 @@
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { Building2, User, Phone, Mail, MapPin, Car } from "lucide-react"
+import type { Client } from "@/hooks/data/useClients"
 
-type Vehicle = {
-    plate: string
-    model: string
-    year: number
-}
-
-type ClientCardProps = {
-    id: string
-    clientType: "PF" | "PJ"
-    name: string
-    email: string
-    phone: string
-    status: "active" | "inactive" | "blocked"
-    cpf?: string
-    cnpj?: string
-    address: string
-    vehicles: Vehicle[]
+type ClientCardProps = Client & {
     onClick: () => void
 }
 

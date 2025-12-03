@@ -16,23 +16,7 @@ import { Building2, User, Phone, FileText, Pencil, Save, X, Plus, Trash2, ArrowL
 import { NewVehicleModal, type Vehicle } from "@/components/frota/new-vehicle-modal"
 import { VehicleCard } from "@/components/frota/vehicle-card"
 import { ClientFinanceiro } from "./client-financeiro"
-
-type Client = {
-    id: string
-    clientType: "PF" | "PJ"
-    name: string
-    email: string
-    phone: string
-    status: "active" | "inactive" | "blocked"
-    cpf?: string
-    cnpj?: string
-    nomeFantasia?: string
-    razaoSocial?: string
-    responsavel?: string
-    contatoResponsavel?: string
-    address: string
-    vehicles: Vehicle[]
-}
+import type { Client } from "@/hooks/data/useClients" // Import Client type from hook
 
 type ClientDetailsProps = {
     client: Client

@@ -4,18 +4,21 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ChevronLeft, ChevronRight, Search, Plus, Calendar as CalendarIcon } from "lucide-react"
-import { mockEvents as initialEvents, mockBoletos } from "@/lib/mock-data"
-import type { Event, UrgencyLevel } from "@/types/agenda"
+import { ChevronLeft, ChevronRight, Search, Plus, Calendar as CalendarIcon, Loader2 } from "lucide-react"
+import type { Event, UrgencyLevel, Boleto } from "@/types/agenda"
 import { DayModal } from "@/components/agenda/day-modal"
 import { FinanceModal } from "@/components/agenda/finance-modal"
 import { EventModal } from "@/components/agenda/event-modal"
 import { cn } from "@/lib/utils"
+import { useEvents } from "@/hooks/data/useEvents"
+
+// Mock boletos temporarily until a useBoletos hook is created
+const mockBoletos: Boleto[] = []
 
 export default function Agenda() {
+    const { events, loading, addEvent, updateEvent, deleteEvent } = useEvents()
     const [date, setDate] = useState<Date | undefined>(new Date())
     const [currentMonth, setCurrentMonth] = useState(new Date())
-    const [events, setEvents] = useState<Event[]>(initialEvents)
     const [isDayModalOpen, setIsDayModalOpen] = useState(false)
     const [isFinanceModalOpen, setIsFinanceModalOpen] = useState(false)
     const [searchQuery, setSearchQuery] = useState("")
@@ -36,11 +39,8 @@ export default function Agenda() {
         event.date.getFullYear() === date.getFullYear()
     )
 
-    const selectedDateAppointments = selectedDateEvents.filter(e => e.category === "compromisso")
-    const selectedDateTasks = selectedDateEvents.filter(e => e.category === "tarefa")
-
     // Filter tasks based on urgency
-    const filteredTasks = selectedDateTasks.filter(task =>
+    const filteredTasks = selectedDateEvents.filter(task =>
         taskUrgencyFilter === "todos" || task.urgency === taskUrgencyFilter
     )
 
@@ -50,7 +50,7 @@ export default function Agenda() {
         event.client.toLowerCase().includes(searchQuery.toLowerCase())
     )
 
-    // Filter boletos for the selected date
+    // Filter boletos for the selected date (using mock for now)
     const selectedDateBoletos = mockBoletos.filter(boleto =>
         date &&
         boleto.dueDate.getDate() === date.getDate() &&
@@ -59,36 +59,32 @@ export default function Agenda() {
     )
 
     const handleAddEvent = (newEvent: Omit<Event, "id">) => {
-        const event: Event = {
-            ...newEvent,
-            id: Math.random().toString(36).substr(2, 9)
-        }
-        setEvents([...events, event])
+        addEvent(newEvent)
     }
 
     const handleAddTask = () => {
         if (!newTaskTitle.trim() || !date) return
 
-        const newTask: Event = {
-            id: Math.random().toString(36).substr(2, 9),
+        const newTask: Omit<Event, "id"> = {
             title: newTaskTitle,
             date: date,
             type: "outros",
             urgency: "normal",
             category: "tarefa",
             client: "Sistema", // Default client
-            description: ""
+            description: "",
+            completed: false
         }
-        setEvents([...events, newTask])
+        addEvent(newTask)
         setNewTaskTitle("")
     }
 
     const handleUpdateEvent = (updatedEvent: Event) => {
-        setEvents(events.map(e => e.id === updatedEvent.id ? updatedEvent : e))
+        updateEvent(updatedEvent)
     }
 
     const handleDeleteEvent = (eventId: string) => {
-        setEvents(events.filter(e => e.id !== eventId))
+        deleteEvent(eventId)
     }
 
     const handleEventClick = (event: Event) => {
@@ -153,6 +149,14 @@ export default function Agenda() {
             e.date.getDate() === d.getDate() &&
             e.date.getMonth() === d.getMonth() &&
             e.date.getFullYear() === d.getFullYear()
+        )
+    }
+
+    if (loading) {
+        return (
+            <div className="flex-1 flex items-center justify-center h-full">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
         )
     }
 

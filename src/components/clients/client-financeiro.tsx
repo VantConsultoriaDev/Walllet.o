@@ -27,6 +27,7 @@ import { Calendar } from "@/components/ui/calendar"
 import { cn } from "@/lib/utils"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 import { Badge } from "@/components/ui/badge"
+import type { Boleto } from "@/types/agenda" // Import Boleto type
 
 // Mock representations (should ideally come from a shared source or prop)
 const MOCK_REPRESENTACOES = [
@@ -34,23 +35,6 @@ const MOCK_REPRESENTACOES = [
     "Associação Protege",
     "Cooperativa União"
 ]
-
-export type Boleto = {
-    id: string
-    valor: number
-    vencimento: Date
-    placas: string[] // Changed from placa: string
-    representacao: string
-    status: "pending" | "paid" | "overdue"
-    dataPagamento?: Date
-    isRecurring: boolean
-    recurrenceType?: "indefinite" | "limited"
-    recurrenceMonths?: number
-    recurrenceGroupId?: string
-    // Comissão recorrente
-    comissaoRecorrente?: number
-    comissaoTipo?: "percentual" | "valor" // Tipo da comissão
-}
 
 interface ClientFinanceiroProps {
     client: any
@@ -61,7 +45,8 @@ type SortField = "vencimento" | "valor" | "placas" | "representacao"
 type SortDirection = "asc" | "desc" | null
 
 export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProps) {
-    const [boletos, setBoletos] = useState<Boleto[]>([])
+    // Initialize with empty array, assuming data will be fetched here or passed down later
+    const [boletos, setBoletos] = useState<Boleto[]>([]) 
     const [isNewBoletoOpen, setIsNewBoletoOpen] = useState(false)
 
     // Form state
@@ -175,7 +160,10 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                 recurrenceMonths: isRecurring && recurrenceType === "limited" ? parseInt(recurrenceMonths) : undefined,
                 recurrenceGroupId,
                 comissaoRecorrente: comissaoRecorrente ? parseFloat(comissaoRecorrente) : undefined,
-                comissaoTipo: comissaoRecorrente ? comissaoTipo : undefined
+                comissaoTipo: comissaoRecorrente ? comissaoTipo : undefined,
+                clientId: client.id, // Use real client ID
+                clientName: client.name, // Use real client name
+                dueDate: addMonths(vencimento, i), // Add dueDate for compatibility with Agenda type
             })
         }
 
