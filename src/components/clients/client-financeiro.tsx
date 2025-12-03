@@ -30,7 +30,7 @@ import { Badge } from "@/components/ui/badge"
 import type { Boleto } from "@/types/agenda" // Import Boleto type
 import { useRepresentations } from "@/hooks/data/useRepresentations"
 import { useBoletos } from "@/hooks/data/useBoletos"
-// Removed: import { v4 as uuidv4 } from 'uuid'
+import { RecurrenceActionDialog } from "../financeiro/recurrence-action-dialog"
 
 interface ClientFinanceiroProps {
     client: any
@@ -84,9 +84,12 @@ const parseCurrencyToFloat = (formattedValue: string): number => {
 
 export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProps) {
     const { partners, loading: representationsLoading } = useRepresentations()
-    const { boletos: allBoletos, loading: boletosLoading, addBoletos, deleteBoleto } = useBoletos()
+    const { boletos: allBoletos, loading: boletosLoading, addBoletos, deleteBoleto, deleteRecurrenceGroup } = useBoletos()
 
     const [isNewBoletoOpen, setIsNewBoletoOpen] = useState(false)
+    const [isRecurrenceDialogOpen, setIsRecurrenceDialogOpen] = useState(false)
+    const [pendingDeleteBoleto, setPendingDeleteBoleto] = useState<Boleto | null>(null)
+
 
     // Filter boletos specific to this client
     const clientBoletos = useMemo(() => {
@@ -197,7 +200,6 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
         if (floatValor <= 0) return // Prevent saving zero value
 
         // Generate a valid UUID for the recurrence group if needed
-        // NOTE: We generate the UUID here for the first batch. Subsequent batches will reuse this ID.
         const recurrenceGroupId = isRecurring ? uuidv4() : undefined
         
         const monthsToGenerate = isRecurring
@@ -230,10 +232,24 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
         resetForm()
     }
 
-    const handleDeleteBoleto = async (id: string) => {
-        if (window.confirm("Tem certeza que deseja excluir este boleto?")) {
-            await deleteBoleto(id)
+    const handleDeleteClick = (boleto: Boleto) => {
+        if (boleto.isRecurring && boleto.recurrenceGroupId) {
+            setPendingDeleteBoleto(boleto)
+            setIsRecurrenceDialogOpen(true)
+        } else {
+            // Single deletion
+            handleDeleteBoleto(boleto, "this")
         }
+    }
+
+    const handleDeleteBoleto = async (boleto: Boleto, scope: "this" | "all") => {
+        if (scope === "all" && boleto.recurrenceGroupId) {
+            await deleteRecurrenceGroup(boleto.recurrenceGroupId)
+        } else {
+            await deleteBoleto(boleto.id)
+        }
+        setPendingDeleteBoleto(null)
+        setIsRecurrenceDialogOpen(false)
     }
 
     const resetForm = () => {
@@ -450,7 +466,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                                             <Button
                                                 variant="ghost"
                                                 size="icon"
-                                                onClick={() => handleDeleteBoleto(boleto.id)}
+                                                onClick={() => handleDeleteClick(boleto)}
                                             >
                                                 <Trash2 className="h-4 w-4 text-destructive" />
                                             </Button>
@@ -690,6 +706,16 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* Recurrence Delete Dialog */}
+            {pendingDeleteBoleto && (
+                <RecurrenceActionDialog
+                    open={isRecurrenceDialogOpen}
+                    onOpenChange={setIsRecurrenceDialogOpen}
+                    onAction={(scope) => handleDeleteBoleto(pendingDeleteBoleto, scope)}
+                    actionType="delete"
+                />
+            )}
         </div>
     )
 }

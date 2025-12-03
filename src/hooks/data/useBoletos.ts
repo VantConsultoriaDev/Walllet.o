@@ -3,7 +3,7 @@ import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
 import type { Boleto } from "@/types/agenda"
-import { addMonths, isBefore, subMonths } from "date-fns"
+import { addMonths, isBefore } from "date-fns"
 import { v4 as uuidv4 } from 'uuid'
 
 // Helper function to map DB object to Boleto type
@@ -131,6 +131,25 @@ export function useBoletos() {
         return { data: true }
     }
 
+    const deleteRecurrenceGroup = async (groupId: string) => {
+        if (!user) return { error: { message: "Usuário não autenticado" } }
+
+        const { error } = await supabase
+            .from('boletos')
+            .delete()
+            .eq('recurrence_group_id', groupId)
+            .eq('user_id', user.id) // Safety check
+
+        if (error) {
+            toast({ title: "Erro", description: "Falha ao excluir grupo de boletos recorrentes.", variant: "destructive" })
+            return { error }
+        }
+
+        setBoletos(prev => prev.filter(b => b.recurrenceGroupId !== groupId))
+        toast({ title: "Sucesso", description: "Grupo de boletos recorrentes excluído com sucesso." })
+        return { data: true }
+    }
+
     // --- Recurrence Monitoring Logic ---
     const generateNextRecurrenceBatch = useCallback(async (groupBoletos: Boleto[]) => {
         if (!user || groupBoletos.length === 0) return
@@ -210,5 +229,5 @@ export function useBoletos() {
         fetchBoletos()
     }, [user, fetchBoletos])
 
-    return { boletos, loading, fetchBoletos, addBoletos, deleteBoleto }
+    return { boletos, loading, fetchBoletos, addBoletos, deleteBoleto, deleteRecurrenceGroup }
 }
