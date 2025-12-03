@@ -39,6 +39,38 @@ interface ClientFinanceiroProps {
 type SortField = "vencimento" | "valor" | "placas" | "representacao"
 type SortDirection = "asc" | "desc" | null
 
+// Utility function to format currency input
+const formatCurrencyInput = (value: string): string => {
+    // 1. Remove all non-digit characters except comma/dot
+    let cleanValue = value.replace(/[^\d,]/g, '')
+    
+    // 2. Replace comma with dot for internal float parsing
+    cleanValue = cleanValue.replace(',', '.')
+
+    // 3. Parse to float
+    const num = parseFloat(cleanValue)
+
+    if (isNaN(num)) return ""
+
+    // 4. Format back to BRL string (R$ 1.000,00)
+    return num.toLocaleString('pt-BR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+        useGrouping: true,
+    })
+}
+
+// Utility function to extract float value from formatted string
+const parseCurrencyToFloat = (formattedValue: string): number => {
+    // Remove R$, dots used for thousands, and replace comma with dot for decimals
+    const cleanValue = formattedValue
+        .replace(/[R$\s.]/g, '')
+        .replace(',', '.')
+    
+    return parseFloat(cleanValue) || 0
+}
+
+
 export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProps) {
     const { partners, loading: representationsLoading } = useRepresentations()
     const { boletos: allBoletos, loading: boletosLoading, addBoletos, deleteBoleto } = useBoletos()
@@ -51,7 +83,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
     }, [allBoletos, client.id])
 
     // Form state
-    const [valor, setValor] = useState("")
+    const [valor, setValor] = useState("") // Stored as formatted string
     const [vencimento, setVencimento] = useState<Date>()
     const [selectedPlates, setSelectedPlates] = useState<string[]>([])
     const [representacaoId, setRepresentacaoId] = useState("")
@@ -137,14 +169,25 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
         return result
     }, [clientBoletos, searchTerm, dateFrom, dateTo, sortField, sortDirection])
 
+    const handleValorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const rawValue = e.target.value
+        // Only allow digits and comma
+        const cleanInput = rawValue.replace(/[^\d,]/g, '')
+        
+        // Convert to float, then format back to string for display
+        const floatValue = parseCurrencyToFloat(cleanInput)
+        setValor(formatCurrencyInput(floatValue.toString()))
+    }
+
     const handleAddBoleto = async () => {
         if (!valor || !vencimento || selectedPlates.length === 0 || !representacaoId) return
 
         const selectedPartner = partners.find(p => p.id === representacaoId)
         const representacaoNome = selectedPartner?.name || "N/A"
+        const floatValor = parseCurrencyToFloat(valor)
 
         const recurrenceGroupId = isRecurring ? Math.random().toString(36).substr(2, 9) : undefined
-        // If indefinite, we generate 24 months as a "preview" but logically it's indefinite.
+        
         const monthsToGenerate = isRecurring
             ? (recurrenceType === "indefinite" ? 24 : parseInt(recurrenceMonths))
             : 1
@@ -153,7 +196,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
 
         for (let i = 0; i < monthsToGenerate; i++) {
             boletosToSave.push({
-                valor: parseFloat(valor),
+                valor: floatValor,
                 vencimento: addMonths(vencimento, i),
                 placas: selectedPlates,
                 representacaoId: representacaoId, // Save ID
@@ -417,10 +460,11 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                         <div className="grid gap-2">
                             <Label>Valor</Label>
                             <Input
-                                type="number"
                                 placeholder="0,00"
                                 value={valor}
-                                onChange={(e) => setValor(e.target.value)}
+                                onChange={handleValorChange}
+                                // Ensure input type is text to allow custom formatting
+                                type="text" 
                             />
                         </div>
                         <div className="grid gap-2">
