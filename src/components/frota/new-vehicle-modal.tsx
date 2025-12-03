@@ -23,6 +23,7 @@ export type VehicleType = "CAVALO" | "TRUCK" | "CARRETA" | "CARRO" | "MOTO"
 
 export type Vehicle = {
     id: string
+    clientId: string // Added clientId
     type: VehicleType
     plate: string
     brand: string
@@ -131,7 +132,7 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
     }
 
     const handleSubmit = () => {
-        if (formData.plate && formData.brand && formData.model) {
+        if (formData.plate && formData.brand && formData.model && formData.clientId) {
             onSubmit({
                 id: vehicleToEdit?.id || Math.random().toString(36).substr(2, 9),
                 type,

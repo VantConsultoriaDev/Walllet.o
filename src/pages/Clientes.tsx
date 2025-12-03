@@ -11,12 +11,18 @@ import { DataTableColumnHeader } from "@/components/ui/data-table-column-header"
 import { DataTableFilterConfig } from "@/components/ui/data-table-toolbar"
 import { normalizeString } from "@/lib/utils"
 import { useClients, type Client } from "@/hooks/data/useClients"
+import { useVehicles } from "@/hooks/data/useVehicles"
+import type { Vehicle } from "@/components/frota/new-vehicle-modal"
 
 export default function Clientes() {
-    const { clients, loading, addClient, updateClient } = useClients()
+    const { clients, loading: clientsLoading, addClient, updateClient, fetchClients } = useClients()
+    const { addVehicle, updateVehicle, deleteVehicle, loading: vehiclesLoading } = useVehicles()
+    
     const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
     const [selectedClient, setSelectedClient] = useState<Client | null>(null)
     const [newClientModalOpen, setNewClientModalOpen] = useState(false)
+
+    const loading = clientsLoading || vehiclesLoading;
 
     const filters: DataTableFilterConfig[] = [
         {
@@ -169,6 +175,30 @@ export default function Clientes() {
         setSelectedClient(updatedClient)
     }
 
+    const handleSaveVehicle = async (vehicle: Vehicle) => {
+        if (!selectedClient) return;
+
+        const vehicleToSave = {
+            ...vehicle,
+            clientId: selectedClient.id,
+        }
+
+        if (vehicle.id) {
+            await updateVehicle(vehicleToSave)
+        } else {
+            await addVehicle(vehicleToSave)
+        }
+        
+        // Re-fetch clients to update the vehicle list in the UI
+        await fetchClients()
+        
+        // Update selected client state locally to reflect changes immediately
+        const updatedClient = clients.find(c => c.id === selectedClient.id);
+        if (updatedClient) {
+            setSelectedClient(updatedClient);
+        }
+    }
+
     if (loading) {
         return (
             <div className="flex-1 flex items-center justify-center h-full">
@@ -216,6 +246,16 @@ export default function Clientes() {
                     onBack={() => setSelectedClient(null)}
                     onStatusChange={handleStatusChange}
                     onSave={handleUpdateClient}
+                    onSaveVehicle={handleSaveVehicle}
+                    onDeleteVehicle={async (vehicleId) => {
+                        await deleteVehicle(vehicleId);
+                        await fetchClients();
+                        // Re-select client to update UI
+                        const updatedClient = clients.find(c => c.id === selectedClient.id);
+                        if (updatedClient) {
+                            setSelectedClient(updatedClient);
+                        }
+                    }}
                 />
             ) : (
                 <>

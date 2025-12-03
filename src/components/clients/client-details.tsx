@@ -23,9 +23,11 @@ type ClientDetailsProps = {
     onBack: () => void
     onStatusChange?: (clientId: string, newStatus: "active" | "inactive" | "blocked") => void
     onSave?: (updatedClient: Client) => void
+    onSaveVehicle: (vehicle: Vehicle) => Promise<void>
+    onDeleteVehicle: (vehicleId: string) => Promise<void>
 }
 
-export function ClientDetails({ client, onBack, onStatusChange, onSave }: ClientDetailsProps) {
+export function ClientDetails({ client, onBack, onStatusChange, onSave, onSaveVehicle, onDeleteVehicle }: ClientDetailsProps) {
     const [isEditing, setIsEditing] = useState(false)
     const [editedClient, setEditedClient] = useState<Client>(client)
     const [isAddingVehicle, setIsAddingVehicle] = useState(false)
@@ -65,34 +67,17 @@ export function ClientDetails({ client, onBack, onStatusChange, onSave }: Client
         setEditingVehicle(undefined)
     }
 
-    const handleSaveVehicle = (vehicle: Vehicle) => {
-        const existingIndex = editedClient.vehicles.findIndex(v => v.id === vehicle.id)
-
-        if (existingIndex >= 0) {
-            // Update existing
-            const updatedVehicles = [...editedClient.vehicles]
-            updatedVehicles[existingIndex] = vehicle
-            setEditedClient({
-                ...editedClient,
-                vehicles: updatedVehicles
-            })
-        } else {
-            // Add new
-            setEditedClient({
-                ...editedClient,
-                vehicles: [...editedClient.vehicles, vehicle]
-            })
-        }
+    const handleSaveVehicle = async (vehicle: Vehicle) => {
+        // Ensure clientId is set before saving
+        const vehicleWithClient = { ...vehicle, clientId: client.id }
+        await onSaveVehicle(vehicleWithClient)
         setEditingVehicle(undefined)
     }
 
-    const handleRemoveVehicle = (index: number) => {
-        const updatedVehicles = [...editedClient.vehicles]
-        updatedVehicles.splice(index, 1)
-        setEditedClient({
-            ...editedClient,
-            vehicles: updatedVehicles
-        })
+    const handleRemoveVehicle = async (vehicleId: string) => {
+        if (window.confirm("Tem certeza que deseja excluir este veículo?")) {
+            await onDeleteVehicle(vehicleId)
+        }
     }
 
     const statusVariant =
@@ -192,7 +177,7 @@ export function ClientDetails({ client, onBack, onStatusChange, onSave }: Client
                     </TabsTrigger>
                     <TabsTrigger value="frota" className="data-[state=active]:bg-background px-6">
                         <Truck className="mr-2 h-4 w-4" />
-                        Frota ({editedClient.vehicles.length})
+                        Frota ({client.vehicles.length})
                     </TabsTrigger>
                     <TabsTrigger value="financeiro" className="data-[state=active]:bg-background px-6">
                         <DollarSign className="mr-2 h-4 w-4" />
@@ -396,7 +381,7 @@ export function ClientDetails({ client, onBack, onStatusChange, onSave }: Client
                         {filteredVehicles.length > 0 ? (
                             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                                 {filteredVehicles.map((vehicle, index) => (
-                                    <div key={index} className="relative group">
+                                    <div key={vehicle.id} className="relative group">
                                         <VehicleCard
                                             {...vehicle}
                                             onClick={() => {
@@ -411,7 +396,7 @@ export function ClientDetails({ client, onBack, onStatusChange, onSave }: Client
                                                 className="absolute top-2 right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg z-10"
                                                 onClick={(e) => {
                                                     e.stopPropagation()
-                                                    handleRemoveVehicle(index)
+                                                    handleRemoveVehicle(vehicle.id)
                                                 }}
                                             >
                                                 <Trash2 className="h-4 w-4" />
@@ -453,7 +438,7 @@ export function ClientDetails({ client, onBack, onStatusChange, onSave }: Client
                 open={isAddingVehicle}
                 onOpenChange={setIsAddingVehicle}
                 onSubmit={handleSaveVehicle}
-                vehicleToEdit={editingVehicle}
+                vehicleToEdit={editingVehicle ? { ...editingVehicle, clientId: client.id } : { clientId: client.id } as Vehicle}
             />
         </div>
     )

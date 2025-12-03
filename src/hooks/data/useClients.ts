@@ -19,11 +19,11 @@ export type Client = {
     responsavel?: string
     contatoResponsavel?: string
     address: string
-    vehicles: Vehicle[] // Assuming vehicles are fetched separately or denormalized
+    vehicles: Vehicle[] // Vehicles are now dynamically fetched and mapped
 }
 
 // Helper function to map DB object to Client type
-const mapDbToClient = (dbClient: any): Client => ({
+const mapDbToClient = (dbClient: any, clientVehicles: Vehicle[] = []): Client => ({
     id: dbClient.id,
     clientType: dbClient.client_type,
     name: dbClient.name,
@@ -37,10 +37,7 @@ const mapDbToClient = (dbClient: any): Client => ({
     razaoSocial: dbClient.razao_social,
     responsavel: dbClient.responsavel,
     contatoResponsavel: dbClient.contato_responsavel,
-    vehicles: [
-        // Mocking vehicles data for now, as vehicle fetching is not implemented yet
-        { id: "v1", type: "CARRO", plate: "ABC-1234", brand: "Honda", model: "Civic", year: 2022, status: "active" },
-    ] as Vehicle[]
+    vehicles: clientVehicles,
 })
 
 // Helper function to map Client type to DB object
@@ -59,6 +56,25 @@ const mapClientToDb = (client: Partial<Client>) => ({
     contato_responsavel: client.contatoResponsavel,
 })
 
+// Helper function to map DB object to Vehicle type (copied from useVehicles for local use)
+const mapDbToVehicle = (dbVehicle: any): Vehicle => ({
+    id: dbVehicle.id,
+    type: dbVehicle.type,
+    plate: dbVehicle.plate,
+    brand: dbVehicle.brand,
+    model: dbVehicle.model,
+    year: dbVehicle.year,
+    renavam: dbVehicle.renavam,
+    chassi: dbVehicle.chassi,
+    fipeCode: dbVehicle.fipe_code,
+    fipeValue: dbVehicle.fipe_value,
+    bodyType: dbVehicle.body_type,
+    bodyValue: dbVehicle.body_value,
+    value: dbVehicle.value,
+    status: dbVehicle.status,
+    clientId: dbVehicle.client_id,
+})
+
 
 export function useClients() {
     const { user } = useAuth()
@@ -73,23 +89,45 @@ export function useClients() {
         }
 
         setLoading(true)
-        const { data, error } = await supabase
+
+        // 1. Fetch all clients
+        const { data: clientsData, error: clientsError } = await supabase
             .from('clients')
             .select('*')
             .eq('user_id', user.id)
             .order('created_at', { ascending: false })
 
-        if (error) {
+        if (clientsError) {
             toast({
                 title: "Erro ao carregar clientes",
-                description: error.message,
+                description: clientsError.message,
                 variant: "destructive",
             })
             setClients([])
-        } else {
-            const formattedClients = data.map(mapDbToClient)
-            setClients(formattedClients)
+            setLoading(false)
+            return
         }
+
+        // 2. Fetch all vehicles for the user
+        const { data: vehiclesData, error: vehiclesError } = await supabase
+            .from('vehicles')
+            .select('*')
+            .eq('user_id', user.id)
+
+        if (vehiclesError) {
+            console.error("Erro ao carregar veículos:", vehiclesError.message)
+            // Continue loading clients even if vehicles fail
+        }
+
+        const allVehicles = vehiclesData ? vehiclesData.map(mapDbToVehicle) : []
+        
+        // 3. Map vehicles to clients
+        const formattedClients = clientsData.map(dbClient => {
+            const clientVehicles = allVehicles.filter(v => v.clientId === dbClient.id)
+            return mapDbToClient(dbClient, clientVehicles)
+        })
+
+        setClients(formattedClients)
         setLoading(false)
     }
 
@@ -116,7 +154,7 @@ export function useClients() {
             return { error }
         }
 
-        const addedClient = mapDbToClient(data)
+        const addedClient = mapDbToClient(data, []) // New client starts with no vehicles
 
         setClients(prev => [addedClient, ...prev])
         toast({ title: "Sucesso", description: "Cliente adicionado com sucesso." })
@@ -126,6 +164,8 @@ export function useClients() {
     const updateClient = async (updatedClient: Client) => {
         if (!user) return { error: { message: "Usuário não autenticado" } }
 
+        // NOTE: We only update client data here. Vehicle updates/adds/deletes should be handled 
+        // by separate functions (e.g., in useVehicles hook or dedicated client vehicle functions).
         const dbData = mapClientToDb(updatedClient)
 
         const { error } = await supabase
