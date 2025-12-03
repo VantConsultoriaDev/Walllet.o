@@ -7,16 +7,16 @@ import { addMonths, isBefore } from "date-fns"
 import { v4 as uuidv4 } from 'uuid'
 
 // Helper function to map DB object to Boleto type
-const mapDbToBoleto = (dbBoleto: any): Boleto => ({
+const mapDbToBoleto = (dbBoleto: any, clientName: string, representationName: string): Boleto => ({
     id: dbBoleto.id,
     title: dbBoleto.title,
     valor: parseFloat(dbBoleto.valor),
     vencimento: new Date(dbBoleto.vencimento),
     dueDate: new Date(dbBoleto.vencimento), // Alias for compatibility
     clientId: dbBoleto.client_id,
-    clientName: dbBoleto.client_name || "N/A", // Assuming clientName might be denormalized or fetched later
+    clientName: clientName,
     placas: dbBoleto.placas || [],
-    representacao: dbBoleto.representacao_nome || "N/A", // Assuming name is denormalized or fetched later
+    representacao: representationName,
     status: dbBoleto.status,
     dataPagamento: dbBoleto.data_pagamento ? new Date(dbBoleto.data_pagamento) : undefined,
     isRecurring: dbBoleto.is_recurring,
@@ -25,6 +25,8 @@ const mapDbToBoleto = (dbBoleto: any): Boleto => ({
     recurrenceGroupId: dbBoleto.recurrence_group_id,
     comissaoRecorrente: dbBoleto.comissao_recorrente ? parseFloat(dbBoleto.comissao_recorrente) : undefined,
     comissaoTipo: dbBoleto.comissao_tipo,
+    // Add representacaoId for internal use
+    representacaoId: dbBoleto.representacao_id,
 })
 
 // Helper function to map Boleto type to DB object
@@ -59,6 +61,16 @@ export function useBoletos() {
         }
 
         setLoading(true)
+        
+        // Fetch necessary lookup data first
+        const [{ data: clientsData }, { data: representationsData }] = await Promise.all([
+            supabase.from('clients').select('id, name').eq('user_id', user.id),
+            supabase.from('representations').select('id, name').eq('user_id', user.id),
+        ])
+
+        const clientMap = new Map(clientsData?.map(c => [c.id, c.name]))
+        const representationMap = new Map(representationsData?.map(r => [r.id, r.name]))
+
         let query = supabase
             .from('boletos')
             .select('*')
@@ -79,7 +91,11 @@ export function useBoletos() {
             })
             setBoletos([])
         } else {
-            const formattedData = data.map(mapDbToBoleto)
+            const formattedData = data.map(dbBoleto => {
+                const clientName = clientMap.get(dbBoleto.client_id) || "Cliente Desconhecido"
+                const representationName = representationMap.get(dbBoleto.representacao_id) || "N/A"
+                return mapDbToBoleto(dbBoleto, clientName, representationName)
+            })
             setBoletos(formattedData)
         }
         setLoading(false)
@@ -105,12 +121,12 @@ export function useBoletos() {
             return { error }
         }
 
-        const addedBoletos = data.map(mapDbToBoleto)
-
-        // Update local state by adding new boletos
-        setBoletos(prev => [...prev, ...addedBoletos].sort((a, b) => a.vencimento.getTime() - b.vencimento.getTime()))
-        toast({ title: "Sucesso", description: `${addedBoletos.length} boleto(s) adicionado(s) com sucesso.` })
-        return { data: addedBoletos }
+        // Re-fetch all boletos to ensure names are correctly mapped after insertion
+        // This is simpler than manually mapping names here, especially for recurrence logic.
+        await fetchBoletos() 
+        
+        toast({ title: "Sucesso", description: `${data.length} boleto(s) adicionado(s) com sucesso.` })
+        return { data: data.map(mapDbToBoleto) } // Return raw mapped data for consistency
     }
 
     const deleteBoleto = async (id: string) => {
@@ -219,6 +235,7 @@ export function useBoletos() {
                     // Trigger generation of the next batch
                     generateNextRecurrenceBatch(groupBoletos)
                 }
+                // NOTE: We skip calling fetchBoletos here because addBoletos already calls it.
             })
         }
     }, [loading, boletos, generateNextRecurrenceBatch])
