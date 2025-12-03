@@ -71,7 +71,7 @@ export function NewSinistroModal({ isOpen, onClose, onSubmit }: NewSinistroModal
     const [thirdParties, setThirdParties] = useState<ThirdParty[]>([])
     const [description, setDescription] = useState("")
 
-    const filteredClients = useMemo(() => {
+    const filteredClients = useMemo<Client[]>(() => {
         if (!clientSearch) return clients
         return clients.filter((client) =>
             client.name.toLowerCase().includes(clientSearch.toLowerCase()) ||
