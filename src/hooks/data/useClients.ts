@@ -64,6 +64,7 @@ const mapDbToVehicle = (dbVehicle: any): Vehicle => ({
     brand: dbVehicle.brand,
     model: dbVehicle.model,
     year: dbVehicle.year,
+    color: dbVehicle.color, // <-- CORRIGIDO: Mapeando 'color'
     renavam: dbVehicle.renavam,
     chassi: dbVehicle.chassi,
     fipeCode: dbVehicle.fipe_code,
