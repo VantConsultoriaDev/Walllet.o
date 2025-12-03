@@ -31,7 +31,8 @@ import type { Boleto } from "@/types/agenda" // Import Boleto type
 import { useRepresentations } from "@/hooks/data/useRepresentations"
 import { useBoletos } from "@/hooks/data/useBoletos"
 import { RecurrenceActionDialog } from "../financeiro/recurrence-action-dialog"
-import { v4 as uuidv4 } from 'uuid' // <-- Adicionando importação
+import { v4 as uuidv4 } from 'uuid'
+import { BoletoDetailsModal } from "./boleto-details-modal"
 
 interface ClientFinanceiroProps {
     client: any
@@ -85,11 +86,12 @@ const parseCurrencyToFloat = (formattedValue: string): number => {
 
 export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProps) {
     const { partners, loading: representationsLoading } = useRepresentations()
-    const { boletos: allBoletos, loading: boletosLoading, addBoletos, deleteBoleto, deleteRecurrenceGroup } = useBoletos()
+    const { boletos: allBoletos, loading: boletosLoading, addBoletos, deleteBoleto, deleteRecurrenceGroup, updateBoletoStatus } = useBoletos()
 
     const [isNewBoletoOpen, setIsNewBoletoOpen] = useState(false)
     const [isRecurrenceDialogOpen, setIsRecurrenceDialogOpen] = useState(false)
     const [pendingDeleteBoleto, setPendingDeleteBoleto] = useState<Boleto | null>(null)
+    const [selectedBoleto, setSelectedBoleto] = useState<Boleto | null>(null)
 
 
     // Filter boletos specific to this client
@@ -253,6 +255,11 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
         setIsRecurrenceDialogOpen(false)
     }
 
+    const handleUpdateStatus = async (boletoId: string, newStatus: Boleto['status']) => {
+        await updateBoletoStatus(boletoId, newStatus)
+        setSelectedBoleto(prev => prev ? { ...prev, status: newStatus, dataPagamento: newStatus === 'paid' ? new Date() : undefined } : null)
+    }
+
     const resetForm = () => {
         setValor("")
         setVencimento(undefined)
@@ -292,6 +299,18 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                 ? current.filter(p => p !== plate)
                 : [...current, plate]
         )
+    }
+
+    const getStatusBadge = (status: Boleto['status']) => {
+        switch (status) {
+            case "paid":
+                return <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">Pago</span>
+            case "overdue":
+                return <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">Vencido</span>
+            case "pending":
+            default:
+                return <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">Pendente</span>
+        }
     }
 
     const hasActiveFilters = searchTerm || dateFrom || dateTo || sortField
@@ -433,7 +452,11 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                                     : null
 
                                 return (
-                                    <TableRow key={boleto.id}>
+                                    <TableRow 
+                                        key={boleto.id} 
+                                        className="cursor-pointer hover:bg-muted/50"
+                                        onClick={() => setSelectedBoleto(boleto)}
+                                    >
                                         <TableCell>
                                             <div className="flex items-center gap-1">
                                                 {boleto.isRecurring && (
@@ -459,15 +482,16 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                                         </TableCell>
                                         <TableCell>{boleto.representacao}</TableCell>
                                         <TableCell>
-                                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">
-                                                Pendente
-                                            </span>
+                                            {getStatusBadge(boleto.status)}
                                         </TableCell>
                                         <TableCell>
                                             <Button
                                                 variant="ghost"
                                                 size="icon"
-                                                onClick={() => handleDeleteClick(boleto)}
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    handleDeleteClick(boleto)
+                                                }}
                                             >
                                                 <Trash2 className="h-4 w-4 text-destructive" />
                                             </Button>
@@ -707,6 +731,15 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* Boleto Details Modal */}
+            <BoletoDetailsModal
+                boleto={selectedBoleto}
+                isOpen={!!selectedBoleto}
+                onClose={() => setSelectedBoleto(null)}
+                onUpdateStatus={handleUpdateStatus}
+                onDelete={handleDeleteClick}
+            />
 
             {/* Recurrence Delete Dialog */}
             {pendingDeleteBoleto && (

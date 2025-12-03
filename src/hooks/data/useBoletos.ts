@@ -3,7 +3,7 @@ import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
 import type { Boleto } from "@/types/agenda"
-import { addMonths, isBefore } from "date-fns"
+import { addMonths, isBefore, isToday } from "date-fns"
 import { v4 as uuidv4 } from 'uuid'
 
 // Helper function to map DB object to Boleto type
@@ -91,10 +91,19 @@ export function useBoletos() {
             })
             setBoletos([])
         } else {
+            const today = new Date()
+            today.setHours(0, 0, 0, 0) // Normalize today's date
+
             const formattedData = data.map(dbBoleto => {
                 const clientName = clientMap.get(dbBoleto.client_id) || "Cliente Desconhecido"
                 const representationName = representationMap.get(dbBoleto.representacao_id) || "N/A"
-                return mapDbToBoleto(dbBoleto, clientName, representationName)
+                const boleto = mapDbToBoleto(dbBoleto, clientName, representationName)
+                
+                // Logic to mark as overdue if status is 'pending' and date is before today
+                if (boleto.status === 'pending' && isBefore(boleto.vencimento, today) && !isToday(boleto.vencimento)) {
+                    boleto.status = 'overdue'
+                }
+                return boleto
             })
             setBoletos(formattedData)
         }
@@ -122,11 +131,51 @@ export function useBoletos() {
         }
 
         // Re-fetch all boletos to ensure names are correctly mapped after insertion
-        // This is simpler than manually mapping names here, especially for recurrence logic.
         await fetchBoletos() 
         
         toast({ title: "Sucesso", description: `${data.length} boleto(s) adicionado(s) com sucesso.` })
         return { data: data.map(mapDbToBoleto) } // Return raw mapped data for consistency
+    }
+
+    const updateBoletoStatus = async (boletoId: string, newStatus: Boleto['status']) => {
+        if (!user) return { error: { message: "Usuário não autenticado" } }
+
+        const updateData: Partial<Boleto> = { status: newStatus }
+        if (newStatus === 'paid') {
+            updateData.dataPagamento = new Date()
+        }
+
+        const dbData = {
+            status: newStatus,
+            data_pagamento: newStatus === 'paid' ? new Date().toISOString().split('T')[0] : null,
+        }
+
+        const { data, error } = await supabase
+            .from('boletos')
+            .update(dbData)
+            .eq('id', boletoId)
+            .select()
+            .single()
+
+        if (error) {
+            toast({ title: "Erro", description: "Falha ao atualizar status do boleto.", variant: "destructive" })
+            return { error }
+        }
+
+        // Update local state
+        setBoletos(prev => prev.map(b => {
+            if (b.id === boletoId) {
+                return {
+                    ...b,
+                    status: newStatus,
+                    dataPagamento: newStatus === 'paid' ? new Date() : undefined,
+                }
+            }
+            return b
+        }))
+        
+        toast({ title: "Sucesso", description: `Status do boleto atualizado para ${newStatus === 'paid' ? 'Pago' : newStatus}.` })
+        return { data: data }
     }
 
     const deleteBoleto = async (id: string) => {
@@ -211,6 +260,7 @@ export function useBoletos() {
     useEffect(() => {
         if (!loading && boletos.length > 0) {
             const today = new Date()
+            today.setHours(0, 0, 0, 0)
             const threeMonthsFromNow = addMonths(today, 3)
 
             // Group boletos by recurrenceGroupId
@@ -235,7 +285,6 @@ export function useBoletos() {
                     // Trigger generation of the next batch
                     generateNextRecurrenceBatch(groupBoletos)
                 }
-                // NOTE: We skip calling fetchBoletos here because addBoletos already calls it.
             })
         }
     }, [loading, boletos, generateNextRecurrenceBatch])
@@ -246,5 +295,5 @@ export function useBoletos() {
         fetchBoletos()
     }, [user, fetchBoletos])
 
-    return { boletos, loading, fetchBoletos, addBoletos, deleteBoleto, deleteRecurrenceGroup }
+    return { boletos, loading, fetchBoletos, addBoletos, deleteBoleto, deleteRecurrenceGroup, updateBoletoStatus }
 }
