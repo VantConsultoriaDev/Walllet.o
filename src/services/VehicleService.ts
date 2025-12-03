@@ -34,7 +34,10 @@ export async function consultarPlaca(placa: string): Promise<PlacaData | null> {
         timeoutId = undefined;
 
         if (!response.ok) {
-            throw new Error(`Erro HTTP: ${response.status}`);
+            // Se a resposta não for OK, tentamos ler o corpo para obter mais detalhes do erro da API
+            const errorBody = await response.text();
+            console.error(`Erro HTTP ${response.status}:`, errorBody);
+            throw new Error(`Erro na consulta de placa: ${response.status} - ${errorBody.substring(0, 100)}...`);
         }
 
         const data = await response.json();
@@ -75,6 +78,7 @@ export async function consultarPlaca(placa: string): Promise<PlacaData | null> {
         if (timeoutId) {
             clearTimeout(timeoutId);
         }
+        // Re-lança o erro para ser capturado pelo modal e exibido ao usuário
         throw error;
     }
 }
