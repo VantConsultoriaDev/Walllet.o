@@ -1,7 +1,7 @@
 import type { PlacaData } from "@/types/vehicle";
 
 // O token de autorização fornecido pelo usuário
-const API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwOi8vZ2F0ZXdheS5hcGlicmFzaWwuaW8vYXBpL3YyL2F1dGgvbG9naW4iLCJpYXQiOjE3NjQ3OTQ0NDcsImV4cCI6MTc5NjMzMDQ0NywibmJmIjoxNzY0Nzk0NDQ3LCJqdGkiOiJnWHk5TkFhaDNPOEJnNGp6Iiwic3ViIjoiMTc4NDIiLCJwcnYiOiIyM2JkNWM4OTQ5ZjYwMGFkYjM5ZTcwMWM0MDA4NzJkYjdhNTk3NjY3In0.V6QSWD39KM6TtCk4nJawVJnigT5r2TojKrOR3qy9Lgc";
+const API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwOi8vZ2F0ZXdheS5hcGlicmFzaWwuaW8vYXBpL3YyL2F1dGgvbG9naW4iLCJpYXQiOjE3NjQ3OTQ0NDcsImV4cCI6MTc5NjMzMDQ0NywibmJmIjoxNzY0Nzk0NDQ3LCJqdGkiOiJnWHk5TkFhaDNPOEJnNGp6Iiwic3ViIjoiMTc4NDIiLCJwcnYiOiIyM2JkNWM4OTQ5ZjYwMGFkYjM5ZTcwMWM0MDA4NzJkYjdhNTk3NmY3In0.V6QSWD39KM6TtCk4nJawVJnigT5r2TojKrOR3qy9Lgc";
 
 export class VehicleService {
   // Novo endpoint conforme solicitado
@@ -51,7 +51,9 @@ export class VehicleService {
 
       if (!response.ok) {
         const errorBody = await response.json().catch(() => ({ message: response.statusText }));
-        throw new Error(`Falha na comunicação com a API (${response.status}): ${errorBody.message || response.statusText}`);
+        // Se a resposta não for OK, tentamos extrair a mensagem de erro da API
+        const errorMessage = errorBody.message || errorBody.error || response.statusText;
+        throw new Error(`Falha na comunicação com a API (${response.status}): ${errorMessage}`);
       }
       
       const result = await response.json();
