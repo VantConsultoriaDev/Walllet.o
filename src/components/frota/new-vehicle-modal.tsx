@@ -71,8 +71,8 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                 setType(vehicleToEdit.type)
                 setFormData(vehicleToEdit)
             } else {
-                // CORREÇÃO: Estreitando o tipo de vehicleToEdit antes de acessar clientId
-                const initialClientId = vehicleToEdit && vehicleToEdit.clientId ? vehicleToEdit.clientId : undefined;
+                // CORREÇÃO: Acessando clientId diretamente do prop vehicleToEdit (que é opcional)
+                const initialClientId = vehicleToEdit?.clientId;
                 setFormData({ 
                     status: "active", 
                     ...(initialClientId && { clientId: initialClientId }) 
