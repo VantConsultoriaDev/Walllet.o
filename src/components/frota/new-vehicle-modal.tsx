@@ -69,11 +69,12 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                 setType(vehicleToEdit.type)
                 setFormData(vehicleToEdit)
             } else {
-                // Inicializa com valores padrão e o clientId, que é o único campo obrigatório
-                // que pode vir do contexto (vehicleToEdit) mesmo que o resto seja novo.
+                // Extrai clientId de forma segura e garante que o tipo seja string | undefined
+                const initialClientId: string | undefined = vehicleToEdit?.clientId;
+
                 setFormData({ 
                     status: "active",
-                    clientId: vehicleToEdit?.clientId, // Acessando diretamente
+                    clientId: initialClientId,
                 });
                 setType("CARRO")
             }
