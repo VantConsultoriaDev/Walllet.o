@@ -66,7 +66,8 @@ export class VehicleService {
           placa: data.placa || placaLimpa,
           marca: data.marca || '',
           modelo: data.modelo || '',
-          ano: data.anomodelo?.toString() || data.ano_modelo?.toString() || data.ano?.toString() || '', // Usando anomodelo
+          // Priorizando 'anomodelo' conforme solicitado, com fallbacks
+          ano: data.anomodelo?.toString() || data.ano_modelo?.toString() || data.ano?.toString() || '', 
           anoModelo: data.anomodelo?.toString() || data.ano_modelo?.toString() || '',
           cor: data.cor || '',
           combustivel: data.combustivel || '',

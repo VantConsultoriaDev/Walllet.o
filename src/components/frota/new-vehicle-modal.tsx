@@ -127,7 +127,21 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                 setPlacaConsultada(true);
                 toast({ title: "Sucesso", description: "Dados da placa carregados automaticamente." })
             } else {
+                // Placa não encontrada, mas mantemos a placa digitada
                 setPlacaError('Placa não encontrada na base de dados externa. Preencha manualmente.');
+                setFormData(prev => ({
+                    ...prev,
+                    plate: placaLimpa, // Manter a placa digitada
+                    brand: "",
+                    model: "",
+                    year: undefined,
+                    color: "",
+                    chassi: "",
+                    renavam: "",
+                    fipeCode: "",
+                    fipeValue: "",
+                    bodyType: "",
+                }))
             }
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'Falha ao consultar placa. Verifique a configuração da API.';
@@ -136,6 +150,7 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
             // Clear auto-filled fields on error, but keep plate
             setFormData(prev => ({
                 ...prev,
+                plate: placaLimpa, // Manter a placa digitada
                 brand: "",
                 model: "",
                 year: undefined,
