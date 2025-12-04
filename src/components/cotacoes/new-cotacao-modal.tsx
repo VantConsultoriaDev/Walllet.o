@@ -29,6 +29,7 @@ import {
     PaymentInstallments,
     ASSET_TYPE_LABELS,
     COMMISSION_TYPE_LABELS,
+    Commission, // Importando Commission type
 } from "@/types/cotacao"
 import { useRepresentations } from "@/hooks/data/useRepresentations"
 import { fetchCNPJData, formatCNPJ, formatCPF, isValidCNPJ } from "@/lib/cnpj-api"
@@ -52,9 +53,8 @@ export type NewCotacaoFormData = {
     asset: Asset
     anuidade: number
     parcelas: PaymentInstallments
-    comissaoType: CommissionType
-    comissaoValue: number
-    comissaoInstallments?: number
+    // Corrigido: Usar o tipo Commission diretamente
+    comissao: Commission 
 }
 
 // Mock clients for CPF/CNPJ lookup (kept for API simulation)
@@ -161,7 +161,7 @@ export function NewCotacaoModal({ isOpen, onClose, onSubmit }: NewCotacaoModalPr
                 setCor(data.cor || "");
                 setChassi(data.chassi || "");
                 setRenavam(data.renavam || "");
-                // FIPE fields are not available in this endpoint, keeping them empty
+                // Corrigido: fipeCode e fipeValue agora existem em PlacaData
                 setCodigoFipe(data.fipeCode || "");
                 setValorFipe(data.fipeValue || "");
                 toast({ title: "Sucesso", description: "Dados do veículo carregados." })
@@ -230,6 +230,13 @@ export function NewCotacaoModal({ isOpen, onClose, onSubmit }: NewCotacaoModalPr
 
         const selectedPartner = partners.find(r => r.id === representacaoId)
 
+        const commissionData: Commission = {
+            type: comissaoType,
+            value: parseFloat(comissaoValue),
+            installments:
+                comissaoType === "recorrente_determinada" ? parseInt(comissaoInstallments) : undefined,
+        }
+
         const formData: NewCotacaoFormData = {
             clientType,
             cpfCnpj,
@@ -240,12 +247,7 @@ export function NewCotacaoModal({ isOpen, onClose, onSubmit }: NewCotacaoModalPr
             asset,
             anuidade: parseFloat(anuidade),
             parcelas,
-            comissao: {
-                type: comissaoType,
-                value: parseFloat(comissaoValue),
-                installments:
-                    comissaoType === "recorrente_determinada" ? parseInt(comissaoInstallments) : undefined,
-            },
+            comissao: commissionData, // Corrigido: Passando o objeto Commission
         }
 
         onSubmit(formData)

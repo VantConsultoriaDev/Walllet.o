@@ -71,6 +71,7 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                 setType(vehicleToEdit.type)
                 setFormData(vehicleToEdit)
             } else {
+                // Corrigido: Inicializa com clientId se disponível
                 setFormData({ status: "active", clientId: vehicleToEdit?.clientId })
                 setType("CARRO")
             }
@@ -128,6 +129,7 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                     color: data.cor || "",
                     chassi: data.chassi ? forceUpperCase(data.chassi) : "",
                     renavam: data.renavam || "",
+                    // Corrigido: fipeCode e fipeValue agora existem em PlacaData
                     fipeCode: data.fipeCode || "",
                     fipeValue: data.fipeValue || "",
                     bodyType: data.categoria?.includes("CAMINHAO") ? data.categoria : "",

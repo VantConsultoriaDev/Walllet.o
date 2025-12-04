@@ -11,4 +11,6 @@ export interface PlacaData {
     renavam?: string
     municipio?: string
     uf?: string
+    fipeCode?: string // Adicionado
+    fipeValue?: string // Adicionado
 }
