@@ -216,8 +216,7 @@ export function NewSinistroModal({ isOpen, onClose, onSubmit }: NewSinistroModal
                                 {showClientDropdown && filteredClients.length > 0 && !selectedClient && clientSearch.length > 0 && (
                                     <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-950 border rounded-md shadow-lg max-h-48 overflow-auto">
                                         {filteredClients.map((client) => {
-                                            // CORREÇÃO: Usando o operador de encadeamento opcional para acessar 'id' de selectedClient
-                                            // e garantindo que a comparação seja segura.
+                                            // CORREÇÃO: Garantindo que selectedClient não seja null antes de acessar 'id'
                                             const isSelected = selectedClient?.id === client.id;
                                             return (
                                                 <div

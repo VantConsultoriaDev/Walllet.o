@@ -71,12 +71,12 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                 setType(vehicleToEdit.type)
                 setFormData(vehicleToEdit)
             } else {
-                // CORREÇÃO: Acessando clientId diretamente do prop vehicleToEdit (que é opcional)
-                const initialClientId: string | undefined = vehicleToEdit?.clientId;
-                setFormData({ 
-                    status: "active", 
-                    ...(initialClientId && { clientId: initialClientId }) 
-                } as Partial<Vehicle>)
+                // Construção explícita do objeto inicial para evitar inferência 'never'
+                const initialData: Partial<Vehicle> = { 
+                    status: "active",
+                    clientId: vehicleToEdit?.clientId, // Acessando clientId de forma segura
+                };
+                setFormData(initialData);
                 setType("CARRO")
             }
             setPlacaError("")
