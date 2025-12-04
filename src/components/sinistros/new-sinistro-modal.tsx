@@ -217,6 +217,7 @@ export function NewSinistroModal({ isOpen, onClose, onSubmit }: NewSinistroModal
                                     <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-950 border rounded-md shadow-lg max-h-48 overflow-auto">
                                         {filteredClients.map((client) => {
                                             // CORREÇÃO: Usando o operador de encadeamento opcional para acessar 'id' de selectedClient
+                                            // e garantindo que a comparação seja segura.
                                             const isSelected = selectedClient?.id === client.id;
                                             return (
                                                 <div
