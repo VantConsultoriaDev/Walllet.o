@@ -46,23 +46,16 @@ export class VehicleService {
       
       const result = response.data;
       
-      if (!result || result.error || !result.data) {
-        if (response.status === 401 || response.status === 403) {
-             throw new Error('ERRO DE AUTORIZAÇÃO: O token da API (VITE_APIBRASIL_TOKEN) é inválido ou expirou. Verifique a configuração.');
-        }
-        return null;
+      // 1. Verifica se a resposta da API contém dados válidos
+      if (!result || result.error || !result.data || Object.keys(result.data).length === 0) {
+          // Se a API retornar 200 OK, mas sem dados (ou com erro interno), retornamos null
+          return null;
       }
 
       const data = result.data;
       
-      if (data) {
-        // Mapeamento conforme solicitado pelo usuário:
-        // marca = marca
-        // modelo = modelo
-        // ano = anomodelo
-        // codigo fipe = codigofipe 
-        // valor fipe = valor
-        return {
+      // 2. Mapeamento dos dados
+      return {
           placa: data.placa || placaLimpa,
           marca: data.marca || '',
           modelo: data.modelo || '',
@@ -79,22 +72,26 @@ export class VehicleService {
           // Mapeamento FIPE
           fipeCode: data.codigofipe || '',
           fipeValue: data.valor?.toString() || '', // Usando 'valor' para valor FIPE
-        };
-      }
+      };
 
-      return null;
     } catch (error) {
       console.error('Erro ao consultar placa:', error);
       
-      if (axios.isAxiosError(error) && (error.response?.status === 401 || error.response?.status === 403)) {
-          throw new Error('ERRO DE AUTORIZAÇÃO: O token da API (VITE_APIBRASIL_TOKEN) é inválido ou expirou. Verifique a configuração.');
+      if (axios.isAxiosError(error)) {
+          if (error.response?.status === 401 || error.response?.status === 403) {
+              throw new Error('ERRO DE AUTORIZAÇÃO: O token da API (VITE_APIBRASIL_TOKEN) é inválido ou expirou. Verifique a configuração.');
+          }
+          // Se for um erro de cliente (4xx) ou servidor (5xx), lançamos uma mensagem genérica para o modal
+          // para que ele possa exibir o erro, mas sem consumir créditos desnecessariamente.
+          throw new Error(`Falha na comunicação com a API: ${error.response?.statusText || error.message}`);
       }
       
-      // Re-throw custom errors or return null for generic errors
-      if (error instanceof Error && (error.message.includes('ERRO DE AUTORIZAÇÃO') || error.message.includes('ERRO DE CONFIGURAÇÃO') || error.message.includes('Placa inválida'))) {
+      // Re-throw custom errors (configuração ou placa inválida)
+      if (error instanceof Error) {
           throw error;
       }
       
+      // Para qualquer outro erro inesperado, retornamos null
       return null;
     }
   }
