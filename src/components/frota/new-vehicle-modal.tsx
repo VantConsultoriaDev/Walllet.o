@@ -95,7 +95,7 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
         try {
             const data: PlacaData | null = await VehicleService.consultarPlaca(placaLimpa);
             
-            if (data) {
+            if (data && data.marca) { // Verifica se há dados e se a marca está presente
                 // Determine type based on vehicle info (simple heuristic)
                 let detectedType: VehicleType = "CARRO"
                 const vehicleTypeStr = data.categoria?.toLowerCase() || ""
@@ -114,20 +114,20 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                 setFormData(prev => ({
                     ...prev,
                     plate: placaLimpa, // GARANTINDO QUE A PLACA LIMPA SEJA MANTIDA
-                    brand: data.marca || prev.brand,
-                    model: data.modelo || prev.model,
+                    brand: data.marca || "",
+                    model: data.modelo || "",
                     year: parseInt(data.ano) || prev.year, // Usando o campo 'ano' mapeado
-                    color: data.cor || prev.color,
-                    chassi: data.chassi ? forceUpperCase(data.chassi) : prev.chassi,
-                    renavam: data.renavam || prev.renavam,
-                    fipeCode: data.fipeCode || prev.fipeCode,
-                    fipeValue: data.fipeValue || prev.fipeValue,
-                    bodyType: data.categoria?.includes("CAMINHAO") ? data.categoria : prev.bodyType,
+                    color: data.cor || "",
+                    chassi: data.chassi ? forceUpperCase(data.chassi) : "",
+                    renavam: data.renavam || "",
+                    fipeCode: data.fipeCode || "",
+                    fipeValue: data.fipeValue || "",
+                    bodyType: data.categoria?.includes("CAMINHAO") ? data.categoria : "",
                 }))
                 setPlacaConsultada(true);
                 toast({ title: "Sucesso", description: "Dados da placa carregados automaticamente." })
             } else {
-                // Placa não encontrada, mas mantemos a placa digitada
+                // Placa não encontrada ou dados insuficientes, mas mantemos a placa digitada
                 setPlacaError('Placa não encontrada na base de dados externa. Preencha manualmente.');
                 setFormData(prev => ({
                     ...prev,
