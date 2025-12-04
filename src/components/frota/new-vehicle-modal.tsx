@@ -234,11 +234,10 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                     <Input value={formData.chassi || ""} onChange={e => setFormData({ ...formData, chassi: e.target.value })} />
                 </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                    <Label>Renavam</Label>
-                    <Input value={formData.renavam || ""} onChange={e => setFormData({ ...formData, renavam: e.target.value })} />
-                </div>
+            {/* Simplificando o layout do Renavam para ocupar a largura total */}
+            <div className="space-y-2"> 
+                <Label>Renavam</Label>
+                <Input value={formData.renavam || ""} onChange={e => setFormData({ ...formData, renavam: e.target.value })} />
             </div>
         </>
     )
