@@ -15,12 +15,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Building2, User, Phone, FileText, Pencil, Save, X, Plus, Trash2, ArrowLeft, Car, Truck, Search, Filter, DollarSign } from "lucide-react"
 import { VehicleCard } from "@/components/frota/vehicle-card"
 import { ClientFinanceiro } from "./client-financeiro"
+import { NewVehicleModal } from "@/components/frota/NewVehicleModal" // <-- Importando o novo modal
 import type { Client } from "@/hooks/data/useClients" // Import Client type from hook
 import type { Vehicle, VehicleType } from "@/hooks/data/useVehicles" // Import Vehicle types from hook
-
-// NOTE: NewVehicleModal is deleted, so we need to re-add it or use a placeholder.
-// Since the user asked to delete it to recreate it, I will temporarily remove the import and usage.
-// I will keep the logic that calls onSaveVehicle/onDeleteVehicle.
 
 type ClientDetailsProps = {
     client: Client
@@ -72,12 +69,17 @@ export function ClientDetails({ client, onBack, onStatusChange, onSave, onSaveVe
         setEditingVehicle(undefined)
     }
 
+    const handleOpenVehicleModal = (vehicle?: Vehicle) => {
+        setEditingVehicle(vehicle)
+        setIsAddingVehicle(true)
+    }
+
     const handleSaveVehicle = async (vehicle: Vehicle) => {
         // Ensure clientId is set before saving
         const vehicleWithClient = { ...vehicle, clientId: client.id }
         await onSaveVehicle(vehicleWithClient)
         setEditingVehicle(undefined)
-        setIsAddingVehicle(false) // Close modal placeholder
+        setIsAddingVehicle(false)
     }
 
     const handleRemoveVehicle = async (vehicleId: string) => {
@@ -347,10 +349,7 @@ export function ClientDetails({ client, onBack, onStatusChange, onSave, onSaveVe
                                 </p>
                             </div>
                             <Button
-                                onClick={() => {
-                                    setEditingVehicle(undefined)
-                                    setIsAddingVehicle(true)
-                                }}
+                                onClick={() => handleOpenVehicleModal(undefined)}
                                 className="gap-2"
                             >
                                 <Plus className="h-4 w-4" />
@@ -390,10 +389,7 @@ export function ClientDetails({ client, onBack, onStatusChange, onSave, onSaveVe
                                     <div key={vehicle.id} className="relative group">
                                         <VehicleCard
                                             {...vehicle}
-                                            onClick={() => {
-                                                setEditingVehicle(vehicle)
-                                                setIsAddingVehicle(true)
-                                            }}
+                                            onClick={() => handleOpenVehicleModal(vehicle)}
                                         />
                                         {isEditing && (
                                             <Button
@@ -421,10 +417,7 @@ export function ClientDetails({ client, onBack, onStatusChange, onSave, onSaveVe
                                     Este cliente ainda não possui veículos vinculados.
                                     Clique em 'Adicionar Veículo' para começar.
                                 </p>
-                                <Button onClick={() => {
-                                    setEditingVehicle(undefined)
-                                    setIsAddingVehicle(true)
-                                }}>
+                                <Button onClick={() => handleOpenVehicleModal(undefined)}>
                                     <Plus className="mr-2 h-4 w-4" />
                                     Adicionar Veículo
                                 </Button>
@@ -440,16 +433,14 @@ export function ClientDetails({ client, onBack, onStatusChange, onSave, onSaveVe
                 </TabsContent>
             </Tabs>
 
-            {/* Placeholder for NewVehicleModal */}
-            {isAddingVehicle && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-                    <div className="bg-background p-8 rounded-lg shadow-2xl">
-                        <p className="text-lg font-semibold">Modal de Veículo Removido</p>
-                        <p className="text-muted-foreground mt-2">O modal de Novo Veículo foi removido. Por favor, recrie-o para continuar.</p>
-                        <Button onClick={() => setIsAddingVehicle(false)} className="mt-4">Fechar Placeholder</Button>
-                    </div>
-                </div>
-            )}
+            {/* New Vehicle Modal */}
+            <NewVehicleModal
+                open={isAddingVehicle}
+                onOpenChange={setIsAddingVehicle}
+                onSubmit={handleSaveVehicle}
+                vehicleToEdit={editingVehicle}
+                clientId={client.id}
+            />
         </div>
     )
 }
