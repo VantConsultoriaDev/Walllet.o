@@ -61,7 +61,8 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
         status: "active"
     })
     const [placaError, setPlacaError] = useState("")
-    const [placaConsultada, setPlacaConsultada] = useState(false)
+    // Removendo placaConsultada, pois a consulta será manual
+    // const [placaConsultada, setPlacaConsultada] = useState(false)
 
     // Reset form when modal opens/closes
     useEffect(() => {
@@ -74,7 +75,6 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                 setType("CARRO")
             }
             setPlacaError("")
-            setPlacaConsultada(false)
         } else {
             setLoading(false)
         }
@@ -90,7 +90,6 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
         
         setLoading(true);
         setPlacaError('');
-        setPlacaConsultada(false);
 
         try {
             const data: PlacaData | null = await VehicleService.consultarPlaca(placaLimpa);
@@ -110,6 +109,7 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                     detectedType = "CAVALO"
                 }
                 
+                // Atualiza o tipo e os dados
                 setType(detectedType)
                 setFormData(prev => ({
                     ...prev,
@@ -124,14 +124,14 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                     fipeValue: data.fipeValue || "",
                     bodyType: data.categoria?.includes("CAMINHAO") ? data.categoria : "",
                 }))
-                setPlacaConsultada(true);
                 toast({ title: "Sucesso", description: "Dados da placa carregados automaticamente." })
             } else {
-                // Placa não encontrada ou dados insuficientes, mas mantemos a placa digitada
+                // Placa não encontrada ou dados insuficientes. Mantemos a placa e o tipo selecionado.
                 setPlacaError('Placa não encontrada na base de dados externa. Preencha manualmente.');
                 setFormData(prev => ({
                     ...prev,
                     plate: placaLimpa, // Manter a placa digitada
+                    // Limpar apenas os campos que seriam preenchidos pela API
                     brand: "",
                     model: "",
                     year: undefined,
@@ -147,7 +147,7 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
             const errorMessage = err instanceof Error ? err.message : 'Falha ao consultar placa. Verifique a configuração da API.';
             setPlacaError(errorMessage);
             toast({ title: "Erro na Consulta", description: errorMessage, variant: "destructive" })
-            // Clear auto-filled fields on error, but keep plate
+            // Manter a placa e o tipo selecionado, limpar apenas os campos preenchíveis
             setFormData(prev => ({
                 ...prev,
                 plate: placaLimpa, // Manter a placa digitada
@@ -166,19 +166,21 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
         }
     }, [toast])
 
-    // Effect to trigger data fetch when plate changes
-    useEffect(() => {
-        if (formData.plate) {
-            const cleanPlate = formData.plate.replace(/[^A-Z0-9]/g, "")
-            if (VehicleService.validarPlaca(cleanPlate) && !placaConsultada) {
-                handlePlacaConsultation(cleanPlate)
-            }
-        }
-    }, [formData.plate, handlePlacaConsultation, placaConsultada])
+    // NO LONGER AUTOMATICALLY CONSULTING ON PLATE CHANGE
+    // useEffect(() => {
+    //     if (formData.plate) {
+    //         const cleanPlate = formData.plate.replace(/[^A-Z0-9]/g, "")
+    //         if (VehicleService.validarPlaca(cleanPlate) && !placaConsultada) {
+    //             handlePlacaConsultation(cleanPlate)
+    //         }
+    //     }
+    // }, [formData.plate, handlePlacaConsultation, placaConsultada])
 
-    const handleManualFipeUpdate = () => {
+    const handleConsultationClick = () => {
         if (formData.plate) {
             handlePlacaConsultation(formData.plate)
+        } else {
+            setPlacaError("Digite a placa para consultar.")
         }
     }
 
@@ -254,22 +256,6 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                     <Input value={formData.fipeValue || ""} onChange={e => setFormData({ ...formData, fipeValue: e.target.value })} />
                 </div>
             </div>
-            
-            {/* Update FIPE Button */}
-            <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={handleManualFipeUpdate} 
-                disabled={loading || !formData.plate || !VehicleService.validarPlaca(formData.plate)}
-                className="w-full gap-2"
-            >
-                {loading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                    <RefreshCw className="h-4 w-4" />
-                )}
-                Consultar Placa Novamente
-            </Button>
         </div>
     )
 
@@ -279,7 +265,7 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                 <DialogHeader>
                     <DialogTitle>{vehicleToEdit ? "Editar Veículo" : "Novo Veículo"}</DialogTitle>
                     <DialogDescription>
-                        Insira a placa para buscar os dados automaticamente ou preencha manualmente.
+                        Insira a placa e consulte os dados automaticamente ou preencha manualmente.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -304,21 +290,30 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                     {/* 2. Plate Input */}
                     <div className="space-y-2">
                         <Label>Placa (Obrigatório)</Label>
-                        <div className="relative">
+                        <div className="relative flex gap-2">
                             <Input
                                 value={formData.plate || ""}
                                 onChange={e => {
                                     setFormData({ ...formData, plate: VehicleService.formatarPlaca(e.target.value) })
-                                    setPlacaConsultada(false) // Reset consultation status on change
                                     setPlacaError("")
                                 }}
                                 placeholder="ABC1234"
-                                className="text-lg font-bold uppercase"
+                                className="text-lg font-bold uppercase flex-1"
                                 maxLength={7}
                             />
-                            {loading && (
-                                <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-primary" />
-                            )}
+                            <Button 
+                                type="button"
+                                onClick={handleConsultationClick} 
+                                disabled={loading || !formData.plate || !VehicleService.validarPlaca(formData.plate || "")}
+                                className="shrink-0 w-[150px]"
+                            >
+                                {loading ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                    <RefreshCw className="h-4 w-4 mr-2" />
+                                )}
+                                Consultar
+                            </Button>
                         </div>
                         {placaError && <p className="text-sm text-red-500 mt-1">{placaError}</p>}
                     </div>
