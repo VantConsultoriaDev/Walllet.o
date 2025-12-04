@@ -69,9 +69,8 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                 setType(vehicleToEdit.type)
                 setFormData(vehicleToEdit)
             } else {
-                // CORREÇÃO FINAL: Usando encadeamento opcional e asserção de tipo para garantir que o TS aceite a extração.
-                // Como clientId é obrigatório em Vehicle, se vehicleToEdit existe, clientId existe.
-                const initialClientId: string | undefined = vehicleToEdit?.clientId as string | undefined;
+                // CORREÇÃO: Se vehicleToEdit é undefined, o clientId inicial também é undefined.
+                const initialClientId: string | undefined = undefined;
 
                 setFormData({ 
                     status: "active",
