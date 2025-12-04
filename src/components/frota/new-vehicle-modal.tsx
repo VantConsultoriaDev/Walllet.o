@@ -31,7 +31,7 @@ export type Vehicle = {
     plate: string
     brand: string
     model: string
-    year: number
+    year: number // <-- Novo campo
     color?: string // <-- Novo campo
     renavam?: string
     chassi?: string
@@ -94,6 +94,13 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
         try {
             const data: PlacaData | null = await VehicleService.consultarPlaca(placaLimpa);
             
+            // Helper for safe integer parsing, defaulting to a fallback number
+            const safeParseInt = (value: string | undefined, fallback: number) => {
+                if (!value) return fallback;
+                const parsed = parseInt(value);
+                return isNaN(parsed) ? fallback : parsed;
+            };
+
             if (data && data.marca) { // Verifica se há dados e se a marca está presente
                 // Determine type based on vehicle info (simple heuristic)
                 let detectedType: VehicleType = "CARRO"
@@ -116,7 +123,8 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                     plate: placaLimpa, // GARANTINDO QUE A PLACA LIMPA SEJA MANTIDA
                     brand: data.marca || "",
                     model: data.modelo || "",
-                    year: parseInt(data.ano) || prev.year, // Usando o campo 'ano' mapeado
+                    // Use safeParseInt para garantir que year seja um número, usando o ano anterior ou o ano atual como fallback
+                    year: safeParseInt(data.ano, prev.year || new Date().getFullYear()), 
                     color: data.cor || "",
                     chassi: data.chassi ? forceUpperCase(data.chassi) : "",
                     renavam: data.renavam || "",
@@ -187,10 +195,14 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
 
     const handleSubmit = () => {
         if (formData.plate && formData.brand && formData.model && formData.clientId) {
+            // Ensure year is set before submission, defaulting to current year if still undefined
+            const finalYear = formData.year || new Date().getFullYear();
+
             onSubmit({
                 id: vehicleToEdit?.id, 
                 type,
-                ...formData
+                ...formData,
+                year: finalYear,
             } as Vehicle)
             onOpenChange(false)
         }

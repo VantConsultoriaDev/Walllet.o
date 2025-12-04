@@ -154,18 +154,16 @@ export function NewCotacaoModal({ isOpen, onClose, onSubmit }: NewCotacaoModalPr
             const data: PlacaData | null = await VehicleService.consultarPlaca(value);
 
             if (data) {
-                const safeString = (val: any) => (val !== null && val !== undefined ? String(val) : "");
-                const safeNumber = (val: any) => (val !== null && val !== undefined ? Number(val) : undefined);
-
+                // Simplificando a atribuição, confiando que VehicleService retorna strings ou strings vazias
                 setMarca(data.marca || "");
                 setModelo(data.modelo || "");
-                setAno(safeNumber(data.ano) ? safeNumber(data.ano)!.toString() : "");
+                setAno(data.ano || ""); 
                 setCor(data.cor || "");
-                setChassi(safeString(data.chassi));
-                setRenavam(safeString(data.renavam));
+                setChassi(data.chassi || "");
+                setRenavam(data.renavam || "");
                 // FIPE fields are not available in this endpoint, keeping them empty
-                setCodigoFipe("");
-                setValorFipe("");
+                setCodigoFipe(data.fipeCode || "");
+                setValorFipe(data.fipeValue || "");
                 toast({ title: "Sucesso", description: "Dados do veículo carregados." })
             } else {
                 setPlacaError('Placa não encontrada na base de dados externa. Preencha manualmente.');
