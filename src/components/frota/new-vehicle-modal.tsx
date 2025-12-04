@@ -74,7 +74,8 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                 // Construção explícita do objeto inicial para evitar inferência 'never'
                 const initialData: Partial<Vehicle> = { 
                     status: "active",
-                    clientId: vehicleToEdit?.clientId, // Acessando clientId de forma segura
+                    // Acessamos clientId de forma segura, garantindo que o valor seja string | undefined
+                    clientId: vehicleToEdit?.clientId, 
                 };
                 setFormData(initialData);
                 setType("CARRO")
