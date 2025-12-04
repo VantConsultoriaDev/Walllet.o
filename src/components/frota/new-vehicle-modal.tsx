@@ -71,7 +71,7 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                 setType(vehicleToEdit.type)
                 setFormData(vehicleToEdit)
             } else {
-                // Corrigido: Inicializa com clientId se disponível
+                // Corrigido: Inicializa com clientId se disponível, garantindo que o objeto seja Partial<Vehicle>
                 setFormData({ status: "active", clientId: vehicleToEdit?.clientId })
                 setType("CARRO")
             }

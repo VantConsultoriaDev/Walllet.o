@@ -158,11 +158,7 @@ export default function Cotacoes() {
             asset: formData.asset,
             anuidade: formData.anuidade,
             parcelas: formData.parcelas,
-            comissao: {
-                type: formData.comissaoType,
-                value: formData.comissaoValue,
-                installments: formData.comissaoInstallments,
-            },
+            comissao: formData.comissao, // CORRIGIDO: Usando o objeto comissao completo
             status: "cotacao",
         }
 
