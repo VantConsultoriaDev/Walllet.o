@@ -16,16 +16,16 @@ export class VehicleService {
    */
   static async consultarPlaca(placa: string): Promise<PlacaData | null> {
     try {
+      if (!API_TOKEN) {
+        console.error('VehicleService: VITE_APIBRASIL_TOKEN não configurado.');
+        throw new Error('ERRO DE CONFIGURAÇÃO: A variável VITE_APIBRASIL_TOKEN não está definida. Por favor, crie um arquivo .env e defina o token.');
+      }
+      
       // Remove formatação da placa
       const placaLimpa = placa.replace(/[^A-Z0-9]/gi, '');
       
       if (!VehicleService.validarPlaca(placaLimpa)) {
         throw new Error('Placa inválida');
-      }
-
-      if (!API_TOKEN) {
-        console.error('VehicleService: VITE_APIBRASIL_TOKEN não configurado.');
-        throw new Error('ERRO DE CONFIGURAÇÃO: A variável VITE_APIBRASIL_TOKEN não está definida.');
       }
 
       const response = await axios.post(
@@ -48,7 +48,7 @@ export class VehicleService {
       
       if (!result || result.error || !result.data) {
         if (response.status === 401 || response.status === 403) {
-             throw new Error('ERRO DE AUTORIZAÇÃO: O token da API é inválido ou expirou.');
+             throw new Error('ERRO DE AUTORIZAÇÃO: O token da API (VITE_APIBRASIL_TOKEN) é inválido ou expirou. Verifique a configuração.');
         }
         return null;
       }
