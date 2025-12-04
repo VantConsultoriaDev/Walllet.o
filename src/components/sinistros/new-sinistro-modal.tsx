@@ -25,7 +25,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { CalendarIcon, Plus, X, Save, Car, Building2, Check } from "lucide-react"
 import { format } from "date-fns"
-import { ptBR } from "date-fns/locale" // CORRIGIDO: Importando ptBR de date-fns/locale
+import { ptBR } from "date-fns/locale"
 import { cn } from "@/lib/utils"
 import { ClaimType, ThirdParty, ThirdPartyAssetType, CLAIM_TYPE_LABELS } from "@/types/sinistro"
 import { useClients, type Client } from "@/hooks/data/useClients"
@@ -215,7 +215,7 @@ export function NewSinistroModal({ isOpen, onClose, onSubmit }: NewSinistroModal
                                 />
                                 {showClientDropdown && filteredClients.length > 0 && !selectedClient && clientSearch.length > 0 && (
                                     <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-950 border rounded-md shadow-lg max-h-48 overflow-auto">
-                                        {filteredClients.map((client: Client) => {
+                                        {filteredClients.map((client) => {
                                             const isSelected = selectedClient?.id === client.id;
                                             return (
                                                 <div
