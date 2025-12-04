@@ -71,7 +71,8 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                 setType(vehicleToEdit.type)
                 setFormData(vehicleToEdit)
             } else {
-                // CORREÇÃO: Acessando clientId diretamente do prop vehicleToEdit (que é opcional)
+                // CORREÇÃO: Usando o operador de encadeamento opcional para acessar clientId
+                // e garantindo que o tipo seja inferido corretamente como string | undefined
                 const initialClientId = vehicleToEdit?.clientId;
                 setFormData({ 
                     status: "active", 
