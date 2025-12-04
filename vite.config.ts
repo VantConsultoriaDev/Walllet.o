@@ -10,4 +10,15 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  server: {
+    proxy: {
+      // Proxy para a API Brasil para contornar CORS
+      '/api-brasil': {
+        target: 'https://gateway.apibrasil.io',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api-brasil/, ''),
+        secure: true,
+      },
+    },
+  },
 })

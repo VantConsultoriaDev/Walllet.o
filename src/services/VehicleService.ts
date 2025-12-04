@@ -4,8 +4,8 @@ import type { PlacaData } from "@/types/vehicle";
 const API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwOi8vZ2F0ZXdheS5hcGlicmFzaWwuaW8vYXBpL3YyL2F1dGgvbG9naW4iLCJpYXQiOjE3NjQ3OTQ0NDcsImV4cCI6MTc5NjMzMDQ3LCJuYmYiOjE3NjQ3OTQ0NDcsImp0aSI6ImdYeTlOQWFoM084Qmc0anoiLCJzdWIiOiIxNzg0MiIsInBydiI6IjIzYmQ1Yzg5NDlmNjAwYWRiMzllNzAxYzQwMDg3MmRiN2E1OTc2ZjcifQ.V6QSWD39KM6TtCk4nJawVJnigT5r2TojKrOR3qy9Lgc";
 
 export class VehicleService {
-  // Novo endpoint conforme solicitado
-  private static readonly API_URL = 'https://gateway.apibrasil.io/api/v2/consulta/veiculos/credits';
+  // Usando o caminho do proxy configurado no vite.config.ts
+  private static readonly API_URL = '/api-brasil/api/v2/consulta/veiculos/credits';
 
   /**
    * Consulta dados da placa usando a API da ApiBrasil via fetch.
@@ -87,32 +87,11 @@ export class VehicleService {
       
       console.error('Erro ao consultar placa:', error);
       
-      // --- FALLBACK MOCK PARA ERROS DE REDE/CORS ---
-      if (error instanceof Error && error.message.includes('Failed to fetch')) {
-          console.warn("Usando dados mockados devido a falha de rede/CORS.");
-          return {
-              placa: placa.toUpperCase(),
-              marca: 'MOCK_MARCA',
-              modelo: 'MOCK_MODELO',
-              ano: '2022',
-              anoModelo: '2022',
-              cor: 'PRETO',
-              combustivel: 'GASOLINA',
-              categoria: 'CARRO',
-              chassi: 'MOCKCHASSI123456789',
-              renavam: 'MOCKRENVAM1234567',
-              municipio: 'SAO PAULO',
-              uf: 'SP',
-              fipeCode: '001234-5',
-              fipeValue: '85000.00',
-          };
-      }
-      // ---------------------------------------------
-
       if (error instanceof Error) {
           if (error.name === 'AbortError' && error.message === 'Timeout excedido') {
               throw new Error('A consulta excedeu o tempo limite de 120 segundos.');
           }
+          // Se o erro for de rede (como o 'Failed to fetch' original), ele será lançado aqui.
           throw error;
       }
       
