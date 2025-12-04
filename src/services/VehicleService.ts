@@ -1,24 +1,25 @@
-import axios from 'axios';
 import type { PlacaData } from "@/types/vehicle";
 
-// O token deve ser lido das variáveis de ambiente
-// NOTE: Você deve definir VITE_APIBRASIL_TOKEN no seu arquivo .env ou similar.
-const API_TOKEN = import.meta.env.VITE_APIBRASIL_TOKEN;
+// O token de autorização fornecido pelo usuário
+const API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwOi8vZ2F0ZXdheS5hcGlicmFzaWwuaW8vYXBpL3YyL2F1dGgvbG9naW4iLCJpYXQiOjE3NjQ3OTQ0NDcsImV4cCI6MTc5NjMzMDQ0NywibmJmIjoxNzY0Nzk0NDQ3LCJqdGkiOiJnWHk5TkFhaDNPOEJnNGp6Iiwic3ViIjoiMTc4NDIiLCJwcnYiOiIyM2JkNWM4OTQ5ZjYwMGFkYjM5ZTcwMWM0MDA4NzJkYjdhNTk3NjY3In0.V6QSWD39KM6TtCk4nJawVJnigT5r2TojKrOR3qy9Lgc";
 
 export class VehicleService {
-  // Usando o endpoint base/000/dados conforme solicitado
-  private static readonly API_URL = 'https://gateway.apibrasil.io/api/v2/vehicles/base/000/dados';
+  // Novo endpoint conforme solicitado
+  private static readonly API_URL = 'https://gateway.apibrasil.io/api/v2/consulta/veiculos/credits';
 
   /**
-   * Consulta dados da placa usando a API da ApiBrasil.
+   * Consulta dados da placa usando a API da ApiBrasil via fetch.
    * @param placa Placa limpa (7 caracteres alfanuméricos).
    * @returns Dados do veículo ou null se não encontrado/erro.
    */
   static async consultarPlaca(placa: string): Promise<PlacaData | null> {
+    const controller = new AbortController();
+    const TIMEOUT_MS = 120000; // 120 segundos
+    let timeoutId: ReturnType<typeof setTimeout> | undefined = setTimeout(() => controller.abort("Timeout excedido"), TIMEOUT_MS);
+
     try {
       if (!API_TOKEN) {
-        console.error('VehicleService: VITE_APIBRASIL_TOKEN não configurado.');
-        throw new Error('ERRO DE CONFIGURAÇÃO: A variável VITE_APIBRASIL_TOKEN não está definida. Por favor, crie um arquivo .env e defina o token.');
+        throw new Error('ERRO DE CONFIGURAÇÃO: O token da API não está definido.');
       }
       
       // Remove formatação da placa
@@ -28,23 +29,32 @@ export class VehicleService {
         throw new Error('Placa inválida');
       }
 
-      const response = await axios.post(
-        VehicleService.API_URL,
-        {
-          // A API espera letras maiúsculas
-          placa: placaLimpa.toUpperCase(),
-          homolog: false,
+      const response = await fetch(VehicleService.API_URL, {
+        method: 'POST',
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${API_TOKEN}`,
         },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${API_TOKEN}`
-          },
-          timeout: 120000, // 120 segundos
-        }
-      );
+        body: JSON.stringify({
+          "tipo": "fipe",
+          "placa": placaLimpa.toUpperCase(),
+          "homolog": false
+        }),
+        signal: controller.signal,
+        redirect: 'follow',
+        credentials: 'include',
+        cache: 'no-store'
+      });
       
-      const result = response.data;
+      clearTimeout(timeoutId);
+      timeoutId = undefined;
+
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => ({ message: response.statusText }));
+        throw new Error(`Falha na comunicação com a API (${response.status}): ${errorBody.message || response.statusText}`);
+      }
+      
+      const result = await response.json();
       
       // 1. Verifica se a resposta da API contém dados válidos
       if (!result || result.error || !result.data || Object.keys(result.data).length === 0) {
@@ -75,23 +85,20 @@ export class VehicleService {
       };
 
     } catch (error) {
-      console.error('Erro ao consultar placa:', error);
-      
-      if (axios.isAxiosError(error)) {
-          if (error.response?.status === 401 || error.response?.status === 403) {
-              throw new Error('ERRO DE AUTORIZAÇÃO: O token da API (VITE_APIBRASIL_TOKEN) é inválido ou expirou. Verifique a configuração.');
-          }
-          // Se for um erro de cliente (4xx) ou servidor (5xx), lançamos uma mensagem genérica para o modal
-          // para que ele possa exibir o erro, mas sem consumir créditos desnecessariamente.
-          throw new Error(`Falha na comunicação com a API: ${error.response?.statusText || error.message}`);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
       }
       
-      // Re-throw custom errors (configuração ou placa inválida)
+      console.error('Erro ao consultar placa:', error);
+      
       if (error instanceof Error) {
+          // Se for um erro de timeout ou de autorização/configuração, lançamos a mensagem
+          if (error.name === 'AbortError' && error.message === 'Timeout excedido') {
+              throw new Error('A consulta excedeu o tempo limite de 120 segundos.');
+          }
           throw error;
       }
       
-      // Para qualquer outro erro inesperado, retornamos null
       return null;
     }
   }
