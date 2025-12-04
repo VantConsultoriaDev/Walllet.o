@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
-import { Save, X, Car, Home, Package, Users, FileText, Loader2 } from "lucide-react"
+import { Save, X, Car, Home, Package, Users, FileText, Loader2, RefreshCw } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
     AssetType,
@@ -137,12 +137,11 @@ export function NewCotacaoModal({ isOpen, onClose, onSubmit }: NewCotacaoModalPr
         }
     }, [cpfCnpj])
 
-    const handlePlacaChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const value = VehicleService.formatarPlaca(e.target.value)
-        setPlaca(value)
-        setPlacaError("")
+    const handlePlacaConsultation = async () => {
+        const placaLimpa = placa.replace(/[^A-Z0-9]/gi, '');
+        setPlaca(placaLimpa); // Atualiza o estado da placa para a versão limpa
 
-        if (!VehicleService.validarPlaca(value)) {
+        if (!VehicleService.validarPlaca(placaLimpa)) {
             setPlacaError('Placa inválida.');
             return;
         }
@@ -151,9 +150,9 @@ export function NewCotacaoModal({ isOpen, onClose, onSubmit }: NewCotacaoModalPr
         setPlacaError('');
 
         try {
-            const data: PlacaData | null = await VehicleService.consultarPlaca(value);
+            const data: PlacaData | null = await VehicleService.consultarPlaca(placaLimpa);
 
-            if (data) {
+            if (data && data.marca) {
                 // Simplificando a atribuição, confiando que VehicleService retorna strings ou strings vazias
                 setMarca(data.marca || "");
                 setModelo(data.modelo || "");
@@ -161,12 +160,20 @@ export function NewCotacaoModal({ isOpen, onClose, onSubmit }: NewCotacaoModalPr
                 setCor(data.cor || "");
                 setChassi(data.chassi || "");
                 setRenavam(data.renavam || "");
-                // Corrigido: fipeCode e fipeValue agora existem em PlacaData
                 setCodigoFipe(data.fipeCode || "");
                 setValorFipe(data.fipeValue || "");
                 toast({ title: "Sucesso", description: "Dados do veículo carregados." })
             } else {
                 setPlacaError('Placa não encontrada na base de dados externa. Preencha manualmente.');
+                // Limpar campos se a consulta falhar
+                setMarca("");
+                setModelo("");
+                setAno("");
+                setCor("");
+                setChassi("");
+                setRenavam("");
+                setCodigoFipe("");
+                setValorFipe("");
             }
 
         } catch (error) {
@@ -174,9 +181,24 @@ export function NewCotacaoModal({ isOpen, onClose, onSubmit }: NewCotacaoModalPr
             console.error('Erro na requisição:', error);
             setPlacaError(errorMessage);
             toast({ title: "Erro na Consulta", description: errorMessage, variant: "destructive" })
+            // Limpar campos em caso de erro
+            setMarca("");
+            setModelo("");
+            setAno("");
+            setCor("");
+            setChassi("");
+            setRenavam("");
+            setCodigoFipe("");
+            setValorFipe("");
         } finally {
             setIsLoadingPlaca(false)
         }
+    }
+
+    const handlePlacaInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = VehicleService.formatarPlaca(e.target.value)
+        setPlaca(value)
+        setPlacaError("")
     }
 
     const handleSubmit = () => {
@@ -426,18 +448,26 @@ export function NewCotacaoModal({ isOpen, onClose, onSubmit }: NewCotacaoModalPr
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <Label>Placa *</Label>
-                                        <div className="relative">
+                                        <div className="relative flex gap-2">
                                             <Input
                                                 value={placa}
-                                                onChange={handlePlacaChange}
+                                                onChange={handlePlacaInputChange}
                                                 placeholder="ABC1234"
                                                 maxLength={7}
                                             />
-                                            {isLoadingPlaca && (
-                                                <div className="absolute right-3 top-2.5">
-                                                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                                                </div>
-                                            )}
+                                            <Button 
+                                                type="button"
+                                                onClick={handlePlacaConsultation} 
+                                                disabled={isLoadingPlaca || !placa || !VehicleService.validarPlaca(placa)}
+                                                className="shrink-0 w-[150px]"
+                                            >
+                                                {isLoadingPlaca ? (
+                                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                                ) : (
+                                                    <RefreshCw className="h-4 w-4 mr-2" />
+                                                )}
+                                                Consultar
+                                            </Button>
                                         </div>
                                         {placaError && <p className="text-xs text-red-500 mt-1">{placaError}</p>}
                                     </div>

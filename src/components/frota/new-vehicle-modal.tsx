@@ -181,16 +181,6 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
         }
     }, [toast])
 
-    // NO LONGER AUTOMATICALLY CONSULTING ON PLATE CHANGE
-    // useEffect(() => {
-    //     if (formData.plate) {
-    //         const cleanPlate = formData.plate.replace(/[^A-Z0-9]/g, "")
-    //         if (VehicleService.validarPlaca(cleanPlate) && !placaConsultada) {
-    //             handlePlacaConsultation(cleanPlate)
-    //         }
-    //     }
-    // }, [formData.plate, handlePlacaConsultation, placaConsultada])
-
     const handleConsultationClick = () => {
         if (formData.plate) {
             handlePlacaConsultation(formData.plate)
