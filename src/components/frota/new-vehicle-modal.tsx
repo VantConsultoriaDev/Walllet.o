@@ -61,9 +61,7 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
         status: "active"
     })
     const [placaError, setPlacaError] = useState("")
-    // Removendo placaConsultada, pois a consulta será manual
-    // const [placaConsultada, setPlacaConsultada] = useState(false)
-
+    
     // Reset form when modal opens/closes
     useEffect(() => {
         if (open) {
@@ -71,12 +69,12 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                 setType(vehicleToEdit.type)
                 setFormData(vehicleToEdit)
             } else {
-                // Coerção de tipo explícita para evitar inferência 'never'
-                const initialData = { 
+                // Inicializa com valores padrão e o clientId, que é o único campo obrigatório
+                // que pode vir do contexto (vehicleToEdit) mesmo que o resto seja novo.
+                setFormData({ 
                     status: "active",
-                    clientId: vehicleToEdit?.clientId, 
-                } as Partial<Vehicle>;
-                setFormData(initialData);
+                    clientId: vehicleToEdit?.clientId, // Acessando diretamente
+                });
                 setType("CARRO")
             }
             setPlacaError("")

@@ -186,6 +186,9 @@ export function NewSinistroModal({ isOpen, onClose, onSubmit }: NewSinistroModal
         onClose()
     }
 
+    // Variável local para o ID do cliente selecionado, garantindo que seja string | undefined
+    const selectedClientId = selectedClient?.id;
+
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
             <DialogContent className="max-w-3xl max-h-[90vh] p-0">
@@ -216,8 +219,7 @@ export function NewSinistroModal({ isOpen, onClose, onSubmit }: NewSinistroModal
                                 {showClientDropdown && filteredClients.length > 0 && !selectedClient && clientSearch.length > 0 && (
                                     <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-950 border rounded-md shadow-lg max-h-48 overflow-auto">
                                         {filteredClients.map((client) => {
-                                            // CORREÇÃO: Usando uma variável local para o ID do cliente selecionado para evitar o erro 'never'
-                                            const selectedClientId = selectedClient?.id;
+                                            // Usando a variável local tipada
                                             const isSelected = selectedClientId === client.id;
                                             return (
                                                 <div
