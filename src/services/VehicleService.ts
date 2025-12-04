@@ -1,7 +1,7 @@
 import type { PlacaData } from "@/types/vehicle";
 
-// O token de autorização fornecido pelo usuário
-const API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwOi8vZ2F0ZXdheS5hcGlicmFzaWwuaW8vYXBpL3YyL2F1dGgvbG9naW4iLCJpYXQiOjE3NjQ3OTQ0NDcsImV4cCI6MTc5NjMzMDQ3LCJuYmYiOjE3NjQ3OTQ0NDcsImp0aSI6ImdYeTlOQWFoM084Qmc0anoiLCJzdWIiOiIxNzg0MiIsInBydiI6IjIzYmQ1Yzg5NDlmNjAwYWRiMzllNzAxYzQwMDg3MmRiN2E1OTc2ZjcifQ.V6QSWD39KM6TtCk4nJawVJnigT5r2TojKrOR3qy9Lgc";
+// Lendo o token da variável de ambiente
+const API_TOKEN = import.meta.env.VITE_API_BRASIL_TOKEN;
 
 export class VehicleService {
   // Usando o caminho do proxy configurado no vite.config.ts
@@ -19,7 +19,7 @@ export class VehicleService {
 
     try {
       if (!API_TOKEN) {
-        throw new Error('ERRO DE CONFIGURAÇÃO: O token da API não está definido.');
+        throw new Error('ERRO DE CONFIGURAÇÃO: O token da API não está definido na variável de ambiente VITE_API_BRASIL_TOKEN.');
       }
       
       // Remove formatação da placa
@@ -91,7 +91,6 @@ export class VehicleService {
           if (error.name === 'AbortError' && error.message === 'Timeout excedido') {
               throw new Error('A consulta excedeu o tempo limite de 120 segundos.');
           }
-          // Se o erro for de rede (como o 'Failed to fetch' original), ele será lançado aqui.
           throw error;
       }
       
