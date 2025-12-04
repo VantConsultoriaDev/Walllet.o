@@ -71,12 +71,11 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                 setType(vehicleToEdit.type)
                 setFormData(vehicleToEdit)
             } else {
-                // Construção explícita do objeto inicial, garantindo que clientId seja string
-                const initialData: Partial<Vehicle> = { 
+                // Coerção de tipo explícita para evitar inferência 'never'
+                const initialData = { 
                     status: "active",
-                    // Usamos o operador || para garantir que o valor seja string (ou undefined, que é permitido por Partial)
-                    clientId: vehicleToEdit?.clientId || undefined, 
-                };
+                    clientId: vehicleToEdit?.clientId, 
+                } as Partial<Vehicle>;
                 setFormData(initialData);
                 setType("CARRO")
             }
