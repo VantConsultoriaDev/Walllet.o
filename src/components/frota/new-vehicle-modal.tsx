@@ -69,8 +69,9 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                 setType(vehicleToEdit.type)
                 setFormData(vehicleToEdit)
             } else {
-                // CORREÇÃO: Usando verificação condicional explícita para evitar erro TS2339
-                const initialClientId: string | undefined = vehicleToEdit ? vehicleToEdit.clientId : undefined;
+                // CORREÇÃO FINAL: Usando encadeamento opcional e asserção de tipo para garantir que o TS aceite a extração.
+                // Como clientId é obrigatório em Vehicle, se vehicleToEdit existe, clientId existe.
+                const initialClientId: string | undefined = vehicleToEdit?.clientId as string | undefined;
 
                 setFormData({ 
                     status: "active",
