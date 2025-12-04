@@ -69,8 +69,8 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                 setType(vehicleToEdit.type)
                 setFormData(vehicleToEdit)
             } else {
-                // Extrai clientId de forma segura e garante que o tipo seja string | undefined
-                const initialClientId: string | undefined = vehicleToEdit?.clientId;
+                // CORREÇÃO: Usando verificação condicional explícita para evitar erro TS2339
+                const initialClientId: string | undefined = vehicleToEdit ? vehicleToEdit.clientId : undefined;
 
                 setFormData({ 
                     status: "active",
