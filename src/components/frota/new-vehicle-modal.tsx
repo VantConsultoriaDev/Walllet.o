@@ -196,45 +196,6 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
 
     const renderCommonFields = () => (
         <>
-            {/* Plate Input - Moved to the top of common fields */}
-            <div className="space-y-2">
-                <Label>Placa (Obrigatório)</Label>
-                <div className="relative">
-                    <Input
-                        value={formData.plate || ""}
-                        onChange={e => {
-                            setFormData({ ...formData, plate: VehicleService.formatarPlaca(e.target.value) })
-                            setPlacaConsultada(false) // Reset consultation status on change
-                            setPlacaError("")
-                        }}
-                        placeholder="ABC1234"
-                        className="text-lg font-bold uppercase"
-                        maxLength={7}
-                    />
-                    {loading && (
-                        <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-primary" />
-                    )}
-                </div>
-                {placaError && <p className="text-sm text-red-500 mt-1">{placaError}</p>}
-            </div>
-
-            {/* Type Selection - Moved here */}
-            <div className="space-y-2">
-                <Label>Tipo de Veículo</Label>
-                <Select value={type} onValueChange={(v) => setType(v as VehicleType)}>
-                    <SelectTrigger>
-                        <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="CARRO">Carro</SelectItem>
-                        <SelectItem value="MOTO">Moto</SelectItem>
-                        <SelectItem value="CAVALO">Cavalo Mecânico</SelectItem>
-                        <SelectItem value="TRUCK">Caminhão (Truck)</SelectItem>
-                        <SelectItem value="CARRETA">Carreta</SelectItem>
-                    </SelectContent>
-                </Select>
-            </div>
-
             <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                     <Label>Marca *</Label>
@@ -323,7 +284,46 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                 </DialogHeader>
 
                 <div className="space-y-6 py-4">
-                    {/* Dynamic Fields Container */}
+                    {/* 1. Type Selection */}
+                    <div className="space-y-2">
+                        <Label>Tipo de Veículo</Label>
+                        <Select value={type} onValueChange={(v) => setType(v as VehicleType)}>
+                            <SelectTrigger>
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="CARRO">Carro</SelectItem>
+                                <SelectItem value="MOTO">Moto</SelectItem>
+                                <SelectItem value="CAVALO">Cavalo Mecânico</SelectItem>
+                                <SelectItem value="TRUCK">Caminhão (Truck)</SelectItem>
+                                <SelectItem value="CARRETA">Carreta</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    {/* 2. Plate Input */}
+                    <div className="space-y-2">
+                        <Label>Placa (Obrigatório)</Label>
+                        <div className="relative">
+                            <Input
+                                value={formData.plate || ""}
+                                onChange={e => {
+                                    setFormData({ ...formData, plate: VehicleService.formatarPlaca(e.target.value) })
+                                    setPlacaConsultada(false) // Reset consultation status on change
+                                    setPlacaError("")
+                                }}
+                                placeholder="ABC1234"
+                                className="text-lg font-bold uppercase"
+                                maxLength={7}
+                            />
+                            {loading && (
+                                <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-primary" />
+                            )}
+                        </div>
+                        {placaError && <p className="text-sm text-red-500 mt-1">{placaError}</p>}
+                    </div>
+
+                    {/* 3. Dynamic Fields Container */}
                     <div className="space-y-4 border rounded-lg p-4 bg-muted/20">
                         {renderCommonFields()}
 
