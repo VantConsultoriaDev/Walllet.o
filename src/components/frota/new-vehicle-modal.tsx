@@ -70,7 +70,7 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                 setType(vehicleToEdit.type)
                 setFormData(vehicleToEdit)
             } else {
-                setFormData({ status: "active" })
+                setFormData({ status: "active", clientId: vehicleToEdit?.clientId })
                 setType("CARRO")
             }
             setPlacaError("")
@@ -113,16 +113,16 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                 setType(detectedType)
                 setFormData(prev => ({
                     ...prev,
+                    plate: placaLimpa, // GARANTINDO QUE A PLACA LIMPA SEJA MANTIDA
                     brand: data.marca || prev.brand,
                     model: data.modelo || prev.model,
-                    year: parseInt(data.ano) || prev.year,
+                    year: parseInt(data.ano) || prev.year, // Usando o campo 'ano' mapeado
                     color: data.cor || prev.color,
                     chassi: data.chassi ? forceUpperCase(data.chassi) : prev.chassi,
                     renavam: data.renavam || prev.renavam,
-                    // FIPE fields are not directly available in this endpoint, keeping them empty or previous values
-                    fipeCode: prev.fipeCode,
-                    fipeValue: prev.fipeValue,
-                    bodyType: data.categoria?.includes("CAMINHAO") ? data.categoria : prev.bodyType, // Using categoria as bodyType for trucks
+                    fipeCode: data.fipeCode || prev.fipeCode,
+                    fipeValue: data.fipeValue || prev.fipeValue,
+                    bodyType: data.categoria?.includes("CAMINHAO") ? data.categoria : prev.bodyType,
                 }))
                 setPlacaConsultada(true);
                 toast({ title: "Sucesso", description: "Dados da placa carregados automaticamente." })
@@ -133,7 +133,7 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
             const errorMessage = err instanceof Error ? err.message : 'Falha ao consultar placa. Verifique a configuração da API.';
             setPlacaError(errorMessage);
             toast({ title: "Erro na Consulta", description: errorMessage, variant: "destructive" })
-            // Clear auto-filled fields on error
+            // Clear auto-filled fields on error, but keep plate
             setFormData(prev => ({
                 ...prev,
                 brand: "",
