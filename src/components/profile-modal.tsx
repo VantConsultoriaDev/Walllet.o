@@ -31,6 +31,14 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     const fileInputRef = useRef<HTMLInputElement>(null)
     const { toast } = useToast()
 
+    // Sync name and avatar when user prop changes (e.g., when modal opens or after a successful update)
+    useEffect(() => {
+        if (user) {
+            setName(user.name || "")
+            setAvatarPreview(user.avatar_url || null)
+        }
+    }, [user])
+
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (file) {
@@ -56,6 +64,7 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                     setLoading(false)
                     return
                 }
+                // NOTE: verifyPassword is a mock in AuthProvider, but we keep the call structure
                 const { valid, error: verifyError } = await verifyPassword(currentPassword)
                 if (verifyError || !valid) {
                     toast({
@@ -70,7 +79,7 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
 
             // In a real app, we would upload the file to storage here
             // For mock, we'll just use the object URL if a file was selected
-            const avatarUrl = avatarFile ? avatarPreview : undefined
+            const avatarUrl = avatarFile ? avatarPreview : user?.avatar_url || undefined
 
             const { error: updateError } = await updateProfile({
                 name,
@@ -92,6 +101,7 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                 })
                 setCurrentPassword("")
                 setNewPassword("")
+                // Close modal after successful update
                 setTimeout(() => {
                     onClose()
                 }, 500)

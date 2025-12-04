@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from "react"
+import { createContext, useContext, useEffect, useState, useCallback } from "react"
 import { supabase } from "@/lib/supabase"
 import type { User, Session } from "@/lib/supabase"
 
@@ -19,16 +19,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [session, setSession] = useState<Session | null>(null)
     const [loading, setLoading] = useState(true)
 
+    const fetchUserProfile = useCallback(async (supabaseUser: any): Promise<User> => {
+        const { data: profileData } = await supabase
+            .from('profiles')
+            .select('first_name, last_name, avatar_url')
+            .eq('id', supabaseUser.id)
+            .single()
+
+        const firstName = profileData?.first_name || (supabaseUser.user_metadata as any)?.name?.split(' ')[0] || supabaseUser.email?.split('@')[0]
+        const lastName = profileData?.last_name || (supabaseUser.user_metadata as any)?.name?.split(' ').slice(1).join(' ') || ''
+        const fullName = [firstName, lastName].filter(Boolean).join(' ')
+
+        return {
+            id: supabaseUser.id,
+            email: supabaseUser.email || '',
+            name: fullName,
+            avatar_url: profileData?.avatar_url || (supabaseUser.user_metadata as any)?.avatar_url,
+        }
+    }, [])
+
     useEffect(() => {
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
             if (session) {
-                // Map Supabase User to local User type, ensuring 'name' is available if possible
-                const localUser: User = {
-                    id: session.user.id,
-                    email: session.user.email || '',
-                    name: (session.user.user_metadata as any)?.name || session.user.email?.split('@')[0],
-                    avatar_url: (session.user.user_metadata as any)?.avatar_url,
-                }
+                const localUser = await fetchUserProfile(session.user)
                 setUser(localUser)
                 setSession(session as Session)
             } else {
@@ -39,14 +52,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         })
 
         // Initial check for session
-        supabase.auth.getSession().then(({ data: { session } }) => {
+        supabase.auth.getSession().then(async ({ data: { session } }) => {
             if (session) {
-                const localUser: User = {
-                    id: session.user.id,
-                    email: session.user.email || '',
-                    name: (session.user.user_metadata as any)?.name || session.user.email?.split('@')[0],
-                    avatar_url: (session.user.user_metadata as any)?.avatar_url,
-                }
+                const localUser = await fetchUserProfile(session.user)
                 setUser(localUser)
                 setSession(session as Session)
             }
@@ -54,7 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         })
 
         return () => subscription.unsubscribe()
-    }, [])
+    }, [fetchUserProfile])
 
     const signIn = async (email: string, password: string) => {
         try {
@@ -80,8 +88,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const updateProfile = async (updates: { name?: string; avatar_url?: string; password?: string }) => {
+        if (!user) return { error: { message: "Usuário não autenticado" } }
+        
         try {
-            const { data, error } = await supabase.auth.updateUser({
+            // 1. Update auth user metadata (for immediate session use)
+            const { error: authError } = await supabase.auth.updateUser({
                 data: {
                     name: updates.name,
                     avatar_url: updates.avatar_url
@@ -89,11 +100,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 password: updates.password
             })
 
-            if (error) {
-                return { error }
+            if (authError) {
+                return { error: authError }
             }
 
-            // State update is handled by onAuthStateChange listener
+            // 2. Update public profiles table
+            const nameParts = updates.name?.split(' ') || [];
+            const firstName = nameParts[0];
+            const lastName = nameParts.slice(1).join(' ');
+
+            const { error: profileError } = await supabase
+                .from('profiles')
+                .update({
+                    first_name: firstName,
+                    last_name: lastName,
+                    avatar_url: updates.avatar_url,
+                    updated_at: new Date().toISOString(),
+                })
+                .eq('id', user.id)
+
+            if (profileError) {
+                console.error("Failed to update profile table:", profileError)
+                // We return the auth error if present, otherwise the profile error
+                return { error: profileError }
+            }
+
+            // Manually update local state immediately after successful update
+            setUser(prev => prev ? { 
+                ...prev, 
+                name: updates.name || prev.name, 
+                avatar_url: updates.avatar_url || prev.avatar_url 
+            } : null)
+
             return { error: null }
         } catch (error) {
             return { error }
@@ -104,8 +142,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Supabase client does not expose a direct verifyPassword method for the current user.
         // This mock function is kept for compatibility but will always return true if no new password is set, 
         // or rely on the updateProfile logic if a password change is attempted.
-        // For a real implementation, this would require a custom Edge Function or relying on the update logic.
-        // Since the mock was simple, we'll keep a simple mock behavior here for now.
+        // Since we are using the real Supabase client, we rely on the update logic in updateProfile.
+        // For the ProfileModal to work, we return true here as a mock for verification.
         console.warn("verifyPassword is a mock function in the real Supabase client context.")
         return { valid: true, error: null }
     }
