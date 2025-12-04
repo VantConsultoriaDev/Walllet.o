@@ -71,8 +71,8 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                 setType(vehicleToEdit.type)
                 setFormData(vehicleToEdit)
             } else {
-                // CORREÇÃO: Usando uma variável temporária para evitar a inferência 'never'
-                const initialClientId = vehicleToEdit?.clientId;
+                // CORREÇÃO: Usando uma verificação explícita para evitar a inferência 'never'
+                const initialClientId = vehicleToEdit ? vehicleToEdit.clientId : undefined;
                 setFormData({ 
                     status: "active", 
                     ...(initialClientId && { clientId: initialClientId }) 
