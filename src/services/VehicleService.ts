@@ -56,19 +56,28 @@ export class VehicleService {
       const data = result.data;
       
       if (data) {
+        // Mapeamento conforme solicitado pelo usuário:
+        // marca = marca
+        // modelo = modelo
+        // ano = anomodelo
+        // codigo fipe = codigofipe 
+        // valor fipe = valor
         return {
           placa: data.placa || placaLimpa,
           marca: data.marca || '',
           modelo: data.modelo || '',
-          ano: data.ano_fabricacao?.toString() || data.ano?.toString() || '',
-          anoModelo: data.ano_modelo?.toString() || data.anoModelo?.toString() || '',
+          ano: data.anomodelo?.toString() || data.ano_modelo?.toString() || data.ano?.toString() || '', // Usando anomodelo
+          anoModelo: data.anomodelo?.toString() || data.ano_modelo?.toString() || '',
           cor: data.cor || '',
           combustivel: data.combustivel || '',
           categoria: data.categoria || data.especie || '',
           chassi: data.chassi || '',
           renavam: data.renavam || '',
           municipio: data.municipio || '',
-          uf: data.uf || ''
+          uf: data.uf || '',
+          // Mapeamento FIPE
+          fipeCode: data.codigofipe || '',
+          fipeValue: data.valor?.toString() || '', // Usando 'valor' para valor FIPE
         };
       }
 
