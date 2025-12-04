@@ -2,7 +2,28 @@ import { useState, useEffect } from "react"
 import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
-import type { Vehicle } from "@/components/frota/new-vehicle-modal"
+// import type { Vehicle } from "@/components/frota/new-vehicle-modal" // REMOVIDO
+
+export type VehicleType = "CAVALO" | "TRUCK" | "CARRETA" | "CARRO" | "MOTO"
+
+export type Vehicle = {
+    id: string
+    clientId: string // Added clientId
+    type: VehicleType
+    plate: string
+    brand: string
+    model: string
+    year: number // <-- Novo campo
+    color?: string // <-- Novo campo
+    renavam?: string
+    chassi?: string
+    fipeCode?: string
+    fipeValue?: string
+    bodyType?: string // Carroceria (Truck)
+    bodyValue?: string // Valor Carroceria (Truck)
+    value?: string // Valor Contrato (ou Valor Carreta)
+    status: "active" | "inactive" | "maintenance"
+}
 
 // Helper function to map DB object to Vehicle type
 const mapDbToVehicle = (dbVehicle: any): Vehicle => ({

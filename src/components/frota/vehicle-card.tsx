@@ -1,7 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Car, Truck, Bike } from "lucide-react"
-import type { Vehicle, VehicleType } from "./new-vehicle-modal"
+import type { Vehicle, VehicleType } from "@/hooks/data/useVehicles" // Importando de useVehicles
 
 type VehicleCardProps = Vehicle & {
     onClick?: () => void

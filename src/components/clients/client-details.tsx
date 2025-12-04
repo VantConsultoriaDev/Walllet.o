@@ -13,10 +13,14 @@ import {
 } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Building2, User, Phone, FileText, Pencil, Save, X, Plus, Trash2, ArrowLeft, Car, Truck, Search, Filter, DollarSign } from "lucide-react"
-import { NewVehicleModal, type Vehicle } from "@/components/frota/new-vehicle-modal"
 import { VehicleCard } from "@/components/frota/vehicle-card"
 import { ClientFinanceiro } from "./client-financeiro"
 import type { Client } from "@/hooks/data/useClients" // Import Client type from hook
+import type { Vehicle, VehicleType } from "@/hooks/data/useVehicles" // Import Vehicle types from hook
+
+// NOTE: NewVehicleModal is deleted, so we need to re-add it or use a placeholder.
+// Since the user asked to delete it to recreate it, I will temporarily remove the import and usage.
+// I will keep the logic that calls onSaveVehicle/onDeleteVehicle.
 
 type ClientDetailsProps = {
     client: Client
@@ -73,6 +77,7 @@ export function ClientDetails({ client, onBack, onStatusChange, onSave, onSaveVe
         const vehicleWithClient = { ...vehicle, clientId: client.id }
         await onSaveVehicle(vehicleWithClient)
         setEditingVehicle(undefined)
+        setIsAddingVehicle(false) // Close modal placeholder
     }
 
     const handleRemoveVehicle = async (vehicleId: string) => {
@@ -435,12 +440,16 @@ export function ClientDetails({ client, onBack, onStatusChange, onSave, onSaveVe
                 </TabsContent>
             </Tabs>
 
-            <NewVehicleModal
-                open={isAddingVehicle}
-                onOpenChange={setIsAddingVehicle}
-                onSubmit={handleSaveVehicle}
-                vehicleToEdit={editingVehicle ? { ...editingVehicle, clientId: client.id } : { clientId: client.id } as Vehicle}
-            />
+            {/* Placeholder for NewVehicleModal */}
+            {isAddingVehicle && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                    <div className="bg-background p-8 rounded-lg shadow-2xl">
+                        <p className="text-lg font-semibold">Modal de Veículo Removido</p>
+                        <p className="text-muted-foreground mt-2">O modal de Novo Veículo foi removido. Por favor, recrie-o para continuar.</p>
+                        <Button onClick={() => setIsAddingVehicle(false)} className="mt-4">Fechar Placeholder</Button>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

@@ -2,7 +2,30 @@ import { useState, useEffect } from "react"
 import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
-import type { Vehicle } from "@/components/frota/new-vehicle-modal"
+// import type { Vehicle } from "@/components/frota/new-vehicle-modal" // REMOVIDO
+
+// Definindo o tipo Vehicle localmente
+export type VehicleType = "CAVALO" | "TRUCK" | "CARRETA" | "CARRO" | "MOTO"
+
+export type Vehicle = {
+    id: string
+    clientId: string
+    type: VehicleType
+    plate: string
+    brand: string
+    model: string
+    year: number
+    color?: string
+    renavam?: string
+    chassi?: string
+    fipeCode?: string
+    fipeValue?: string
+    bodyType?: string
+    bodyValue?: string
+    value?: string
+    status: "active" | "inactive" | "maintenance"
+}
+
 
 // Define o tipo Client baseado na estrutura do banco de dados (src/pages/Clientes.tsx)
 export type Client = {
