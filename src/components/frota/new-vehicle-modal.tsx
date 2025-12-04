@@ -71,11 +71,11 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                 setType(vehicleToEdit.type)
                 setFormData(vehicleToEdit)
             } else {
-                // Construção explícita do objeto inicial para evitar inferência 'never'
+                // Construção explícita do objeto inicial, garantindo que clientId seja string
                 const initialData: Partial<Vehicle> = { 
                     status: "active",
-                    // Acessamos clientId de forma segura, garantindo que o valor seja string | undefined
-                    clientId: vehicleToEdit?.clientId, 
+                    // Usamos o operador || para garantir que o valor seja string (ou undefined, que é permitido por Partial)
+                    clientId: vehicleToEdit?.clientId || undefined, 
                 };
                 setFormData(initialData);
                 setType("CARRO")
@@ -151,6 +151,7 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                     model: "",
                     year: undefined,
                     color: "",
+                    ...prev.clientId && { clientId: prev.clientId }, // Manter clientId se existir
                     chassi: "",
                     renavam: "",
                     fipeCode: "",
@@ -170,6 +171,7 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
                 model: "",
                 year: undefined,
                 color: "",
+                ...prev.clientId && { clientId: prev.clientId }, // Manter clientId se existir
                 chassi: "",
                 renavam: "",
                 fipeCode: "",
@@ -201,14 +203,21 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit }:
 
 
     const handleSubmit = () => {
-        if (formData.plate && formData.brand && formData.model && formData.clientId) {
+        // CRITICAL: Ensure clientId is present before casting to Vehicle
+        if (!formData.clientId) {
+            toast({ title: "Erro", description: "ID do cliente não encontrado.", variant: "destructive" });
+            return;
+        }
+
+        if (formData.plate && formData.brand && formData.model) {
             // Ensure year is set before submission, defaulting to current year if still undefined
             const finalYear = formData.year || new Date().getFullYear();
 
             onSubmit({
-                id: vehicleToEdit?.id, 
+                id: vehicleToEdit?.id || Math.random().toString(36).substr(2, 9), // Adicionando fallback para ID
                 type,
                 ...formData,
+                clientId: formData.clientId, // Garantindo que clientId seja string
                 year: finalYear,
             } as Vehicle)
             onOpenChange(false)
