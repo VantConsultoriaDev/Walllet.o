@@ -131,7 +131,112 @@ export function useBoletos() {
     const [loading, setLoading] = useState(true)
     const [isRefetching, setIsRefetching] = useState(false)
 
-    // --- Core CRUD Functions (Defined first for stability) ---
+    // --- Internal Fetching Logic ---
+    const fetchBoletos = useCallback(async () => {
+        if (!user) {
+            setLoading(false)
+            return
+        }
+
+        if (boletos.length === 0) {
+            setLoading(true)
+        } else {
+            setIsRefetching(true)
+        }
+
+        // 1. Fetch all necessary data concurrently
+        const [{ data: boletosData, error: boletosError }, { data: clientsData }, { data: representationsData }] = await Promise.all([
+            supabase.from('boletos').select('*').eq('user_id', user.id).order('vencimento', { ascending: false }),
+            supabase.from('clients').select('id, name, nome_fantasia, razao_social'),
+            supabase.from('representations').select('id, name, commission_day'),
+        ]);
+
+        if (boletosError) {
+            toast({ title: "Erro", description: boletosError.message, variant: "destructive" })
+            setBoletos([])
+            setLoading(false)
+            setIsRefetching(false)
+            return
+        }
+
+        const clientMap = new Map(clientsData?.map(c => [c.id, c]) || [])
+        const representationMap = new Map(representationsData?.map(r => [r.id, r]) || [])
+
+        // 2. Map and format boletos
+        const formattedBoletos: Boleto[] = boletosData.map(dbBoleto => {
+            const clientInfo = clientMap.get(dbBoleto.client_id);
+            const repInfo = representationMap.get(dbBoleto.representacao_id);
+            
+            const clientName = clientInfo 
+                ? (clientInfo.nome_fantasia || clientInfo.razao_social || clientInfo.name) 
+                : "Cliente Desconhecido";
+            
+            const representationInfo = {
+                name: repInfo?.name || "N/A",
+                commissionDay: repInfo?.commission_day,
+            };
+
+            const boleto = mapDbToBoleto(dbBoleto, clientName, representationInfo);
+            
+            // 3. Handle Expected Commission Transaction creation/update
+            if (boleto.comissaoRecorrente && boleto.comissaoTipo && boleto.status !== 'paid') {
+                let commissionAmount = boleto.comissaoRecorrente;
+                if (boleto.comissaoTipo === 'percentual') {
+                    commissionAmount = (boleto.valor * boleto.comissaoRecorrente) / 100;
+                }
+                
+                if (commissionAmount > 0) {
+                    const expectedDueDate = calculateExpectedCommissionDate(boleto.vencimento, boleto.commissionDay);
+                    // NOTE: This call updates the global transactions state via useTransactions hook
+                    addExpectedCommissionTransaction(
+                        boleto.id,
+                        boleto.clientName,
+                        commissionAmount,
+                        expectedDueDate,
+                        boleto.representacaoId,
+                        boleto.representacao
+                    );
+                }
+            }
+            
+            // 4. Check for overdue status (only if not paid)
+            if (boleto.status !== 'paid' && isBefore(boleto.vencimento, setHours(new Date(), 0, 0, 0))) {
+                boleto.status = 'overdue';
+            }
+
+            return boleto;
+        });
+
+        setBoletos(formattedBoletos);
+        setLoading(false);
+        setIsRefetching(false);
+        return formattedBoletos;
+    }, [user, toast, boletos.length, addExpectedCommissionTransaction]); // Dependências atualizadas
+
+    // --- Internal Add Logic ---
+    const addBoletos = useCallback(async (newBoletos: Omit<Boleto, 'id' | 'representacao' | 'dueDate'>[]) => {
+        if (!user) return { error: { message: "Usuário não autenticado" } }
+
+        const dbData = newBoletos.map(b => mapBoletoToDb(b, user.id))
+
+        const { error } = await supabase
+            .from('boletos')
+            .insert(dbData)
+
+        if (error) {
+            toast({ title: "Erro", description: `Falha ao adicionar boletos: ${error.message}`, variant: "destructive" })
+            return { error }
+        }
+
+        // Re-fetch all data to ensure state consistency and trigger expected commission creation
+        await fetchBoletos()
+        
+        toast({ title: "Sucesso", description: `${newBoletos.length} boleto(s) adicionado(s) com sucesso.` })
+        return { data: true }
+    }, [user, toast, fetchBoletos])
+
+
+    // --- Core CRUD Functions (Exported) ---
 
     const updateBoleto = async (updatedBoleto: Boleto, scope: "this" | "all" = "this") => {
         if (!user) return { error: { message: "Usuário não autenticado" } }
