@@ -121,8 +121,8 @@ export { calculateExpectedCommissionDate }; // Exportando para uso no Financeiro
 export function useBoletos() {
     const { user } = useAuth()
     const { toast } = useToast()
-    // Desestruturando fetchTransactions do useTransactions
-    const { addCommissionTransaction, addExpectedCommissionTransaction, fetchTransactions: fetchAllTransactions } = useTransactions() 
+    // Desestruturando funções estáveis do useTransactions
+    const { addCommissionTransaction, addExpectedCommissionTransaction } = useTransactions() 
     const [boletos, setBoletos] = useState<Boleto[]>([])
     const [loading, setLoading] = useState(true)
     const [isRefetching, setIsRefetching] = useState(false)
@@ -133,6 +133,9 @@ export function useBoletos() {
             return
         }
 
+        // Removendo a dependência de boletos.length para evitar re-execução em cascata
+        // O estado de loading/refetching será controlado pela chamada externa.
+        // Se for a primeira chamada, setLoading(true).
         if (boletos.length === 0) {
             setLoading(true)
         } else {
@@ -189,11 +192,12 @@ export function useBoletos() {
             setBoletos(formattedData)
             
             // --- CRITICAL FIX: Ensure Expected Commission Transactions exist for all fetched boletos ---
+            // Executar a criação/atualização de comissões esperadas de forma assíncrona e não bloqueante.
             const boletosToProcess = formattedData.filter(b => b.comissaoRecorrente && b.comissaoTipo);
             
-            // Processar em paralelo para não bloquear o UI, mas garantir que todas as chamadas sejam feitas
-            // NOTE: We rely on addExpectedCommissionTransaction updating the transactions state locally.
-            await Promise.all(boletosToProcess.map(async (boleto) => {
+            // Usamos Promise.all para garantir que todas as chamadas sejam feitas, mas não bloqueamos o retorno do fetchBoletos
+            // O estado de transactions será atualizado pelo useTransactions, que não deve re-executar este fetch.
+            Promise.all(boletosToProcess.map(async (boleto) => {
                 let commissionAmount = boleto.comissaoRecorrente!;
 
                 if (boleto.comissaoTipo === 'percentual') {
@@ -203,7 +207,6 @@ export function useBoletos() {
                 if (commissionAmount > 0) {
                     const expectedDueDate = calculateExpectedCommissionDate(boleto.vencimento);
                     
-                    // Esta função irá criar ou atualizar a transação esperada
                     await addExpectedCommissionTransaction(
                         boleto.id,
                         boleto.clientName,
@@ -213,14 +216,13 @@ export function useBoletos() {
                         boleto.representacao
                     );
                 }
-            }));
+            })).catch(e => console.error("Erro ao processar comissões esperadas:", e));
             // --- FIM CRITICAL FIX ---
         }
         setLoading(false)
         setIsRefetching(false)
         
-        // REMOVIDO: await fetchAllTransactions(); // <-- REMOVIDO PARA QUEBRAR O LOOP
-    }, [user, toast, boletos.length, addExpectedCommissionTransaction])
+    }, [user, toast, addExpectedCommissionTransaction]) // Dependências: user, toast, addExpectedCommissionTransaction
 
     useEffect(() => {
         fetchBoletos()
@@ -262,7 +264,8 @@ export function useBoletos() {
             return mapDbToBoleto(dbBoleto, clientName, representationName)
         })
 
-        for (const boleto of addedBoletos) {
+        // Processar comissões esperadas para os boletos recém-adicionados
+        await Promise.all(addedBoletos.map(async (boleto) => {
             if (boleto.comissaoRecorrente && boleto.comissaoTipo) {
                 let commissionAmount = boleto.comissaoRecorrente;
 
@@ -284,14 +287,12 @@ export function useBoletos() {
                     );
                 }
             }
-        }
+        }));
         // --- FIM CRIAÇÃO DA TRANSAÇÃO DE COMISSÃO ESPERADA ---
 
         // Re-fetch all boletos to ensure names are correctly mapped after insertion
         await fetchBoletos() 
         
-        // REMOVIDO: await fetchAllTransactions()
-
         toast({ title: "Sucesso", description: `${data.length} boleto(s) adicionado(s) com sucesso.` })
         return { data: true } 
     }
@@ -394,8 +395,6 @@ export function useBoletos() {
             await fetchBoletos()
         }
 
-        // REMOVIDO: await fetchAllTransactions()
-
         toast({ title: "Sucesso", description: `Boleto(s) atualizado(s) com sucesso.` })
         return { data: updatedBoleto }
     }
@@ -473,8 +472,6 @@ export function useBoletos() {
             return b
         }))
         
-        // REMOVIDO: await fetchAllTransactions()
-
         toast({ title: "Sucesso", description: `Status do boleto atualizado para ${newStatus === 'paid' ? 'Pago' : newStatus}.` })
         return { data: data }
     }
@@ -494,8 +491,6 @@ export function useBoletos() {
 
         setBoletos(prev => prev.filter(b => b.id !== id))
         
-        // REMOVIDO: await fetchAllTransactions()
-
         toast({ title: "Sucesso", description: "Boleto excluído com sucesso." })
         return { data: true }
     }
@@ -516,8 +511,6 @@ export function useBoletos() {
 
         setBoletos(prev => prev.filter(b => b.recurrenceGroupId !== groupId))
         
-        // REMOVIDO: await fetchAllTransactions()
-
         toast({ title: "Sucesso", description: "Grupo de boletos recorrentes excluído com sucesso." })
         return { data: true }
     }
@@ -553,6 +546,7 @@ export function useBoletos() {
             })
         }
 
+        // NOTE: We call addBoletos here, which internally calls fetchBoletos() and adds expected commissions.
         const { error } = await addBoletos(newBoletosData)
         if (!error) {
             toast({

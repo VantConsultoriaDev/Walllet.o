@@ -54,13 +54,13 @@ export function useTransactions() {
         }
         setLoading(false)
         setIsRefetching(false)
-    }, [user, toast]) // Removed transactions.length dependency
+    }, [user, toast, transactions.length]) // Mantendo transactions.length aqui para re-executar fetchTransactions quando o array muda
 
     useEffect(() => {
         fetchTransactions()
     }, [user, fetchTransactions])
 
-    const addTransaction = async (newTransaction: Omit<Transaction, 'id'>) => {
+    const addTransaction = useCallback(async (newTransaction: Omit<Transaction, 'id'>) => {
         if (!user) return { error: { message: "Usuário não autenticado" } }
 
         const { data, error } = await supabase
@@ -88,9 +88,9 @@ export function useTransactions() {
         setTransactions(prev => [addedTransaction, ...prev])
         // Note: We skip the toast here if called from addCommissionTransaction to avoid spamming the user.
         return { data: addedTransaction }
-    }
+    }, [user, toast])
 
-    const addCommissionTransaction = async (
+    const addCommissionTransaction = useCallback(async (
         boletoId: string,
         clientName: string,
         amount: number,
@@ -104,6 +104,7 @@ export function useTransactions() {
         const descriptionPrefix = `Comissão Boleto #${boletoId}`;
         const commissionDateString = commissionDueDate.toISOString().split('T')[0];
 
+        // Usamos o estado atual de transactions (capturado pelo useCallback) para verificar a existência
         const existingTransaction = transactions.find(t => 
             t.description.includes(descriptionPrefix) && 
             t.date.toISOString().split('T')[0] === commissionDateString &&
@@ -152,9 +153,9 @@ export function useTransactions() {
         setTransactions(prev => [addedTransaction, ...prev])
         
         return { data: addedTransaction }
-    }
+    }, [user, transactions]) // Adicionando transactions como dependência para a verificação de existência
     
-    const addExpectedCommissionTransaction = async (
+    const addExpectedCommissionTransaction = useCallback(async (
         boletoId: string,
         clientName: string,
         amount: number,
@@ -169,7 +170,7 @@ export function useTransactions() {
         const expectedDateString = expectedDueDate.toISOString().split('T')[0];
 
         // 1. Tenta encontrar uma transação existente com a mesma descrição e data
-        const existingTransaction = transactions.find(t => 
+        let existingTransaction = transactions.find(t => 
             t.description.includes(descriptionPrefix) && 
             t.date.toISOString().split('T')[0] === expectedDateString &&
             t.category === 'Comissão Esperada' // Nova categoria
@@ -184,7 +185,7 @@ export function useTransactions() {
                 console.log(`Comissão ESPERADA para Boleto #${boletoId} atualizada.`);
                 return { data: updatedTransaction };
             }
-            console.log(`Comissão ESPERADA para Boleto #${boletoId} já existe e valor é o mesmo. Pulando criação.`);
+            // console.log(`Comissão ESPERADA para Boleto #${boletoId} já existe e valor é o mesmo. Pulando criação.`);
             return { data: existingTransaction };
         }
 
@@ -223,9 +224,9 @@ export function useTransactions() {
 
         setTransactions(prev => [addedTransaction, ...prev])
         return { data: addedTransaction }
-    }
+    }, [user, transactions, updateTransaction]) // Adicionando transactions e updateTransaction como dependências
 
-    const updateTransaction = async (updatedTransaction: Transaction) => {
+    const updateTransaction = useCallback(async (updatedTransaction: Transaction) => {
         if (!user) return { error: { message: "Usuário não autenticado" } }
 
         const { id, ...updateData } = updatedTransaction;
@@ -251,9 +252,9 @@ export function useTransactions() {
             toast({ title: "Sucesso", description: "Transação atualizada com sucesso." })
         }
         return { data: updatedTransaction }
-    }
+    }, [user, toast])
 
-    const deleteTransaction = async (id: string) => {
+    const deleteTransaction = useCallback(async (id: string) => {
         if (!user) return { error: { message: "Usuário não autenticado" } }
 
         const { error } = await supabase
@@ -269,7 +270,7 @@ export function useTransactions() {
         setTransactions(prev => prev.filter(t => t.id !== id))
         toast({ title: "Sucesso", description: "Transação excluída com sucesso." })
         return { data: true }
-    }
+    }, [user, toast])
 
     return { 
         transactions, 
