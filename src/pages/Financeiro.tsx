@@ -61,9 +61,9 @@ export default function Financeiro() {
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
     const [globalFilter, setGlobalFilter] = useState("")
     
-    // Default filter: Last month + Current month
+    // Default filter: Current month
     const [dateRange, setDateRange] = useState<DateRange | undefined>({
-        from: startOfMonth(subMonths(new Date(), 1)),
+        from: startOfMonth(new Date()),
         to: endOfMonth(new Date()),
     })
 
