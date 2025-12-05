@@ -39,29 +39,56 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, [])
 
     useEffect(() => {
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-            if (session) {
-                const localUser = await fetchUserProfile(session.user)
-                setUser(localUser)
-                setSession(session as Session)
-            } else {
-                setUser(null)
-                setSession(null)
-            }
-            setLoading(false)
-        })
+        let subscription: { unsubscribe: () => void } | null = null;
 
-        // Initial check for session
-        supabase.auth.getSession().then(async ({ data: { session } }) => {
-            if (session) {
-                const localUser = await fetchUserProfile(session.user)
-                setUser(localUser)
-                setSession(session as Session)
+        const initializeAuth = async () => {
+            // 1. Get initial session state directly
+            const { data: { session: initialSession } } = await supabase.auth.getSession();
+            
+            if (initialSession) {
+                try {
+                    const localUser = await fetchUserProfile(initialSession.user);
+                    setUser(localUser);
+                    setSession(initialSession as Session);
+                } catch (e) {
+                    console.error("Failed to fetch user profile on initial session:", e);
+                    // Fallback user data if profile fetch fails
+                    setUser({
+                        id: initialSession.user.id,
+                        email: initialSession.user.email || '',
+                        name: initialSession.user.email?.split('@')[0],
+                        avatar_url: undefined,
+                    });
+                    setSession(initialSession as Session);
+                }
             }
-            setLoading(false)
-        })
+            
+            setLoading(false); // CRUCIAL: Define loading como false após a verificação inicial
 
-        return () => subscription.unsubscribe()
+            // 2. Set up real-time listener for subsequent changes
+            const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
+                if (session) {
+                    // Evita reprocessar INITIAL_SESSION, que já foi tratada acima
+                    if (event !== 'INITIAL_SESSION') {
+                        const localUser = await fetchUserProfile(session.user);
+                        setUser(localUser);
+                        setSession(session as Session);
+                    }
+                } else if (event === 'SIGNED_OUT') {
+                    setUser(null);
+                    setSession(null);
+                }
+            });
+            subscription = data.subscription;
+        };
+
+        initializeAuth();
+
+        return () => {
+            if (subscription) {
+                subscription.unsubscribe();
+            }
+        };
     }, [fetchUserProfile])
 
     const signIn = async (email: string, password: string) => {
@@ -142,7 +169,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Supabase client does not expose a direct verifyPassword method for the current user.
         // This mock function is kept for compatibility but will always return true if no new password is set, 
         // or rely on the updateProfile logic if a password change is attempted.
-        // Since we are using the real Supabase client, we rely on the update logic in updateProfile.
         // For the ProfileModal to work, we return true here as a mock for verification.
         console.warn("verifyPassword is a mock function in the real Supabase client context.")
         return { valid: true, error: null }
