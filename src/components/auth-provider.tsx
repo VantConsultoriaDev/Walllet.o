@@ -110,8 +110,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const signOut = async () => {
-        await supabase.auth.signOut()
-        // State update is handled by onAuthStateChange listener
+        // Explicitly clear local state immediately for faster UI response
+        setUser(null);
+        setSession(null);
+        
+        const { error } = await supabase.auth.signOut()
+        
+        if (error) {
+            console.error("Error during Supabase signOut:", error);
+            // Optionally, re-set user/session if sign out failed, but usually better to keep them logged out locally
+        }
     }
 
     const updateProfile = async (updates: { name?: string; avatar_url?: string; password?: string }) => {
