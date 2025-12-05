@@ -9,6 +9,7 @@ export default function MainLayout() {
             <div className="fixed inset-0 -z-10 dark:bg-gradient-to-br dark:from-slate-900/20 dark:via-background dark:to-blue-900/20 hidden dark:block" />
             <div className="fixed inset-0 -z-10 dark:bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] dark:from-blue-900/10 dark:via-transparent dark:to-transparent hidden dark:block" />
 
+            {/* Desktop Sidebar */}
             <div className="hidden md:block h-screen sticky top-0 z-30">
                 <Sidebar />
             </div>
