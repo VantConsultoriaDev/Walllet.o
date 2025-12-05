@@ -1,10 +1,9 @@
-import { Cross2Icon } from "@radix-ui/react-icons"
 import { Table } from "@tanstack/react-table"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { DataTableViewOptions } from "@/components/ui/data-table-view-options"
-import { Search } from "lucide-react"
+import { Search, X } from "lucide-react" // Importando X do lucide-react
 
 import { DataTableFacetedFilter } from "./data-table-faceted-filter"
 
@@ -66,7 +65,7 @@ export function DataTableToolbar<TData>({
                         className="h-8 px-2 lg:px-3"
                     >
                         Limpar
-                        <Cross2Icon className="ml-2 h-4 w-4" />
+                        <X className="ml-2 h-4 w-4" />
                     </Button>
                 )}
             </div>
