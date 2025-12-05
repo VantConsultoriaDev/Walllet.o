@@ -63,7 +63,10 @@ const mapBoletoToDb = (boleto: Partial<Boleto>, userId: string) => ({
     comissao_tipo: boleto.comissaoTipo,
 })
 
-// Helper to calculate the commission date based on payment date and representation
+/**
+ * Calcula a data de vencimento da comissão com base na DATA DE PAGAMENTO do boleto.
+ * Esta é a data em que a comissão CONFIRMADA será registrada.
+ */
 const calculateCommissionDate = (paymentDate: Date, representationName: string): Date => {
     // Start with the 1st of the next month
     let commissionDate = addMonths(setDate(paymentDate, 1), 1);
@@ -90,6 +93,21 @@ const calculateCommissionDate = (paymentDate: Date, representationName: string):
     // Ensure the returned date is fixed at noon to prevent timezone issues later
     return setHours(commissionDate, 12);
 };
+
+/**
+ * Calcula a data de EXPECTATIVA da comissão com base na DATA DE VENCIMENTO do boleto.
+ * Esta é a data em que a comissão ESPERADA será registrada.
+ */
+const calculateExpectedCommissionDate = (dueDate: Date): Date => {
+    // A comissão é esperada no 1º dia do mês seguinte ao vencimento do boleto.
+    let expectedDate = addMonths(dueDate, 1);
+    expectedDate = setDate(expectedDate, 1);
+    
+    // Fixar ao meio-dia
+    return setHours(expectedDate, 12);
+};
+
+export { calculateExpectedCommissionDate }; // Exportando para uso no Financeiro.tsx
 
 
 export function useBoletos() {
@@ -276,6 +294,7 @@ export function useBoletos() {
                     .update({
                         vencimento: format(correctedTargetDate, 'yyyy-MM-dd'),
                         // Only update data_pagamento for the current boleto if it was changed
+                        // NOTE: We explicitly DO NOT update data_pagamento for future boletos, only the current one.
                         ...(currentDbBoleto.id === updatedBoleto.id && { data_pagamento: dataPagamento ? format(dataPagamento, 'yyyy-MM-dd') : null })
                     })
                     .eq('id', currentDbBoleto.id)
@@ -342,7 +361,7 @@ export function useBoletos() {
                     currentBoleto.representacao
                 );
                 
-                // NOTE: O toast de comissão foi movido para dentro do addCommissionTransaction para evitar duplicação.
+                toast({ title: "Comissão Registrada", description: `Comissão de ${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(commissionAmount)} agendada para ${format(commissionDueDate, 'dd/MM/yyyy')}.`, variant: "default" })
             }
         }
 

@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Plus, ArrowDownCircle, DollarSign, Search, Wallet, TrendingUp, ArrowUpDown, Loader2 } from "lucide-react"
 import { NewTransactionModal, type Transaction } from "@/components/financeiro/new-transaction-modal"
-import { format, isWithinInterval, startOfMonth, endOfMonth, subMonths } from "date-fns"
+import { format, isWithinInterval, startOfMonth, endOfMonth, subMonths, getMonth, getYear } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import {
     ColumnDef,
@@ -29,6 +29,8 @@ import {
 import { DatePickerWithRange } from "@/components/ui/date-range-picker"
 import type { DateRange } from "react-day-picker"
 import { useTransactions } from "@/hooks/data/useTransactions"
+import { useBoletos } from "@/hooks/data/useBoletos"
+import { calculateExpectedCommissionDate } from "@/hooks/data/useBoletos" // Importando a nova função
 
 // Custom filter for date range
 const dateRangeFilter: FilterFn<Transaction> = (row, columnId, value: DateRange | undefined) => {
@@ -41,7 +43,9 @@ const dateRangeFilter: FilterFn<Transaction> = (row, columnId, value: DateRange 
 }
 
 export default function Financeiro() {
-    const { transactions, loading, addTransaction, updateTransaction, deleteTransaction } = useTransactions()
+    const { transactions, loading: transactionsLoading, addTransaction, updateTransaction, deleteTransaction } = useTransactions()
+    const { boletos: allBoletos, loading: boletosLoading } = useBoletos()
+    
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [editingTransaction, setEditingTransaction] = useState<Transaction | undefined>(undefined)
 
@@ -55,6 +59,8 @@ export default function Financeiro() {
         from: startOfMonth(subMonths(new Date(), 1)),
         to: endOfMonth(new Date()),
     })
+
+    const loading = transactionsLoading || boletosLoading;
 
     const handleSaveTransaction = (transaction: Transaction, scope?: "this" | "all") => {
         if (editingTransaction) {
@@ -245,7 +251,7 @@ export default function Financeiro() {
         .filter(row => row.original.type === "income")
         .reduce((acc, row) => acc + row.original.amount, 0)
 
-    const monthlyCommission = filteredRows
+    const monthlyCommissionConfirmed = filteredRows
         .filter(row => row.original.type === "income" && row.original.category === "Comissão")
         .reduce((acc, row) => acc + row.original.amount, 0)
 
@@ -253,7 +259,35 @@ export default function Financeiro() {
         .filter(row => row.original.type === "expense")
         .reduce((acc, row) => acc + row.original.amount, 0)
 
-    const netProfit = monthlyCommission - monthlyExpenses
+    const netProfit = monthlyCommissionConfirmed - monthlyExpenses
+    
+    // --- NEW CALCULATION: Expected Commission ---
+    const monthlyCommissionExpected = useMemo(() => {
+        if (!dateRange?.from) return 0;
+
+        const start = dateRange.from;
+        const end = dateRange.to || new Date();
+
+        return allBoletos.reduce((sum, boleto) => {
+            if (boleto.comissaoRecorrente && boleto.comissaoTipo) {
+                // 1. Calculate the expected commission date based on the boleto's DUE DATE
+                const expectedDate = calculateExpectedCommissionDate(boleto.vencimento);
+                
+                // 2. Check if the expected commission date falls within the filtered range
+                if (isWithinInterval(expectedDate, { start, end })) {
+                    let commissionAmount = boleto.comissaoRecorrente;
+
+                    if (boleto.comissaoTipo === 'percentual') {
+                        commissionAmount = (boleto.valor * boleto.comissaoRecorrente) / 100;
+                    }
+                    return sum + commissionAmount;
+                }
+            }
+            return sum;
+        }, 0);
+    }, [allBoletos, dateRange]);
+    // --- END NEW CALCULATION ---
+
 
     return (
         <div className="flex-1 space-y-4 p-4 pt-6 md:p-8 animate-in fade-in duration-500">
@@ -277,7 +311,7 @@ export default function Financeiro() {
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <Card className="shadow-sm hover:shadow-md transition-shadow">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Faturamento (Filtrado)</CardTitle>
+                        <CardTitle className="text-sm font-medium">Faturamento (Receitas)</CardTitle>
                         <TrendingUp className="h-4 w-4 text-blue-500" />
                     </CardHeader>
                     <CardContent>
@@ -285,16 +319,31 @@ export default function Financeiro() {
                         <p className="text-xs text-muted-foreground">Receitas no período selecionado</p>
                     </CardContent>
                 </Card>
+                
+                {/* NEW KPI: Comissão Esperada */}
                 <Card className="shadow-sm hover:shadow-md transition-shadow">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Comissionamento</CardTitle>
+                        <CardTitle className="text-sm font-medium">Comissão Esperada</CardTitle>
+                        <Wallet className="h-4 w-4 text-yellow-500" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold text-yellow-600">{formatCurrency(monthlyCommissionExpected)}</div>
+                        <p className="text-xs text-muted-foreground">Comissões a receber (vencimento)</p>
+                    </CardContent>
+                </Card>
+                
+                {/* RENAMED KPI: Comissão Confirmada */}
+                <Card className="shadow-sm hover:shadow-md transition-shadow">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Comissão Confirmada</CardTitle>
                         <Wallet className="h-4 w-4 text-green-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-green-600">{formatCurrency(monthlyCommission)}</div>
-                        <p className="text-xs text-muted-foreground">Comissões no período</p>
+                        <div className="text-2xl font-bold text-green-600">{formatCurrency(monthlyCommissionConfirmed)}</div>
+                        <p className="text-xs text-muted-foreground">Comissões recebidas (pagamento)</p>
                     </CardContent>
                 </Card>
+                
                 <Card className="shadow-sm hover:shadow-md transition-shadow">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Despesas</CardTitle>
@@ -303,18 +352,6 @@ export default function Financeiro() {
                     <CardContent>
                         <div className="text-2xl font-bold text-red-600">{formatCurrency(monthlyExpenses)}</div>
                         <p className="text-xs text-muted-foreground">Saídas no período</p>
-                    </CardContent>
-                </Card>
-                <Card className="shadow-sm hover:shadow-md transition-shadow">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Lucro Líquido</CardTitle>
-                        <DollarSign className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className={`text-2xl font-bold ${netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            {formatCurrency(netProfit)}
-                        </div>
-                        <p className="text-xs text-muted-foreground">Comissões - Despesas</p>
                     </CardContent>
                 </Card>
             </div>
