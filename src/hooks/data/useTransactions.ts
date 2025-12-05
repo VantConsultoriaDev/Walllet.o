@@ -3,7 +3,7 @@ import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
 import type { Transaction } from "@/components/financeiro/new-transaction-modal"
-import { addMonths } from "date-fns"
+import { addMonths, format } from "date-fns" // Importando 'format'
 
 export function useTransactions() {
     const { user } = useAuth()
@@ -27,7 +27,8 @@ export function useTransactions() {
             .update({
                 ...updateData,
                 amount: numericAmount.toFixed(2),
-                date: updatedTransaction.date.toISOString().split('T')[0],
+                // CORREÇÃO: Usar format para garantir YYYY-MM-DD local
+                date: format(updatedTransaction.date, 'yyyy-MM-dd'),
             })
             .eq('id', id)
             .select()
@@ -134,7 +135,8 @@ export function useTransactions() {
                 ...newTransaction,
                 user_id: user.id,
                 amount: numericAmount.toFixed(2), // Ensure amount is stored as numeric/string
-                date: newTransaction.date.toISOString().split('T')[0], // Store date as YYYY-MM-DD
+                // CORREÇÃO: Usar format para garantir YYYY-MM-DD local
+                date: format(newTransaction.date, 'yyyy-MM-dd'),
             })
             .select()
             .single()
@@ -168,12 +170,12 @@ export function useTransactions() {
 
         // Verifica se a transação de comissão CONFIRMADA já existe para este boleto
         const descriptionPrefix = `Comissão Boleto #${boletoId}`;
-        const commissionDateString = commissionDueDate.toISOString().split('T')[0];
-
+        const commissionDateString = format(commissionDueDate, 'yyyy-MM-dd'); // Usando format
+        
         // Usamos o estado atual de transactions (capturado pelo useCallback) para verificar a existência
         const existingTransaction = transactions.find(t => 
             t.description.includes(descriptionPrefix) && 
-            t.date.toISOString().split('T')[0] === commissionDateString &&
+            format(t.date, 'yyyy-MM-dd') === commissionDateString && // Usando format para comparação
             t.category === 'Comissão' // Confirmação
         );
 
@@ -201,7 +203,7 @@ export function useTransactions() {
                 ...newTransaction,
                 user_id: user.id,
                 amount: numericAmount.toFixed(2),
-                date: newTransaction.date.toISOString().split('T')[0],
+                date: format(newTransaction.date, 'yyyy-MM-dd'), // Usando format
             })
             .select()
             .single()
@@ -235,14 +237,14 @@ export function useTransactions() {
 
         // Verifica se a transação de comissão ESPERADA já existe para este boleto
         const descriptionPrefix = `Comissão Esperada Boleto #${boletoId}`;
-        const expectedDateString = expectedDueDate.toISOString().split('T')[0];
+        const expectedDateString = format(expectedDueDate, 'yyyy-MM-dd'); // Usando format
         
         const numericAmount = typeof amount === 'number' ? amount : parseFloat(amount as any);
 
         // 1. Tenta encontrar uma transação existente com a mesma descrição e data
         let existingTransaction = transactions.find(t => 
             t.description.includes(descriptionPrefix) && 
-            t.date.toISOString().split('T')[0] === expectedDateString &&
+            format(t.date, 'yyyy-MM-dd') === expectedDateString && // Usando format para comparação
             t.category === 'Comissão Esperada' // Nova categoria
         );
 
@@ -277,7 +279,7 @@ export function useTransactions() {
                 ...newTransaction,
                 user_id: user.id,
                 amount: numericAmount.toFixed(2),
-                date: newTransaction.date.toISOString().split('T')[0],
+                date: format(newTransaction.date, 'yyyy-MM-dd'), // Usando format
             })
             .select()
             .single()
