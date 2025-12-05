@@ -481,7 +481,7 @@ export default function Financeiro() {
                                                         </TableCell>
                                                         <TableCell>
                                                             <div className="font-medium">
-                                                                {/* Exibe o nome do cliente (que deve ser 'CONSTRUTORA SANTANA') */}
+                                                                {/* Exibe o nome do cliente (do boleto) */}
                                                                 {boleto.clientName}
                                                             </div>
                                                             <div className="text-xs text-muted-foreground">{boleto.representacao}</div>
