@@ -87,19 +87,29 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit, c
             if (data && data.marca) {
                 let detectedType: VehicleType = "CARRO"
                 const vehicleTypeStr = data.categoria?.toLowerCase() || ""
-
+                
+                // Lógica de detecção de tipo:
                 if (vehicleTypeStr.includes("moto") || vehicleTypeStr.includes("motocicleta")) {
                     detectedType = "MOTO"
-                } else if (vehicleTypeStr.includes("caminhao") || vehicleTypeStr.includes("caminhão")) {
+                } else if (vehicleTypeStr.includes("caminhao") || vehicleTypeStr.includes("caminhão") || vehicleTypeStr.includes("truck")) {
                     detectedType = "TRUCK"
-                } else if (vehicleTypeStr.includes("reboque") || vehicleTypeStr.includes("semi-reboque")) {
+                } else if (vehicleTypeStr.includes("reboque") || vehicleTypeStr.includes("semi-reboque") || vehicleTypeStr.includes("carreta")) {
                     detectedType = "CARRETA"
                 } else if (vehicleTypeStr.includes("cavalo")) {
                     detectedType = "CAVALO"
                 }
                 
-                // Atualiza o tipo e os dados
-                setType(detectedType)
+                // Se o tipo detectado for TRUCK ou CAVALO, e o usuário já tiver selecionado um desses,
+                // mantemos a seleção do usuário para evitar troca indesejada.
+                const userSelectedType = formData.type || type;
+                if ((detectedType === "TRUCK" || detectedType === "CAVALO") && (userSelectedType === "TRUCK" || userSelectedType === "CAVALO")) {
+                    // Mantém o tipo selecionado pelo usuário (que está no estado `type`)
+                } else {
+                    // Caso contrário, usa o tipo detectado
+                    setType(detectedType)
+                }
+                
+                // Atualiza os dados
                 setFormData(prev => ({
                     ...prev,
                     plate: placaLimpa,
@@ -110,7 +120,7 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit, c
                     color: data.cor || "",
                     chassi: data.chassi ? forceUpperCase(data.chassi) : "",
                     renavam: data.renavam || "",
-                    fipeCode: data.fipeCode || "",
+                    fipeCode: data.fipeCode || "", // <-- Garantindo que o fipeCode seja mapeado
                     fipeValue: data.fipeValue || "",
                     bodyType: data.categoria?.includes("CAMINHAO") ? data.categoria : "",
                 }))
@@ -151,7 +161,7 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit, c
         } finally {
             setLoading(false);
         }
-    }, [toast])
+    }, [toast, formData.type, type]) // Adicionado formData.type e type como dependências
 
     const handleConsultationClick = () => {
         if (formData.plate) {
