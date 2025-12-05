@@ -102,7 +102,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
     const [sortDirection, setSortDirection] = useState<SortDirection>("asc")
 
     // --- New Boleto Form State ---
-    const [title, setTitle] = useState("") // <-- Novo estado para o título
+    // REMOVIDO: const [title, setTitle] = useState("") 
     const [valor, setValor] = useState("") // Stored as formatted string
     const [vencimento, setVencimento] = useState<Date | undefined>(undefined) // <-- Inicializado como undefined
     const [selectedPlates, setSelectedPlates] = useState<string[]>([])
@@ -269,6 +269,11 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
 
         if (floatValor <= 0) return // Prevent saving zero value
 
+        // Determine the client's display name
+        const clientDisplayName = client.clientType === "PJ" 
+            ? client.nomeFantasia || client.razaoSocial || client.name
+            : client.name;
+
         // Generate a valid UUID for the recurrence group if needed
         const recurrenceGroupId = isRecurring ? uuidv4() : undefined
         
@@ -282,8 +287,8 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
             // Ensure the date is set to noon (12h) to prevent timezone issues on save
             const correctedVencimento = setHours(addMonths(vencimento, i), 12);
 
-            // CRITICAL FIX: Use the user-provided title or generate a default one
-            const finalTitle = title.trim() || `${client.name} - ${representacaoNome}`;
+            // CRITICAL FIX: Generate title automatically
+            const finalTitle = `${clientDisplayName} - ${representacaoNome}`;
 
             boletosToSave.push({
                 valor: floatValor,
@@ -375,7 +380,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
     }
 
     const resetForm = () => {
-        setTitle("") // Reset title
+        // REMOVIDO: setTitle("") 
         setValor("")
         setVencimento(undefined)
         setSelectedPlates([])
@@ -432,6 +437,11 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
     }
 
     const hasActiveFilters = searchTerm || activeFilterType === "range" || selectedMonth !== initialMonth || selectedYear !== initialYear
+
+    // Determine the client's display name for the modal header
+    const clientDisplayName = client.clientType === "PJ" 
+        ? client.nomeFantasia || client.razaoSocial || client.name
+        : client.name;
 
     if (representationsLoading || boletosLoading) {
         return (
@@ -707,16 +717,12 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                 <DialogContent className="max-w-md">
                     <DialogHeader>
                         <DialogTitle>Novo Boleto</DialogTitle>
+                        <p className="text-sm text-muted-foreground">
+                            Para: <span className="font-medium text-foreground">{clientDisplayName}</span>
+                        </p>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
-                        <div className="grid gap-2">
-                            <Label>Título (Opcional)</Label>
-                            <Input
-                                placeholder={`Ex: Anuidade ${client.name}`}
-                                value={title}
-                                onChange={(e) => setTitle(e.target.value)}
-                            />
-                        </div>
+                        {/* REMOVIDO CAMPO TÍTULO */}
                         <div className="grid gap-2">
                             <Label>Valor</Label>
                             <Input
