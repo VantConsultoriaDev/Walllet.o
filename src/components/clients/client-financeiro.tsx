@@ -28,7 +28,7 @@ import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import type { Boleto } from "@/types/agenda" // Import Boleto type
 import { useRepresentations } from "@/hooks/data/useRepresentations"
-import { useBoletos } from "@/hooks/data/useBoletos"
+import { useBoletos, calculateExpectedCommissionDate } from "@/hooks/data/useBoletos"
 import { RecurrenceActionDialog } from "../financeiro/recurrence-action-dialog"
 import { v4 as uuidv4 } from 'uuid'
 import { BoletoDetailsModal } from "./boleto-details-modal"
@@ -287,8 +287,8 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
             // Ensure the date is set to noon (12h) to prevent timezone issues on save
             const correctedVencimento = setHours(addMonths(vencimento, i), 12);
 
-            // CRITICAL FIX: Generate title automatically
-            const finalTitle = `${clientDisplayName} - ${representacaoNome}`;
+            // CRITICAL FIX: Generate title automatically (Removed "- Proteauto" logic)
+            const finalTitle = clientDisplayName;
 
             boletosToSave.push({
                 valor: floatValor,
@@ -963,7 +963,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                 boleto={selectedBoleto}
                 open={isEditModalOpen}
                 onOpenChange={setIsEditModalOpen}
-                onSave={handleEditBoleto}
+                onSave={handleBoletoSave}
                 onDelete={handleDeleteClick}
                 vehicles={vehicles}
             />

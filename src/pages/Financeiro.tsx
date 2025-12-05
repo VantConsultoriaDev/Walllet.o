@@ -15,7 +15,7 @@ import { format, isWithinInterval, startOfMonth, endOfMonth, ptBR as localePtBR,
 import { DatePickerWithRange } from "@/components/ui/date-range-picker"
 import type { DateRange } from "react-day-picker"
 import { useTransactions } from "@/hooks/data/useTransactions"
-import { useBoletos } from "@/hooks/data/useBoletos"
+import { useBoletos, calculateExpectedCommissionDate } from "@/hooks/data/useBoletos" // Importando calculateExpectedCommissionDate
 import type { Boleto } from "@/types/agenda"
 import { Badge } from "@/components/ui/badge"
 import { normalizeString } from "@/lib/utils"
@@ -77,7 +77,14 @@ export default function Financeiro() {
 
             result = result.filter(row => {
                 if (row.isBoleto) {
-                    // Filter boletos by Vencimento
+                    // Para boletos com comissão, filtramos pela data de comissão esperada
+                    if (row.comissaoRecorrente) {
+                        const expectedDate = calculateExpectedCommissionDate(row.vencimento);
+                        if (!end) return !isBefore(expectedDate, start);
+                        return isWithinInterval(expectedDate, { start, end });
+                    }
+                    
+                    // Para boletos sem comissão, filtramos pelo vencimento
                     const vencimento = row.vencimento;
                     if (!end) return !isBefore(vencimento, start);
                     return isWithinInterval(vencimento, { start, end });
@@ -110,9 +117,9 @@ export default function Financeiro() {
                 let aVal: any;
                 let bVal: any;
 
-                // Use Vencimento for boletos, Date for transactions
-                const aDate = a.isBoleto ? a.vencimento : a.date;
-                const bDate = b.isBoleto ? b.vencimento : b.date;
+                // Data de referência para ordenação:
+                const aDate = a.isBoleto && a.comissaoRecorrente ? calculateExpectedCommissionDate(a.vencimento) : (a.isBoleto ? a.vencimento : a.date);
+                const bDate = b.isBoleto && b.comissaoRecorrente ? calculateExpectedCommissionDate(b.vencimento) : (b.isBoleto ? b.vencimento : b.date);
 
                 if (sortField === "date") {
                     aVal = aDate.getTime();
@@ -155,6 +162,7 @@ export default function Financeiro() {
         // 1. Faturamento (Boletos Pagos no Período de Vencimento)
         // 2. Comissão Esperada (Comissão de Boletos Vencendo no Período)
         allBoletos.forEach(boleto => {
+            // Para KPI de Faturamento, usamos o vencimento do boleto
             const isVencimentoInPeriod = isWithinInterval(boleto.vencimento, { start: currentMonthStart, end: currentMonthEnd });
             
             // Calcula o valor da comissão (se for percentual)
@@ -169,16 +177,24 @@ export default function Financeiro() {
                 if (boleto.status === 'paid') {
                     totalFaturamento += boleto.valor;
                 }
-                // Comissão Esperada: Baseada no vencimento do boleto
-                totalComissaoEsperada += commissionAmount;
+            }
+            
+            // Comissão Esperada: Baseada na data de EXPECTATIVA da comissão (mês seguinte ao vencimento do boleto)
+            if (commissionAmount > 0) {
+                const expectedCommissionDate = calculateExpectedCommissionDate(boleto.vencimento);
+                const isExpectedCommissionInPeriod = isWithinInterval(expectedCommissionDate, { start: currentMonthStart, end: currentMonthEnd });
+                
+                if (isExpectedCommissionInPeriod) {
+                    totalComissaoEsperada += commissionAmount;
+                }
             }
         });
 
         // 3. Comissão Confirmada (Comissão de Boletos Pagos no Mês ANTERIOR)
-        // Buscamos as transações de 'Comissão' (confirmadas) que caíram no mês anterior.
+        // Buscamos as transações de 'Comissão' (confirmadas) que caíram no período selecionado.
         transactions.filter(t => t.category === 'Comissão').forEach(t => {
-            const isCommissionDateInPreviousMonth = isWithinInterval(t.date, { start: previousMonthStart, end: previousMonthEnd });
-            if (isCommissionDateInPreviousMonth) {
+            const isCommissionDateInPeriod = isWithinInterval(t.date, { start: currentMonthStart, end: currentMonthEnd });
+            if (isCommissionDateInPeriod) {
                 totalComissaoConfirmada += t.amount;
             }
         });
@@ -388,7 +404,7 @@ export default function Financeiro() {
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-green-600">{formatCurrency(comissaoConfirmada)}</div>
-                        <p className="text-xs text-muted-foreground">Comissões pagas no mês anterior</p>
+                        <p className="text-xs text-muted-foreground">Comissões pagas no período</p>
                     </CardContent>
                 </Card>
                 
@@ -458,8 +474,10 @@ export default function Financeiro() {
                                                         : boleto.comissaoRecorrente;
                                                 }
                                                 
-                                                // Data de referência: Vencimento do Boleto
-                                                const displayDate = boleto.vencimento;
+                                                // Data de referência: Se tiver comissão, usa a data esperada da comissão. Senão, usa o vencimento do boleto.
+                                                const displayDate = boleto.comissaoRecorrente 
+                                                    ? calculateExpectedCommissionDate(boleto.vencimento) 
+                                                    : boleto.vencimento;
 
                                                 return (
                                                     <TableRow 
