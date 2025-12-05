@@ -22,6 +22,7 @@ import { VehicleService } from "@/services/VehicleService"
 import type { PlacaData } from "@/types/vehicle"
 import { useToast } from "@/hooks/use-toast"
 import type { Vehicle, VehicleType } from "@/hooks/data/useVehicles"
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog" // Importando o novo componente
 
 type NewVehicleModalProps = {
     open: boolean
@@ -43,6 +44,7 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, onDelete, vehicl
         status: "active"
     })
     const [placaError, setPlacaError] = useState("")
+    const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false) // Novo estado para o modal de confirmação
     
     // Reset form when modal opens/closes or when editing a different vehicle
     useEffect(() => {
@@ -197,11 +199,16 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, onDelete, vehicl
         }
     }
 
-    const handleDelete = () => {
-        if (vehicleToEdit && vehicleToEdit.id && confirm("Tem certeza que deseja excluir este veículo?")) {
+    const handleConfirmDelete = (confirmed: boolean) => {
+        setIsConfirmDeleteOpen(false)
+        if (confirmed && vehicleToEdit && vehicleToEdit.id) {
             onDelete(vehicleToEdit.id)
             onOpenChange(false)
         }
+    }
+
+    const handleDeleteClick = () => {
+        setIsConfirmDeleteOpen(true)
     }
 
     const renderCommonFields = () => (
@@ -266,119 +273,131 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, onDelete, vehicl
     )
 
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                    <DialogTitle>{vehicleToEdit ? "Editar Veículo" : "Novo Veículo"}</DialogTitle>
-                    <DialogDescription>
-                        Insira a placa e consulte os dados automaticamente ou preencha manualmente.
-                    </DialogDescription>
-                </DialogHeader>
+        <>
+            <Dialog open={open} onOpenChange={onOpenChange}>
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>{vehicleToEdit ? "Editar Veículo" : "Novo Veículo"}</DialogTitle>
+                        <DialogDescription>
+                            Insira a placa e consulte os dados automaticamente ou preencha manualmente.
+                        </DialogDescription>
+                    </DialogHeader>
 
-                <div className="space-y-6 py-4">
-                    {/* 1. Type Selection */}
-                    <div className="space-y-2">
-                        <Label>Tipo de Veículo</Label>
-                        <Select value={type} onValueChange={(v) => setType(v as VehicleType)}>
-                            <SelectTrigger>
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="CARRO">Carro</SelectItem>
-                                <SelectItem value="MOTO">Moto</SelectItem>
-                                <SelectItem value="CAVALO">Cavalo Mecânico</SelectItem>
-                                <SelectItem value="TRUCK">Caminhão (Truck)</SelectItem>
-                                <SelectItem value="CARRETA">Carreta</SelectItem>
-                            </SelectContent>
-                        </Select>
+                    <div className="space-y-6 py-4">
+                        {/* 1. Type Selection */}
+                        <div className="space-y-2">
+                            <Label>Tipo de Veículo</Label>
+                            <Select value={type} onValueChange={(v) => setType(v as VehicleType)}>
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="CARRO">Carro</SelectItem>
+                                    <SelectItem value="MOTO">Moto</SelectItem>
+                                    <SelectItem value="CAVALO">Cavalo Mecânico</SelectItem>
+                                    <SelectItem value="TRUCK">Caminhão (Truck)</SelectItem>
+                                    <SelectItem value="CARRETA">Carreta</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        {/* 2. Plate Input */}
+                        <div className="space-y-2">
+                            <Label>Placa (Obrigatório)</Label>
+                            <div className="relative flex gap-2">
+                                <Input
+                                    value={formData.plate || ""}
+                                    onChange={e => {
+                                        setFormData({ ...formData, plate: VehicleService.formatarPlaca(e.target.value) })
+                                        setPlacaError("")
+                                    }}
+                                    placeholder="ABC1234"
+                                    className="text-lg font-bold uppercase flex-1"
+                                    maxLength={7}
+                                />
+                                <Button 
+                                    type="button"
+                                    onClick={handleConsultationClick} 
+                                    disabled={loading || !formData.plate || !VehicleService.validarPlaca(formData.plate || "")}
+                                    className="shrink-0 w-[150px]"
+                                >
+                                    {loading ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <RefreshCw className="h-4 w-4 mr-2" />
+                                    )}
+                                    Consultar
+                                </Button>
+                            </div>
+                            {placaError && <p className="text-sm text-red-500 mt-1">{placaError}</p>}
+                        </div>
+
+                        {/* 3. Dynamic Fields Container */}
+                        <div className="space-y-4 border rounded-lg p-4 bg-muted/20">
+                            {renderCommonFields()}
+
+                            {/* Type Specific Fields */}
+                            {(type === "CARRO" || type === "MOTO" || type === "CAVALO") && (
+                                renderFipeFields()
+                            )}
+
+                            {type === "TRUCK" && (
+                                <>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label>Tipo de Carroceria</Label>
+                                            <Input value={formData.bodyType || ""} onChange={e => setFormData({ ...formData, bodyType: e.target.value })} placeholder="Ex: Baú, Graneleiro" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Valor Carroceria</Label>
+                                            <Input value={formData.bodyValue || ""} onChange={e => setFormData({ ...formData, bodyValue: e.target.value })} />
+                                        </div>
+                                    </div>
+                                    {renderFipeFields()}
+                                </>
+                            )}
+
+                            {type === "CARRETA" && (
+                                <div className="space-y-4">
+                                    <div className="space-y-2">
+                                        <Label>Valor (Carreta) (R$)</Label>
+                                        <Input value={formData.value || ""} onChange={e => setFormData({ ...formData, value: e.target.value })} />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
 
-                    {/* 2. Plate Input */}
-                    <div className="space-y-2">
-                        <Label>Placa (Obrigatório)</Label>
-                        <div className="relative flex gap-2">
-                            <Input
-                                value={formData.plate || ""}
-                                onChange={e => {
-                                    setFormData({ ...formData, plate: VehicleService.formatarPlaca(e.target.value) })
-                                    setPlacaError("")
-                                }}
-                                placeholder="ABC1234"
-                                className="text-lg font-bold uppercase flex-1"
-                                maxLength={7}
-                            />
-                            <Button 
-                                type="button"
-                                onClick={handleConsultationClick} 
-                                disabled={loading || !formData.plate || !VehicleService.validarPlaca(formData.plate || "")}
-                                className="shrink-0 w-[150px]"
-                            >
-                                {loading ? (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                    <RefreshCw className="h-4 w-4 mr-2" />
-                                )}
-                                Consultar
+                    <DialogFooter className="flex justify-between sm:justify-between">
+                        {vehicleToEdit && (
+                            <Button variant="destructive" onClick={handleDeleteClick}>
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Excluir Veículo
+                            </Button>
+                        )}
+                        <div className="flex gap-2">
+                            <Button variant="outline" onClick={() => onOpenChange(false)}>
+                                <X className="mr-2 h-4 w-4" />
+                                Cancelar
+                            </Button>
+                            <Button onClick={handleSubmit} disabled={!formData.plate || !formData.brand || !formData.model || loading}>
+                                <Save className="mr-2 h-4 w-4" />
+                                Salvar Veículo
                             </Button>
                         </div>
-                        {placaError && <p className="text-sm text-red-500 mt-1">{placaError}</p>}
-                    </div>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
-                    {/* 3. Dynamic Fields Container */}
-                    <div className="space-y-4 border rounded-lg p-4 bg-muted/20">
-                        {renderCommonFields()}
-
-                        {/* Type Specific Fields */}
-                        {(type === "CARRO" || type === "MOTO" || type === "CAVALO") && (
-                            renderFipeFields()
-                        )}
-
-                        {type === "TRUCK" && (
-                            <>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label>Tipo de Carroceria</Label>
-                                        <Input value={formData.bodyType || ""} onChange={e => setFormData({ ...formData, bodyType: e.target.value })} placeholder="Ex: Baú, Graneleiro" />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label>Valor Carroceria</Label>
-                                        <Input value={formData.bodyValue || ""} onChange={e => setFormData({ ...formData, bodyValue: e.target.value })} />
-                                    </div>
-                                </div>
-                                {renderFipeFields()}
-                            </>
-                        )}
-
-                        {type === "CARRETA" && (
-                            <div className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label>Valor (Carreta) (R$)</Label>
-                                    <Input value={formData.value || ""} onChange={e => setFormData({ ...formData, value: e.target.value })} />
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                <DialogFooter className="flex justify-between sm:justify-between">
-                    {vehicleToEdit && (
-                        <Button variant="destructive" onClick={handleDelete}>
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Excluir Veículo
-                        </Button>
-                    )}
-                    <div className="flex gap-2">
-                        <Button variant="outline" onClick={() => onOpenChange(false)}>
-                            <X className="mr-2 h-4 w-4" />
-                            Cancelar
-                        </Button>
-                        <Button onClick={handleSubmit} disabled={!formData.plate || !formData.brand || !formData.model || loading}>
-                            <Save className="mr-2 h-4 w-4" />
-                            Salvar Veículo
-                        </Button>
-                    </div>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+            {/* Confirmation Dialog */}
+            <ConfirmationDialog
+                open={isConfirmDeleteOpen}
+                onClose={handleConfirmDelete}
+                title="Confirmar Exclusão"
+                description={`Tem certeza que deseja excluir o veículo ${vehicleToEdit?.plate}? Esta ação é irreversível.`}
+                confirmText="Excluir"
+                variant="destructive"
+            />
+        </>
     )
 }
