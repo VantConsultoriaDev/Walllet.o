@@ -237,14 +237,6 @@ export default function Sinistros() {
         }, {} as Record<ClaimStatus, Claim[]>)
     }, [filteredClaims])
 
-    if (loading) {
-        return (
-            <div className="flex-1 flex items-center justify-center h-full">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-        )
-    }
-
     return (
         <div className="flex-1 flex flex-col h-full p-4 pt-6 md:p-8 animate-in fade-in duration-500">
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-4">
@@ -321,7 +313,11 @@ export default function Sinistros() {
                 </div>
             </div>
 
-            {viewMode === "kanban" ? (
+            {loading ? (
+                <div className="flex-1 flex items-center justify-center h-full">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+            ) : viewMode === "kanban" ? (
                 <div className="flex-1 overflow-x-auto pb-4">
                     <div className="flex gap-4 h-full min-w-max">
                         {COLUMNS.map((column) => (

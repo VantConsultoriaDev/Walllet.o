@@ -24,7 +24,7 @@ export default function Clientes() {
     const [newClientModalOpen, setNewClientModalOpen] = useState(false)
     const [globalFilter, setGlobalFilter] = useState("") // Novo estado de busca global
 
-    const loading = clientsLoading || vehiclesLoading;
+    const loading = clientsLoading || vehiclesLoading; // Mantido para referência, mas não bloqueia a renderização
 
     const filters: DataTableFilterConfig[] = [
         {
@@ -241,14 +241,6 @@ export default function Clientes() {
     }, [clients, globalFilter])
 
 
-    if (loading) {
-        return (
-            <div className="flex-1 flex items-center justify-center h-full">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-        )
-    }
-
     return (
         <div className="flex-1 space-y-4 p-4 pt-6 md:p-8" >
             <div className="flex items-center justify-between space-y-2">
@@ -302,6 +294,11 @@ export default function Clientes() {
                 />
             ) : (
                 <>
+                    {loading && (
+                        <div className="flex items-center justify-center py-12 text-muted-foreground">
+                            <Loader2 className="h-6 w-6 animate-spin mr-2" /> Carregando clientes...
+                        </div>
+                    )}
                     {viewMode === "grid" ? (
                         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                             {filteredClientsForGrid.map((client, index) => (
@@ -329,7 +326,7 @@ export default function Clientes() {
                         />
                     )}
 
-                    {(viewMode === "grid" ? filteredClientsForGrid.length : clients.length) === 0 && (
+                    {(!loading && (viewMode === "grid" ? filteredClientsForGrid.length : clients.length) === 0) && (
                         <div className="text-center py-12">
                             <p className="text-muted-foreground">Nenhum cliente encontrado.</p>
                         </div>

@@ -69,14 +69,6 @@ export default function Representacoes() {
         })
     }, [partners, searchTerm])
 
-    if (loading) {
-        return (
-            <div className="flex-1 flex items-center justify-center h-full">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-        )
-    }
-
     return (
         <div className="flex-1 space-y-4 p-4 pt-6 md:p-8">
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between space-y-2 md:space-y-0">
@@ -100,47 +92,54 @@ export default function Representacoes() {
                     </Button>
                 </div>
             </div>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {filteredPartners.map((partner) => (
-                    <Card
-                        key={partner.id}
-                        className="overflow-hidden cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02]"
-                        onClick={() => handleCardClick(partner)}
-                    >
-                        <CardHeader>
-                            {partner.logo && (
-                                <div className="mb-4 flex justify-center">
-                                    <div className="h-24 w-24 rounded-lg border-2 border-border bg-muted/30 p-2 flex items-center justify-center">
-                                        <img
-                                            src={partner.logo}
-                                            alt={partner.name}
-                                            className="max-h-full max-w-full object-contain"
-                                        />
-                                    </div>
-                                </div>
-                            )}
-                            <CardTitle className="text-center">{partner.name}</CardTitle>
-                            <CardDescription className="text-center">{partner.type}</CardDescription>
-                        </CardHeader>
-                        <CardFooter className="flex justify-center">
-                            {partner.website && (
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    asChild
-                                    onClick={(e) => e.stopPropagation()}
-                                >
-                                    <a href={partner.website} target="_blank" rel="noreferrer">
-                                        <ExternalLink className="mr-2 h-4 w-4" /> Site
-                                    </a>
-                                </Button>
-                            )}
-                        </CardFooter>
-                    </Card>
-                ))}
-            </div>
             
-            {filteredPartners.length === 0 && (
+            {loading ? (
+                <div className="flex items-center justify-center py-12 text-muted-foreground">
+                    <Loader2 className="h-6 w-6 animate-spin mr-2" /> Carregando representações...
+                </div>
+            ) : (
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {filteredPartners.map((partner) => (
+                        <Card
+                            key={partner.id}
+                            className="overflow-hidden cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02]"
+                            onClick={() => handleCardClick(partner)}
+                        >
+                            <CardHeader>
+                                {partner.logo && (
+                                    <div className="mb-4 flex justify-center">
+                                        <div className="h-24 w-24 rounded-lg border-2 border-border bg-muted/30 p-2 flex items-center justify-center">
+                                            <img
+                                                src={partner.logo}
+                                                alt={partner.name}
+                                                className="max-h-full max-w-full object-contain"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                                <CardTitle className="text-center">{partner.name}</CardTitle>
+                                <CardDescription className="text-center">{partner.type}</CardDescription>
+                            </CardHeader>
+                            <CardFooter className="flex justify-center">
+                                {partner.website && (
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        asChild
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        <a href={partner.website} target="_blank" rel="noreferrer">
+                                            <ExternalLink className="mr-2 h-4 w-4" /> Site
+                                        </a>
+                                    </Button>
+                                )}
+                            </CardFooter>
+                        </Card>
+                    ))}
+                </div>
+            )}
+            
+            {(!loading && filteredPartners.length === 0) && (
                 <div className="text-center py-12">
                     <p className="text-muted-foreground">Nenhuma representação encontrada.</p>
                 </div>

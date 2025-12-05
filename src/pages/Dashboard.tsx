@@ -203,14 +203,6 @@ export default function Dashboard() {
         return { kpis, chartData: monthlyData }
     }, [clients, transactions, quotations, loading])
 
-    if (loading) {
-        return (
-            <div className="flex-1 flex items-center justify-center h-full">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-        )
-    }
-
     const currentChartData = (chartData as MonthlyDataItem[]).map((item: MonthlyDataItem) => ({
         name: item.name,
         value: item[currentMetric as keyof MonthlyDataItem]
@@ -229,96 +221,104 @@ export default function Dashboard() {
                 </div>
             </motion.div>
 
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <KpiCard
-                    title="Vendas Mensais"
-                    value={kpis.vendasMensais.value}
-                    description={kpis.vendasMensais.description}
-                    icon={FileText}
-                    trend="up"
-                    trendValue="+12%" // Mocked trend
-                    gradient="from-purple-500 to-pink-500"
-                    index={0}
-                />
-                <KpiCard
-                    title="Novos Clientes"
-                    value={kpis.novosClientes.value}
-                    description={kpis.novosClientes.description}
-                    icon={Users}
-                    trend="up"
-                    trendValue="+8%" // Mocked trend
-                    gradient="from-blue-500 to-cyan-500"
-                    index={1}
-                    totalValue={kpis.novosClientes.totalValue}
-                    totalLabel={kpis.novosClientes.totalLabel}
-                />
-                <KpiCard
-                    title="Novas Placas"
-                    value={kpis.novasPlacas.value}
-                    description={kpis.novasPlacas.description}
-                    icon={Car}
-                    trend="up"
-                    trendValue="+15%" // Mocked trend
-                    gradient="from-orange-500 to-red-500"
-                    index={2}
-                    totalValue={kpis.novasPlacas.totalValue}
-                    totalLabel={kpis.novasPlacas.totalLabel}
-                />
-                <KpiCard
-                    title="Faturamento"
-                    value={kpis.faturamento.value}
-                    description={kpis.faturamento.description}
-                    icon={DollarSign}
-                    trend="up"
-                    trendValue="+20%" // Mocked trend
-                    gradient="from-green-500 to-emerald-500"
-                    index={3}
-                />
-            </div>
+            {loading ? (
+                <div className="flex items-center justify-center py-12 text-muted-foreground">
+                    <Loader2 className="h-6 w-6 animate-spin mr-2" /> Carregando dados do Dashboard...
+                </div>
+            ) : (
+                <>
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                        <KpiCard
+                            title="Vendas Mensais"
+                            value={kpis.vendasMensais.value}
+                            description={kpis.vendasMensais.description}
+                            icon={FileText}
+                            trend="up"
+                            trendValue="+12%" // Mocked trend
+                            gradient="from-purple-500 to-pink-500"
+                            index={0}
+                        />
+                        <KpiCard
+                            title="Novos Clientes"
+                            value={kpis.novosClientes.value}
+                            description={kpis.novosClientes.description}
+                            icon={Users}
+                            trend="up"
+                            trendValue="+8%" // Mocked trend
+                            gradient="from-blue-500 to-cyan-500"
+                            index={1}
+                            totalValue={kpis.novosClientes.totalValue}
+                            totalLabel={kpis.novosClientes.totalLabel}
+                        />
+                        <KpiCard
+                            title="Novas Placas"
+                            value={kpis.novasPlacas.value}
+                            description={kpis.novasPlacas.description}
+                            icon={Car}
+                            trend="up"
+                            trendValue="+15%" // Mocked trend
+                            gradient="from-orange-500 to-red-500"
+                            index={2}
+                            totalValue={kpis.novasPlacas.totalValue}
+                            totalLabel={kpis.novasPlacas.totalLabel}
+                        />
+                        <KpiCard
+                            title="Faturamento"
+                            value={kpis.faturamento.value}
+                            description={kpis.faturamento.description}
+                            icon={DollarSign}
+                            trend="up"
+                            trendValue="+20%" // Mocked trend
+                            gradient="from-green-500 to-emerald-500"
+                            index={3}
+                        />
+                    </div>
 
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-                <DashboardChart
-                    data={currentChartData}
-                    dataKey="value"
-                    title={metricTitles[currentMetric as keyof typeof metricTitles]}
-                    onMetricChange={setCurrentMetric}
-                    currentMetric={currentMetric}
-                />
-                <motion.div
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.4 }}
-                    className="col-span-3 space-y-4"
-                >
-                    <KpiCard
-                        title="Comissionamento"
-                        value={kpis.comissionamento.value}
-                        description={kpis.comissionamento.description}
-                        icon={TrendingUp}
-                        trend="up"
-                        trendValue="+18%" // Mocked trend
-                        gradient="from-indigo-500 to-violet-500"
-                    />
-                    <KpiCard
-                        title="Patrimônio Protegido"
-                        value={kpis.patrimonioProtegido.value}
-                        description={kpis.patrimonioProtegido.description}
-                        icon={DollarSign}
-                        trend="up"
-                        trendValue="+5%" // Mocked trend
-                        gradient="from-teal-500 to-green-500"
-                    />
-                    <KpiCard
-                        title="Cotações em Andamento"
-                        value={kpis.contratosVencidos.value}
-                        description={kpis.contratosVencidos.description}
-                        icon={AlertTriangle}
-                        trend="down"
-                        trendValue="+2" // Mocked trend
-                        gradient="from-yellow-500 to-orange-500"
-                    />
-                </motion.div>
-            </div>
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+                        <DashboardChart
+                            data={currentChartData}
+                            dataKey="value"
+                            title={metricTitles[currentMetric as keyof typeof metricTitles]}
+                            onMetricChange={setCurrentMetric}
+                            currentMetric={currentMetric}
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, x: 20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 0.4 }}
+                            className="col-span-3 space-y-4"
+                        >
+                            <KpiCard
+                                title="Comissionamento"
+                                value={kpis.comissionamento.value}
+                                description={kpis.comissionamento.description}
+                                icon={TrendingUp}
+                                trend="up"
+                                trendValue="+18%" // Mocked trend
+                                gradient="from-indigo-500 to-violet-500"
+                            />
+                            <KpiCard
+                                title="Patrimônio Protegido"
+                                value={kpis.patrimonioProtegido.value}
+                                description={kpis.patrimonioProtegido.description}
+                                icon={DollarSign}
+                                trend="up"
+                                trendValue="+5%" // Mocked trend
+                                gradient="from-teal-500 to-green-500"
+                            />
+                            <KpiCard
+                                title="Cotações em Andamento"
+                                value={kpis.contratosVencidos.value}
+                                description={kpis.contratosVencidos.description}
+                                icon={AlertTriangle}
+                                trend="down"
+                                trendValue="+2" // Mocked trend
+                                gradient="from-yellow-500 to-orange-500"
+                            />
+                        </motion.div>
+                    </div>
+                </>
+            )}
         </div>
     )
 }
