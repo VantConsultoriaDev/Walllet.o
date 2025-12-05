@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
@@ -30,14 +30,20 @@ export function useRepresentations() {
     const { toast } = useToast()
     const [partners, setPartners] = useState<Partner[]>([])
     const [loading, setLoading] = useState(true)
+    const [isRefetching, setIsRefetching] = useState(false)
 
-    const fetchPartners = async () => {
+    const fetchPartners = useCallback(async () => {
         if (!user) {
             setLoading(false)
             return
         }
 
-        setLoading(true)
+        if (partners.length === 0) {
+            setLoading(true)
+        } else {
+            setIsRefetching(true)
+        }
+
         const { data, error } = await supabase
             .from('representations')
             .select('*')
@@ -56,11 +62,12 @@ export function useRepresentations() {
             setPartners(formattedData)
         }
         setLoading(false)
-    }
+        setIsRefetching(false)
+    }, [user, toast, partners.length])
 
     useEffect(() => {
         fetchPartners()
-    }, [user])
+    }, [user, fetchPartners])
 
     const addPartner = async (newPartnerData: Omit<Partner, 'id' | 'contact' | 'email' | 'logo'> & { logo?: File | null }) => {
         if (!user) return { error: { message: "Usuário não autenticado" } }
@@ -117,5 +124,5 @@ export function useRepresentations() {
         return { data: updatedPartner }
     }
 
-    return { partners, loading, fetchPartners, addPartner, updatePartner }
+    return { partners, loading, isRefetching, fetchPartners, addPartner, updatePartner }
 }

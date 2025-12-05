@@ -53,6 +53,7 @@ export function useBoletos() {
     const { toast } = useToast()
     const [boletos, setBoletos] = useState<Boleto[]>([])
     const [loading, setLoading] = useState(true)
+    const [isRefetching, setIsRefetching] = useState(false)
 
     const fetchBoletos = useCallback(async (clientId?: string) => {
         if (!user) {
@@ -60,7 +61,11 @@ export function useBoletos() {
             return
         }
 
-        setLoading(true)
+        if (boletos.length === 0) {
+            setLoading(true)
+        } else {
+            setIsRefetching(true)
+        }
         
         // Fetch necessary lookup data first
         const [{ data: clientsData }, { data: representationsData }] = await Promise.all([
@@ -109,7 +114,8 @@ export function useBoletos() {
             setBoletos(formattedData)
         }
         setLoading(false)
-    }, [user, toast])
+        setIsRefetching(false)
+    }, [user, toast, boletos.length])
 
     const addBoletos = async (newBoletosData: Omit<Boleto, 'id' | 'representacao' | 'dueDate'>[]) => {
         if (!user) return { error: { message: "Usuário não autenticado" } }
@@ -299,5 +305,5 @@ export function useBoletos() {
         fetchBoletos()
     }, [user, fetchBoletos])
 
-    return { boletos, loading, fetchBoletos, addBoletos, deleteBoleto, deleteRecurrenceGroup, updateBoletoStatus }
+    return { boletos, loading, isRefetching, fetchBoletos, addBoletos, deleteBoleto, deleteRecurrenceGroup, updateBoletoStatus }
 }

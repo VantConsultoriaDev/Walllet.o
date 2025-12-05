@@ -69,6 +69,7 @@ export function useVehicles() {
     const { toast } = useToast()
     const [vehicles, setVehicles] = useState<Vehicle[]>([])
     const [loading, setLoading] = useState(true)
+    const [isRefetching, setIsRefetching] = useState(false)
 
     const fetchVehicles = useCallback(async () => {
         if (!user) {
@@ -76,7 +77,12 @@ export function useVehicles() {
             return
         }
 
-        setLoading(true)
+        if (vehicles.length === 0) {
+            setLoading(true)
+        } else {
+            setIsRefetching(true)
+        }
+
         const { data, error } = await supabase
             .from('vehicles')
             .select('*')
@@ -95,11 +101,12 @@ export function useVehicles() {
             setVehicles(formattedData)
         }
         setLoading(false)
-    }, [user, toast]) // Dependências: user e toast
+        setIsRefetching(false)
+    }, [user, toast, vehicles.length])
 
     useEffect(() => {
         fetchVehicles()
-    }, [user, fetchVehicles]) // Adicionando fetchVehicles como dependência
+    }, [user, fetchVehicles])
 
     const addVehicle = async (newVehicleData: Omit<Vehicle, 'id'>) => {
         if (!user) return { error: { message: "Usuário não autenticado" } }
@@ -177,5 +184,5 @@ export function useVehicles() {
         return { data: true }
     }
 
-    return { vehicles, loading, fetchVehicles, addVehicle, updateVehicle, deleteVehicle }
+    return { vehicles, loading, isRefetching, fetchVehicles, addVehicle, updateVehicle, deleteVehicle }
 }

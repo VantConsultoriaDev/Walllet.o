@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
@@ -47,14 +47,19 @@ export function useClaims() {
     const { toast } = useToast()
     const [claims, setClaims] = useState<Claim[]>([])
     const [loading, setLoading] = useState(true)
+    const [isRefetching, setIsRefetching] = useState(false)
 
-    const fetchClaims = async () => {
+    const fetchClaims = useCallback(async () => {
         if (!user) {
             setLoading(false)
             return
         }
 
-        setLoading(true)
+        if (claims.length === 0) {
+            setLoading(true)
+        } else {
+            setIsRefetching(true)
+        }
 
         // 1. Fetch all claims
         const { data: claimsData, error: claimsError } = await supabase
@@ -67,6 +72,7 @@ export function useClaims() {
             toast({ title: "Erro ao carregar sinistros", description: claimsError.message, variant: "destructive" })
             setClaims([])
             setLoading(false)
+            setIsRefetching(false)
             return
         }
 
@@ -115,11 +121,12 @@ export function useClaims() {
 
         setClaims(formattedClaims)
         setLoading(false)
-    }
+        setIsRefetching(false)
+    }, [user, toast, claims.length])
 
     useEffect(() => {
         fetchClaims()
-    }, [user])
+    }, [user, fetchClaims])
 
     const addClaim = async (newClaim: Omit<Claim, 'id' | 'history' | 'comments' | 'createdAt' | 'updatedAt' | 'thirdPartyName' | 'thirdPartyPlate'>) => {
         if (!user) return { error: { message: "Usuário não autenticado" } }
@@ -244,5 +251,5 @@ export function useClaims() {
         return { data: newComment }
     }
 
-    return { claims, loading, fetchClaims, addClaim, updateClaimStatus, addComment }
+    return { claims, loading, isRefetching, fetchClaims, addClaim, updateClaimStatus, addComment }
 }

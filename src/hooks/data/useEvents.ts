@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
@@ -9,14 +9,20 @@ export function useEvents() {
     const { toast } = useToast()
     const [events, setEvents] = useState<Event[]>([])
     const [loading, setLoading] = useState(true)
+    const [isRefetching, setIsRefetching] = useState(false)
 
-    const fetchEvents = async () => {
+    const fetchEvents = useCallback(async () => {
         if (!user) {
             setLoading(false)
             return
         }
 
-        setLoading(true)
+        if (events.length === 0) {
+            setLoading(true)
+        } else {
+            setIsRefetching(true)
+        }
+
         const { data, error } = await supabase
             .from('events')
             .select('*')
@@ -40,11 +46,12 @@ export function useEvents() {
             setEvents(formattedData)
         }
         setLoading(false)
-    }
+        setIsRefetching(false)
+    }, [user, toast, events.length])
 
     useEffect(() => {
         fetchEvents()
-    }, [user])
+    }, [user, fetchEvents])
 
     const addEvent = async (newEvent: Omit<Event, 'id' | 'client'> & { client: string }) => {
         if (!user) return { error: { message: "Usuário não autenticado" } }
@@ -121,5 +128,5 @@ export function useEvents() {
         return { data: true }
     }
 
-    return { events, loading, fetchEvents, addEvent, updateEvent, deleteEvent }
+    return { events, loading, isRefetching, fetchEvents, addEvent, updateEvent, deleteEvent }
 }

@@ -105,6 +105,7 @@ export function useClients() {
     const { toast } = useToast()
     const [clients, setClients] = useState<Client[]>([])
     const [loading, setLoading] = useState(true)
+    const [isRefetching, setIsRefetching] = useState(false) // Novo estado para refetch
 
     const fetchClients = useCallback(async (): Promise<Client[]> => {
         if (!user) {
@@ -112,7 +113,13 @@ export function useClients() {
             return []
         }
 
-        setLoading(true)
+        // Só mostra o loading spinner na primeira carga (loading=true)
+        // Em refetch, usamos isRefetching para um indicador mais sutil
+        if (clients.length === 0) {
+            setLoading(true)
+        } else {
+            setIsRefetching(true)
+        }
 
         // 1. Fetch all clients
         const { data: clientsData, error: clientsError } = await supabase
@@ -120,6 +127,12 @@ export function useClients() {
             .select('*')
             .eq('user_id', user.id)
             .order('created_at', { ascending: false })
+
+        // 2. Fetch all vehicles for the user
+        const { data: vehiclesData, error: vehiclesError } = await supabase
+            .from('vehicles')
+            .select('*')
+            .eq('user_id', user.id)
 
         if (clientsError) {
             toast({
@@ -129,18 +142,12 @@ export function useClients() {
             })
             setClients([])
             setLoading(false)
+            setIsRefetching(false)
             return []
         }
 
-        // 2. Fetch all vehicles for the user
-        const { data: vehiclesData, error: vehiclesError } = await supabase
-            .from('vehicles')
-            .select('*')
-            .eq('user_id', user.id)
-
         if (vehiclesError) {
             console.error("Erro ao carregar veículos:", vehiclesError.message)
-            // Continue loading clients even if vehicles fail
         }
 
         const allVehicles = vehiclesData ? vehiclesData.map(mapDbToVehicle) : []
@@ -153,12 +160,13 @@ export function useClients() {
 
         setClients(formattedClients)
         setLoading(false)
+        setIsRefetching(false)
         return formattedClients
-    }, [user, toast]) // Dependências: user e toast
+    }, [user, toast, clients.length]) // Adicionando clients.length para re-executar fetchClients quando o array muda
 
     useEffect(() => {
         fetchClients()
-    }, [user, fetchClients]) // Adicionando fetchClients como dependência
+    }, [user, fetchClients])
 
     const addClient = async (newClientData: Omit<Client, 'id' | 'status' | 'vehicles'>) => {
         if (!user) return { error: { message: "Usuário não autenticado" } }
@@ -209,5 +217,5 @@ export function useClients() {
         return { data: updatedClient }
     }
 
-    return { clients, loading, fetchClients, addClient, updateClient }
+    return { clients, loading, isRefetching, fetchClients, addClient, updateClient }
 }

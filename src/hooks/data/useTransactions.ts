@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
@@ -9,14 +9,20 @@ export function useTransactions() {
     const { toast } = useToast()
     const [transactions, setTransactions] = useState<Transaction[]>([])
     const [loading, setLoading] = useState(true)
+    const [isRefetching, setIsRefetching] = useState(false)
 
-    const fetchTransactions = async () => {
+    const fetchTransactions = useCallback(async () => {
         if (!user) {
             setLoading(false)
             return
         }
 
-        setLoading(true)
+        if (transactions.length === 0) {
+            setLoading(true)
+        } else {
+            setIsRefetching(true)
+        }
+
         const { data, error } = await supabase
             .from('transactions')
             .select('*')
@@ -40,11 +46,12 @@ export function useTransactions() {
             setTransactions(formattedData)
         }
         setLoading(false)
-    }
+        setIsRefetching(false)
+    }, [user, toast, transactions.length])
 
     useEffect(() => {
         fetchTransactions()
-    }, [user])
+    }, [user, fetchTransactions])
 
     const addTransaction = async (newTransaction: Omit<Transaction, 'id'>) => {
         if (!user) return { error: { message: "Usuário não autenticado" } }
@@ -119,5 +126,5 @@ export function useTransactions() {
         return { data: true }
     }
 
-    return { transactions, loading, fetchTransactions, addTransaction, updateTransaction, deleteTransaction }
+    return { transactions, loading, isRefetching, fetchTransactions, addTransaction, updateTransaction, deleteTransaction }
 }

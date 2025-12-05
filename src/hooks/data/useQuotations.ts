@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
@@ -46,14 +46,19 @@ export function useQuotations() {
     const { toast } = useToast()
     const [quotations, setQuotations] = useState<Cotacao[]>([])
     const [loading, setLoading] = useState(true)
+    const [isRefetching, setIsRefetching] = useState(false)
 
-    const fetchQuotations = async () => {
+    const fetchQuotations = useCallback(async () => {
         if (!user) {
             setLoading(false)
             return
         }
 
-        setLoading(true)
+        if (quotations.length === 0) {
+            setLoading(true)
+        } else {
+            setIsRefetching(true)
+        }
 
         // 1. Fetch all quotations
         const { data: quotesData, error: quotesError } = await supabase
@@ -66,6 +71,7 @@ export function useQuotations() {
             toast({ title: "Erro", description: quotesError.message, variant: "destructive" })
             setQuotations([])
             setLoading(false)
+            setIsRefetching(false)
             return
         }
 
@@ -100,11 +106,12 @@ export function useQuotations() {
 
         setQuotations(formattedQuotations)
         setLoading(false)
-    }
+        setIsRefetching(false)
+    }, [user, toast, quotations.length])
 
     useEffect(() => {
         fetchQuotations()
-    }, [user])
+    }, [user, fetchQuotations])
 
     const addQuotation = async (newQuotation: Omit<Cotacao, 'id' | 'history' | 'createdAt' | 'updatedAt'>) => {
         if (!user) return { error: { message: "Usuário não autenticado" } }
@@ -195,5 +202,5 @@ export function useQuotations() {
         return { data: updatedCotacao }
     }
 
-    return { quotations, loading, fetchQuotations, addQuotation, updateQuotationStatus }
+    return { quotations, loading, isRefetching, fetchQuotations, addQuotation, updateQuotationStatus }
 }
