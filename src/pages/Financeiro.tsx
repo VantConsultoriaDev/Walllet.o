@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Plus, ArrowDownCircle, DollarSign, Search, Wallet, TrendingUp, ArrowUpDown, Loader2 } from "lucide-react"
 import { NewTransactionModal, type Transaction } from "@/components/financeiro/new-transaction-modal"
-import { format, isWithinInterval, startOfMonth, endOfMonth, subMonths, getMonth, getYear } from "date-fns"
+import { format, isWithinInterval, startOfMonth, endOfMonth, subMonths } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import {
     ColumnDef,
@@ -30,16 +30,23 @@ import { DatePickerWithRange } from "@/components/ui/date-range-picker"
 import type { DateRange } from "react-day-picker"
 import { useTransactions } from "@/hooks/data/useTransactions"
 import { useBoletos } from "@/hooks/data/useBoletos"
-import { calculateExpectedCommissionDate } from "@/hooks/data/useBoletos" // Importando a nova função
+import { calculateExpectedCommissionDate } from "@/hooks/data/useBoletos"
 
 // Custom filter for date range
 const dateRangeFilter: FilterFn<Transaction> = (row, columnId, value: DateRange | undefined) => {
     if (!value?.from) return true
     const rowDate = row.getValue(columnId) as Date
-    if (!value.to) {
-        return rowDate.getTime() >= value.from.getTime()
+    
+    // Ensure rowDate is treated as a date without time component for comparison
+    const rowDateOnly = new Date(rowDate.getFullYear(), rowDate.getMonth(), rowDate.getDate());
+    
+    const start = value.from;
+    const end = value.to ? new Date(value.to.getFullYear(), value.to.getMonth(), value.to.getDate(), 23, 59, 59) : undefined;
+
+    if (!end) {
+        return rowDateOnly.getTime() >= start.getTime()
     }
-    return isWithinInterval(rowDate, { start: value.from, end: value.to })
+    return isWithinInterval(rowDateOnly, { start, end })
 }
 
 export default function Financeiro() {
@@ -251,8 +258,14 @@ export default function Financeiro() {
         .filter(row => row.original.type === "income")
         .reduce((acc, row) => acc + row.original.amount, 0)
 
+    // Comissão Confirmada: Transações com categoria 'Comissão'
     const monthlyCommissionConfirmed = filteredRows
         .filter(row => row.original.type === "income" && row.original.category === "Comissão")
+        .reduce((acc, row) => acc + row.original.amount, 0)
+        
+    // Comissão Esperada: Transações com categoria 'Comissão Esperada'
+    const monthlyCommissionExpected = filteredRows
+        .filter(row => row.original.type === "income" && row.original.category === "Comissão Esperada")
         .reduce((acc, row) => acc + row.original.amount, 0)
 
     const monthlyExpenses = filteredRows
@@ -261,32 +274,30 @@ export default function Financeiro() {
 
     const netProfit = monthlyCommissionConfirmed - monthlyExpenses
     
-    // --- NEW CALCULATION: Expected Commission ---
-    const monthlyCommissionExpected = useMemo(() => {
-        if (!dateRange?.from) return 0;
+    // --- OLD CALCULATION: Expected Commission (Removed as it's now handled by transactions) ---
+    // const monthlyCommissionExpected = useMemo(() => {
+    //     if (!dateRange?.from) return 0;
 
-        const start = dateRange.from;
-        const end = dateRange.to || new Date();
+    //     const start = dateRange.from;
+    //     const end = dateRange.to || new Date();
 
-        return allBoletos.reduce((sum, boleto) => {
-            if (boleto.comissaoRecorrente && boleto.comissaoTipo) {
-                // 1. Calculate the expected commission date based on the boleto's DUE DATE
-                const expectedDate = calculateExpectedCommissionDate(boleto.vencimento);
+    //     return allBoletos.reduce((sum, boleto) => {
+    //         if (boleto.comissaoRecorrente && boleto.comissaoTipo) {
+    //             const expectedDate = calculateExpectedCommissionDate(boleto.vencimento);
                 
-                // 2. Check if the expected commission date falls within the filtered range
-                if (isWithinInterval(expectedDate, { start, end })) {
-                    let commissionAmount = boleto.comissaoRecorrente;
+    //             if (isWithinInterval(expectedDate, { start, end })) {
+    //                 let commissionAmount = boleto.comissaoRecorrente;
 
-                    if (boleto.comissaoTipo === 'percentual') {
-                        commissionAmount = (boleto.valor * boleto.comissaoRecorrente) / 100;
-                    }
-                    return sum + commissionAmount;
-                }
-            }
-            return sum;
-        }, 0);
-    }, [allBoletos, dateRange]);
-    // --- END NEW CALCULATION ---
+    //                 if (boleto.comissaoTipo === 'percentual') {
+    //                     commissionAmount = (boleto.valor * boleto.comissaoRecorrente) / 100;
+    //                 }
+    //                 return sum + commissionAmount;
+    //             }
+    //         }
+    //         return sum;
+    //     }, 0);
+    // }, [allBoletos, dateRange]);
+    // --- END OLD CALCULATION ---
 
 
     return (
@@ -320,7 +331,7 @@ export default function Financeiro() {
                     </CardContent>
                 </Card>
                 
-                {/* NEW KPI: Comissão Esperada */}
+                {/* NEW KPI: Comissão Esperada (Calculado a partir das transações de categoria 'Comissão Esperada') */}
                 <Card className="shadow-sm hover:shadow-md transition-shadow">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Comissão Esperada</CardTitle>
@@ -332,7 +343,7 @@ export default function Financeiro() {
                     </CardContent>
                 </Card>
                 
-                {/* RENAMED KPI: Comissão Confirmada */}
+                {/* RENAMED KPI: Comissão Confirmada (Calculado a partir das transações de categoria 'Comissão') */}
                 <Card className="shadow-sm hover:shadow-md transition-shadow">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Comissão Confirmada</CardTitle>

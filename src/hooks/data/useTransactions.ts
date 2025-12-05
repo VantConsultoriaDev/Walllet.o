@@ -168,6 +168,7 @@ export function useTransactions() {
         const descriptionPrefix = `Comissão Esperada Boleto #${boletoId}`;
         const expectedDateString = expectedDueDate.toISOString().split('T')[0];
 
+        // 1. Tenta encontrar uma transação existente com a mesma descrição e data
         const existingTransaction = transactions.find(t => 
             t.description.includes(descriptionPrefix) && 
             t.date.toISOString().split('T')[0] === expectedDateString &&
@@ -175,7 +176,15 @@ export function useTransactions() {
         );
 
         if (existingTransaction) {
-            console.log(`Comissão ESPERADA para Boleto #${boletoId} já existe. Pulando criação.`);
+            // Se a transação esperada já existe, verifica se o valor mudou.
+            if (existingTransaction.amount !== amount) {
+                // Se o valor mudou, atualiza a transação existente.
+                const updatedTransaction = { ...existingTransaction, amount: amount };
+                await updateTransaction(updatedTransaction);
+                console.log(`Comissão ESPERADA para Boleto #${boletoId} atualizada.`);
+                return { data: updatedTransaction };
+            }
+            console.log(`Comissão ESPERADA para Boleto #${boletoId} já existe e valor é o mesmo. Pulando criação.`);
             return { data: existingTransaction };
         }
 
@@ -237,7 +246,10 @@ export function useTransactions() {
         }
 
         setTransactions(prev => prev.map(t => t.id === id ? updatedTransaction : t))
-        toast({ title: "Sucesso", description: "Transação atualizada com sucesso." })
+        // Note: We skip the toast here if called internally by addExpectedCommissionTransaction
+        if (!updatedTransaction.description.includes("Comissão Esperada Boleto")) {
+            toast({ title: "Sucesso", description: "Transação atualizada com sucesso." })
+        }
         return { data: updatedTransaction }
     }
 
@@ -266,7 +278,7 @@ export function useTransactions() {
         fetchTransactions, 
         addTransaction, 
         addCommissionTransaction, 
-        addExpectedCommissionTransaction, // Exportando a nova função
+        addExpectedCommissionTransaction, 
         updateTransaction, 
         deleteTransaction 
     }
