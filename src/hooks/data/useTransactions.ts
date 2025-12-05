@@ -105,6 +105,7 @@ export function useTransactions() {
         const descriptionPrefix = `Comissão Boleto #${boletoId}`;
         const commissionDateString = commissionDueDate.toISOString().split('T')[0];
 
+        // CRITICAL FIX: Check against the current local state first
         const existingTransaction = transactions.find(t => 
             t.description.includes(descriptionPrefix) && 
             t.date.toISOString().split('T')[0] === commissionDateString
@@ -148,7 +149,7 @@ export function useTransactions() {
             amount: parseFloat(data.amount),
         }
 
-        // Adiciona ao estado local imediatamente
+        // CRITICAL FIX: Adiciona ao estado local imediatamente
         setTransactions(prev => [addedTransaction, ...prev])
         
         return { data: addedTransaction }

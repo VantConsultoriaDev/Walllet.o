@@ -65,7 +65,8 @@ const mapBoletoToDb = (boleto: Partial<Boleto>, userId: string) => ({
 
 // Helper to calculate the commission date based on payment date and representation
 const calculateCommissionDate = (paymentDate: Date, representationName: string): Date => {
-    let commissionDate = addMonths(paymentDate, 1);
+    // Start with the 1st of the next month
+    let commissionDate = addMonths(setDate(paymentDate, 1), 1);
     
     if (representationName.toLowerCase().includes("proteauto")) {
         // Set to the 26th of the next month
@@ -73,25 +74,20 @@ const calculateCommissionDate = (paymentDate: Date, representationName: string):
         
         // Check if it's a weekend (0=Sunday, 6=Saturday)
         if (isWeekend(commissionDate)) {
-            // If Saturday, move to Monday (2 days later)
-            if (commissionDate.getDay() === 6) {
-                commissionDate = addMonths(setDate(paymentDate, 28), 1); // 26 + 2 = 28
+            const dayOfWeek = getDay(commissionDate);
+            
+            // If Saturday (6), move to Monday (2 days later)
+            if (dayOfWeek === 6) {
+                commissionDate = setDate(commissionDate, 28); 
             } 
-            // If Sunday, move to Monday (1 day later)
-            else if (commissionDate.getDay() === 0) {
-                commissionDate = addMonths(setDate(paymentDate, 27), 1); // 26 + 1 = 27
+            // If Sunday (0), move to Monday (1 day later)
+            else if (dayOfWeek === 0) {
+                commissionDate = setDate(commissionDate, 27); 
             }
         }
     }
-    // For all other representations, it defaults to the 1st of the next month (handled by addMonths(paymentDate, 1) if we set the date to 1)
-    // Since addCommissionTransaction uses this date, we ensure it's the 1st if no specific rule applies.
     
-    // If not Proteauto, ensure it defaults to the 1st of the next month for consistency in transaction tracking
-    if (!representationName.toLowerCase().includes("proteauto")) {
-        commissionDate = setDate(commissionDate, 1);
-    }
-
-    // Ensure the returned date is also fixed at noon to prevent timezone issues later
+    // Ensure the returned date is fixed at noon to prevent timezone issues later
     return setHours(commissionDate, 12);
 };
 
@@ -346,7 +342,7 @@ export function useBoletos() {
                     currentBoleto.representacao
                 );
                 
-                toast({ title: "Comissão Registrada", description: `Comissão de ${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(commissionAmount)} agendada para ${format(commissionDueDate, 'dd/MM/yyyy')}.`, variant: "default" })
+                // NOTE: O toast de comissão foi movido para dentro do addCommissionTransaction para evitar duplicação.
             }
         }
 
