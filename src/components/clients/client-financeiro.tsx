@@ -102,6 +102,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
     const [sortDirection, setSortDirection] = useState<SortDirection>("asc")
 
     // --- New Boleto Form State ---
+    const [title, setTitle] = useState("") // <-- Novo estado para o título
     const [valor, setValor] = useState("") // Stored as formatted string
     const [vencimento, setVencimento] = useState<Date | undefined>(undefined) // <-- Inicializado como undefined
     const [selectedPlates, setSelectedPlates] = useState<string[]>([])
@@ -281,6 +282,9 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
             // Ensure the date is set to noon (12h) to prevent timezone issues on save
             const correctedVencimento = setHours(addMonths(vencimento, i), 12);
 
+            // CRITICAL FIX: Use the user-provided title or generate a default one
+            const finalTitle = title.trim() || `${client.name} - ${representacaoNome}`;
+
             boletosToSave.push({
                 valor: floatValor,
                 vencimento: correctedVencimento,
@@ -295,7 +299,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                 comissaoTipo: comissaoRecorrente ? comissaoTipo : undefined,
                 clientId: client.id,
                 clientName: client.name,
-                title: `${client.name} - ${representacaoNome}`, // Add title for DB
+                title: finalTitle, // Use finalTitle
             })
         }
 
@@ -370,6 +374,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
     }
 
     const resetForm = () => {
+        setTitle("") // Reset title
         setValor("")
         setVencimento(undefined)
         setSelectedPlates([])
@@ -704,6 +709,14 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
                         <div className="grid gap-2">
+                            <Label>Título (Opcional)</Label>
+                            <Input
+                                placeholder={`Ex: Anuidade ${client.name}`}
+                                value={title}
+                                onChange={(e) => setTitle(e.target.value)}
+                            />
+                        </div>
+                        <div className="grid gap-2">
                             <Label>Valor</Label>
                             <Input
                                 placeholder="0,00"
@@ -940,7 +953,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
 
             {/* Edit Boleto Modal */}
             <EditBoletoModal
-                boleto={selectedBoleto}
+                boleto={selectedBoletoToEdit}
                 open={isEditModalOpen}
                 onOpenChange={setIsEditModalOpen}
                 onSave={handleEditBoleto}
