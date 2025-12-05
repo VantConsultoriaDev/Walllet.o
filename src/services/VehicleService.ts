@@ -164,12 +164,16 @@ export class VehicleService {
 
       const data = result.data;
       
+      // Prioriza 'anoModelo' (camelCase) e 'valor' (FIPE)
+      const anoModelo = data.anoModelo?.toString() || data.anoFabricacao?.toString() || data.ano?.toString() || '';
+      const valorFipe = data.valor?.toString() || '';
+
       const placaData: PlacaData = {
           placa: data.placa || placaLimpa,
           marca: data.marca || '',
           modelo: data.modelo || '',
-          ano: data.anomodelo?.toString() || data.ano_modelo?.toString() || data.ano?.toString() || '', 
-          anoModelo: data.anomodelo?.toString() || data.ano_modelo?.toString() || '',
+          ano: anoModelo, 
+          anoModelo: anoModelo,
           cor: data.cor || '',
           combustivel: data.combustivel || '',
           categoria: data.categoria || data.especie || '',
@@ -178,7 +182,7 @@ export class VehicleService {
           municipio: data.municipio || '',
           uf: data.uf || '',
           fipeCode: data.codigoFipe || data.codigofipe || data.codigo_fipe || '',
-          fipeValue: data.valor?.toString() || '',
+          fipeValue: valorFipe,
       };
 
       // 4. Salvar no cache antes de retornar
