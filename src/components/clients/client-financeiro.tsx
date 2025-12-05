@@ -954,7 +954,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
 
             {/* Edit Boleto Modal */}
             <EditBoletoModal
-                boleto={selectedBoleto} {/* CORRIGIDO: Usando selectedBoleto */}
+                boleto={selectedBoleto}
                 open={isEditModalOpen}
                 onOpenChange={setIsEditModalOpen}
                 onSave={handleEditBoleto}
