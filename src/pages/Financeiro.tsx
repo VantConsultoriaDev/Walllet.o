@@ -360,9 +360,9 @@ export default function Financeiro() {
             {/* Summary Cards */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <Card className="shadow-sm hover:shadow-md transition-shadow">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Faturamento (Boletos Pagos)</CardTitle>
-                        <TrendingUp className="h-4 w-4 text-blue-500" />
+                    <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium pr-2">Faturamento (Boletos Pagos)</CardTitle>
+                        <TrendingUp className="h-4 w-4 text-blue-500 shrink-0" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-blue-600">{formatCurrency(faturamento)}</div>
@@ -371,9 +371,9 @@ export default function Financeiro() {
                 </Card>
                 
                 <Card className="shadow-sm hover:shadow-md transition-shadow">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Comissão Esperada</CardTitle>
-                        <Wallet className="h-4 w-4 text-yellow-500" />
+                    <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium pr-2">Comissão Esperada</CardTitle>
+                        <Wallet className="h-4 w-4 text-yellow-500 shrink-0" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-yellow-600">{formatCurrency(comissaoEsperada)}</div>
@@ -382,9 +382,9 @@ export default function Financeiro() {
                 </Card>
                 
                 <Card className="shadow-sm hover:shadow-md transition-shadow">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Comissão Confirmada</CardTitle>
-                        <Wallet className="h-4 w-4 text-green-500" />
+                    <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium pr-2">Comissão Confirmada</CardTitle>
+                        <Wallet className="h-4 w-4 text-green-500 shrink-0" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-green-600">{formatCurrency(comissaoConfirmada)}</div>
@@ -393,9 +393,9 @@ export default function Financeiro() {
                 </Card>
                 
                 <Card className="shadow-sm hover:shadow-md transition-shadow">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Despesas</CardTitle>
-                        <ArrowDownCircle className="h-4 w-4 text-red-500" />
+                    <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium pr-2">Despesas</CardTitle>
+                        <ArrowDownCircle className="h-4 w-4 text-red-500 shrink-0" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-red-600">{formatCurrency(despesas)}</div>
@@ -467,7 +467,10 @@ export default function Financeiro() {
                                                         onClick={() => handleOpenBoletoEditModal(boleto)} // Abre modal de edição de boleto
                                                     >
                                                         <TableCell>
-                                                            <div className="font-medium">{boleto.clientName}</div>
+                                                            <div className="font-medium flex items-center gap-2">
+                                                                {boleto.clientName}
+                                                                {boleto.isRecurring && <Repeat className="h-4 w-4 text-blue-600 dark:text-blue-400" title="Recorrente" />}
+                                                            </div>
                                                             <div className="text-xs text-muted-foreground">{boleto.representacao}</div>
                                                         </TableCell>
                                                         <TableCell>
@@ -510,7 +513,10 @@ export default function Financeiro() {
                                                         onClick={() => openEditTransactionModal(transaction)} // Abre modal de edição de transação
                                                     >
                                                         <TableCell>
-                                                            <div className="font-medium">{transaction.description}</div>
+                                                            <div className="font-medium flex items-center gap-2">
+                                                                {transaction.description}
+                                                                {transaction.isRecurrent && <Repeat className="h-4 w-4 text-blue-600 dark:text-blue-400" title="Recorrente" />}
+                                                            </div>
                                                             {transaction.representacaoNome && <div className="text-xs text-muted-foreground">{transaction.representacaoNome}</div>}
                                                         </TableCell>
                                                         <TableCell>-</TableCell>
