@@ -28,7 +28,8 @@ const mapDbToBoleto = (dbBoleto: any, clientName: string, representationName: st
     vencimento: parseDbDate(dbBoleto.vencimento)!, // Vencimento is mandatory
     dueDate: parseDbDate(dbBoleto.vencimento)!, // Alias for compatibility
     clientId: dbBoleto.client_id,
-    // Usamos o clientName mapeado (que vem do clientMap) ou o título do boleto como fallback
+    // Se o nome do cliente não foi encontrado no mapa (Cliente Desconhecido), 
+    // usamos o título do boleto como o nome do cliente.
     clientName: clientName !== "Cliente Desconhecido" ? clientName : (dbBoleto.title || "N/A"),
     placas: dbBoleto.placas || [],
     representacao: representationName,

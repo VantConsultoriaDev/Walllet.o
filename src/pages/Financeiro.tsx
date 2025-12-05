@@ -468,6 +468,7 @@ export default function Financeiro() {
                                                     >
                                                         <TableCell>
                                                             <div className="font-medium flex items-center gap-2">
+                                                                {/* Exibe o nome do cliente (que deve ser 'CONSTRUTORA SANTANA') */}
                                                                 {boleto.clientName}
                                                                 {boleto.isRecurring && <Repeat className="h-4 w-4 text-blue-600 dark:text-blue-400" title="Recorrente" />}
                                                             </div>
