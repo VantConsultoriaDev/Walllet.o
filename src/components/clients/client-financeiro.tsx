@@ -96,6 +96,22 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
     const [sortField, setSortField] = useState<SortField | null>("vencimento")
     const [sortDirection, setSortDirection] = useState<SortDirection>("asc")
 
+    // --- New Boleto Form State ---
+    const [valor, setValor] = useState("") // Stored as formatted string
+    const [vencimento, setVencimento] = useState<Date>()
+    const [selectedPlates, setSelectedPlates] = useState<string[]>([])
+    const [representacaoId, setRepresentacaoId] = useState("")
+    const [isRecurring, setIsRecurring] = useState(false)
+    const [recurrenceType, setRecurrenceType] = useState<"indefinite" | "limited">("indefinite")
+    const [recurrenceMonths, setRecurrenceMonths] = useState("12")
+    const [comissaoRecorrente, setComissaoRecorrente] = useState("")
+    const [comissaoTipo, setComissaoTipo] = useState<"percentual" | "valor">("valor")
+    const [openPlateSelect, setOpenPlateSelect] = useState(false)
+    const [plateSearch, setPlateSearch] = useState("")
+    const [isCalendarOpen, setIsCalendarOpen] = useState(false)
+    // --- End New Boleto Form State ---
+
+
     // Generate year options dynamically (e.g., current year +/- 5)
     const yearOptions = useMemo(() => {
         const currentYear = getYear(today)
@@ -128,11 +144,15 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
     const handleMonthChange = (v: string) => {
         setSelectedMonth(v === "ALL" ? "ALL" : parseInt(v))
         setActiveFilterType("month")
+        setExplicitDateFrom(undefined)
+        setExplicitDateTo(undefined)
     }
 
     const handleYearChange = (v: string) => {
         setSelectedYear(parseInt(v))
         setActiveFilterType("month")
+        setExplicitDateFrom(undefined)
+        setExplicitDateTo(undefined)
     }
 
     const handleDateRangeChange = (from: Date | undefined, to: Date | undefined) => {
@@ -142,7 +162,10 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
             setActiveFilterType("range")
             setSelectedMonth("ALL") // Deactivate month filter when range is set
         } else {
-            setActiveFilterType("month") // Revert to month filter if range is cleared
+            // If range is cleared, revert to month filter (default previous month)
+            setActiveFilterType("month") 
+            setSelectedMonth(previousMonth)
+            setSelectedYear(getYear(today))
         }
     }
 
@@ -461,7 +484,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                                 <Button 
                                     variant={activeFilterType === "range" ? "default" : "outline"} 
                                     className="gap-2 w-full md:w-auto"
-                                    onClick={() => setActiveFilterType("range")}
+                                    onClick={() => handleDateRangeChange(explicitDateFrom, explicitDateTo)} // Trigger re-evaluation
                                 >
                                     <CalendarIcon className="h-4 w-4" />
                                     {explicitDateFrom ? format(explicitDateFrom, "dd/MM/yy") : "De"}
@@ -480,7 +503,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                                 <Button 
                                     variant={activeFilterType === "range" ? "default" : "outline"} 
                                     className="gap-2 w-full md:w-auto"
-                                    onClick={() => setActiveFilterType("range")}
+                                    onClick={() => handleDateRangeChange(explicitDateFrom, explicitDateTo)} // Trigger re-evaluation
                                 >
                                     <CalendarIcon className="h-4 w-4" />
                                     {explicitDateTo ? format(explicitDateTo, "dd/MM/yy") : "Até"}
