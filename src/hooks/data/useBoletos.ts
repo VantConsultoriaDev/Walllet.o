@@ -7,19 +7,27 @@ import { addMonths, isBefore, isToday, setDate, isWeekend, format, setHours } fr
 import { v4 as uuidv4 } from 'uuid'
 import { useTransactions } from "./useTransactions" // Importando useTransactions
 
+// Helper function to safely parse DB date string (YYYY-MM-DD) into a Date object at noon local time
+const parseDbDate = (dateString: string | null | undefined): Date | undefined => {
+    if (!dateString) return undefined;
+    // Create a date object using only the date part, then set hours to 12 to prevent timezone shifting
+    const date = new Date(dateString);
+    return setHours(date, 12);
+};
+
 // Helper function to map DB object to Boleto type
 const mapDbToBoleto = (dbBoleto: any, clientName: string, representationName: string): Boleto => ({
     id: dbBoleto.id,
     title: dbBoleto.title,
     valor: parseFloat(dbBoleto.valor),
-    vencimento: new Date(dbBoleto.vencimento),
-    dueDate: new Date(dbBoleto.vencimento), // Alias for compatibility
+    vencimento: parseDbDate(dbBoleto.vencimento)!, // Vencimento is mandatory
+    dueDate: parseDbDate(dbBoleto.vencimento)!, // Alias for compatibility
     clientId: dbBoleto.client_id,
     clientName: clientName,
     placas: dbBoleto.placas || [],
     representacao: representationName,
     status: dbBoleto.status,
-    dataPagamento: dbBoleto.data_pagamento ? new Date(dbBoleto.data_pagamento) : undefined,
+    dataPagamento: parseDbDate(dbBoleto.data_pagamento),
     isRecurring: dbBoleto.is_recurring,
     recurrenceType: dbBoleto.recurrence_type,
     recurrenceMonths: dbBoleto.recurrence_months,
@@ -36,6 +44,8 @@ const mapBoletoToDb = (boleto: Partial<Boleto>, userId: string) => ({
     client_id: boleto.clientId,
     title: boleto.title || `Boleto ${boleto.clientName}`, // Ensure title exists
     valor: boleto.valor?.toFixed(2),
+    // When saving, we rely on the date object already being set to noon (12h) 
+    // by the UI components (EditBoletoModal/BoletoDetailsModal) to ensure correct date string output.
     vencimento: boleto.vencimento?.toISOString().split('T')[0],
     placas: boleto.placas,
     representacao_id: boleto.representacaoId, // This must be present
@@ -131,7 +141,7 @@ export function useBoletos() {
             })
             setBoletos([])
         } else {
-            const today = new Date()
+            const today = setHours(new Date(), 12); // Use corrected date for comparison
             today.setHours(0, 0, 0, 0) // Normalize today's date
 
             const formattedData = data.map(dbBoleto => {
