@@ -278,8 +278,8 @@ export default function Financeiro() {
         setIsEditBoletoModalOpen(true)
     }
 
+    // --- Funções de manipulação de Boleto para o Modal de Edição ---
     const handleBoletoSave = async (updatedBoleto: Boleto, scope: "this" | "all") => {
-        // Lógica de salvamento do boleto (copiada de ClientFinanceiro)
         const originalBoleto = allBoletos.find(b => b.id === updatedBoleto.id);
         
         if (originalBoleto && originalBoleto.status !== updatedBoleto.status) {
@@ -309,6 +309,7 @@ export default function Financeiro() {
         setIsEditBoletoModalOpen(false)
         setSelectedBoletoToEdit(null)
     }
+    // --- Fim Funções de manipulação de Boleto ---
     
     const handleRecurrenceDeleteAction = async (scope: "this" | "all") => {
         if (pendingDeleteTransaction?.isBoleto) {
