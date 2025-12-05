@@ -3,7 +3,7 @@ import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
 import type { Boleto } from "@/types/agenda"
-import { addMonths, isBefore, isToday, setDate, isWeekend, format, setHours } from "date-fns"
+import { addMonths, isBefore, isToday, setDate, isWeekend, format, setHours, getDay, getDate, getMonth, getYear } from "date-fns"
 import { v4 as uuidv4 } from 'uuid'
 import { useTransactions } from "./useTransactions" // Importando useTransactions
 
@@ -44,8 +44,6 @@ const mapBoletoToDb = (boleto: Partial<Boleto>, userId: string) => ({
     client_id: boleto.clientId,
     title: boleto.title || `Boleto ${boleto.clientName}`, // Ensure title exists
     valor: boleto.valor?.toFixed(2),
-    // When saving, we rely on the date object already being set to noon (12h) 
-    // by the UI components (EditBoletoModal/BoletoDetailsModal) to ensure correct date string output.
     vencimento: boleto.vencimento?.toISOString().split('T')[0],
     placas: boleto.placas,
     representacao_id: boleto.representacaoId, // This must be present
@@ -190,37 +188,92 @@ export function useBoletos() {
         await fetchBoletos() 
         
         toast({ title: "Sucesso", description: `${data.length} boleto(s) adicionado(s) com sucesso.` })
-        // We return the raw data from the DB, but since we just called fetchBoletos, the state is updated.
-        // To satisfy the return type, we map the raw data using the helper function, but we need client/rep names.
-        // Since we don't have them easily here, we return a simplified success object.
         return { data: true } 
     }
 
     const updateBoleto = async (updatedBoleto: Boleto, scope: "this" | "all" = "this") => {
         if (!user) return { error: { message: "Usuário não autenticado" } }
 
-        const dbData = mapBoletoToDb(updatedBoleto, user.id)
+        // 1. Prepare base update data (excluding date fields for now, as they need special handling for recurrence)
+        const { vencimento, dataPagamento, ...restOfBoleto } = updatedBoleto;
         
+        const baseDbData = mapBoletoToDb({ 
+            ...restOfBoleto, 
+            vencimento: vencimento, // Include vencimento for single update
+            dataPagamento: dataPagamento, // Include dataPagamento for single update
+        }, user.id);
+
         let query = supabase
             .from('boletos')
-            .update(dbData)
+            .update(baseDbData)
             .eq('user_id', user.id)
 
         if (scope === "this" || !updatedBoleto.recurrenceGroupId) {
-            // Update only the current boleto
+            // --- Update only the current boleto ---
             query = query.eq('id', updatedBoleto.id)
         } else {
-            // Update this and all subsequent boletos in the recurrence group
-            query = query
+            // --- Update this and all subsequent boletos in the recurrence group ---
+            
+            // We need to update the VENCIMENTO of all future boletos to maintain the same day of the month, 
+            // but starting from the month of the updatedBoleto.
+            
+            // 1. Find all future boletos in the group (including the current one)
+            const futureBoletos = boletos.filter(b => 
+                b.recurrenceGroupId === updatedBoleto.recurrenceGroupId && 
+                b.vencimento.getTime() >= vencimento.getTime()
+            ).sort((a, b) => a.vencimento.getTime() - b.vencimento.getTime());
+
+            if (futureBoletos.length === 0) {
+                toast({ title: "Aviso", description: "Nenhum boleto futuro encontrado para atualização em grupo.", variant: "default" });
+                return { data: updatedBoleto };
+            }
+
+            // 2. Perform the update on the database for non-date fields
+            const { vencimento: _, data_pagamento: __, ...nonDateDbData } = baseDbData;
+            
+            const { error: updateError } = await supabase
+                .from('boletos')
+                .update(nonDateDbData)
                 .eq('recurrence_group_id', updatedBoleto.recurrenceGroupId)
-                .gte('vencimento', updatedBoleto.vencimento.toISOString().split('T')[0])
-        }
+                .gte('vencimento', vencimento.toISOString().split('T')[0])
+                .eq('user_id', user.id); // Safety check
 
-        const { error } = await query.select()
+            if (updateError) {
+                toast({ title: "Erro", description: `Falha ao atualizar campos não-data dos boletos recorrentes: ${updateError.message}`, variant: "destructive" });
+                return { error: updateError };
+            }
 
-        if (error) {
-            toast({ title: "Erro", description: `Falha ao atualizar boleto(s): ${error.message}`, variant: "destructive" })
-            return { error }
+            // 3. Handle VENCIMENTO update separately for each future boleto
+            const dayOfMonth = getDate(vencimento);
+            const month = getMonth(vencimento);
+            const year = getYear(vencimento);
+            
+            // We iterate over the future boletos and update their dates sequentially
+            for (let i = 0; i < futureBoletos.length; i++) {
+                const currentBoleto = futureBoletos[i];
+                
+                // Calculate the target date: start from the updated month/year and add 'i' months
+                let targetDate = setDate(setMonth(setYear(vencimento, year), month), dayOfMonth);
+                targetDate = addMonths(targetDate, i);
+                
+                // Ensure the date is set to noon to prevent timezone issues on save
+                const correctedTargetDate = setHours(targetDate, 12);
+
+                const { error: dateError } = await supabase
+                    .from('boletos')
+                    .update({
+                        vencimento: correctedTargetDate.toISOString().split('T')[0],
+                        // Only update data_pagamento for the current boleto if it was changed
+                        ...(currentBoleto.id === updatedBoleto.id && { data_pagamento: dataPagamento?.toISOString().split('T')[0] || null })
+                    })
+                    .eq('id', currentBoleto.id)
+                    .eq('user_id', user.id);
+
+                if (dateError) {
+                    console.error(`Erro ao atualizar data do boleto ${currentBoleto.id}:`, dateError);
+                    // Continue loop but log error
+                }
+            }
         }
 
         // Re-fetch all boletos to ensure all affected recurring items are updated in state
