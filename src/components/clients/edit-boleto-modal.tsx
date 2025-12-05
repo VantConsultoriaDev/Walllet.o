@@ -109,6 +109,7 @@ export function EditBoletoModal({
     // Helper to correct date timezone offset
     const correctDateOffset = (date: Date | undefined): Date | undefined => {
         if (!date) return undefined;
+        // Use setHours(date, 12) to fix the date at noon local time
         return setHours(date, 12);
     }
 
@@ -239,7 +240,8 @@ export function EditBoletoModal({
                                         mode="single"
                                         selected={dataPagamento}
                                         onSelect={(date) => {
-                                            setDataPagamento(date)
+                                            // Ensure date is set to noon (12h) to prevent timezone issues on save
+                                            setDataPagamento(setHours(date!, 12))
                                             setIsPaymentCalendarOpen(false)
                                         }}
                                         initialFocus

@@ -10,9 +10,14 @@ import { useTransactions } from "./useTransactions" // Importando useTransaction
 // Helper function to safely parse DB date string (YYYY-MM-DD) into a Date object at noon local time
 const parseDbDate = (dateString: string | null | undefined): Date | undefined => {
     if (!dateString) return undefined;
-    // Create a date object using only the date part, then set hours to 12 to prevent timezone shifting
-    const date = new Date(dateString);
-    return setHours(date, 12);
+    
+    // Create a date object using the date string, which should be interpreted as UTC midnight (00:00:00Z).
+    // Then, set the hours to 12 (noon) to ensure that when converted to local time, 
+    // it still falls on the intended day, preventing -1 day shift.
+    const date = new Date(`${dateString}T12:00:00`);
+    
+    // Final check to ensure it's a valid date
+    return isNaN(date.getTime()) ? undefined : date;
 };
 
 // Helper function to map DB object to Boleto type
@@ -44,11 +49,12 @@ const mapBoletoToDb = (boleto: Partial<Boleto>, userId: string) => ({
     client_id: boleto.clientId,
     title: boleto.title || `Boleto ${boleto.clientName}`, // Ensure title exists
     valor: boleto.valor?.toFixed(2),
-    vencimento: boleto.vencimento?.toISOString().split('T')[0],
+    // Store date as YYYY-MM-DD string
+    vencimento: boleto.vencimento ? format(boleto.vencimento, 'yyyy-MM-dd') : undefined,
     placas: boleto.placas,
     representacao_id: boleto.representacaoId, // This must be present
     status: boleto.status,
-    data_pagamento: boleto.dataPagamento?.toISOString().split('T')[0],
+    data_pagamento: boleto.dataPagamento ? format(boleto.dataPagamento, 'yyyy-MM-dd') : null,
     is_recurring: boleto.isRecurring,
     recurrence_type: boleto.recurrenceType,
     recurrence_months: boleto.recurrenceMonths,
@@ -85,7 +91,8 @@ const calculateCommissionDate = (paymentDate: Date, representationName: string):
         commissionDate = setDate(commissionDate, 1);
     }
 
-    return commissionDate;
+    // Ensure the returned date is also fixed at noon to prevent timezone issues later
+    return setHours(commissionDate, 12);
 };
 
 
@@ -139,8 +146,7 @@ export function useBoletos() {
             })
             setBoletos([])
         } else {
-            const today = setHours(new Date(), 12); // Use corrected date for comparison
-            today.setHours(0, 0, 0, 0) // Normalize today's date
+            const today = parseDbDate(format(new Date(), 'yyyy-MM-dd'))!; // Use corrected date for comparison
 
             const formattedData = data.map(dbBoleto => {
                 const clientName = clientMap.get(dbBoleto.client_id) || "Cliente Desconhecido"
@@ -194,66 +200,76 @@ export function useBoletos() {
     const updateBoleto = async (updatedBoleto: Boleto, scope: "this" | "all" = "this") => {
         if (!user) return { error: { message: "Usuário não autenticado" } }
 
-        // 1. Prepare base update data (excluding date fields for now, as they need special handling for recurrence)
+        // 1. Prepare base update data
         const { vencimento, dataPagamento, ...restOfBoleto } = updatedBoleto;
         
-        const baseDbData = mapBoletoToDb({ 
+        // Data fields to update in DB (excluding dates for the initial batch update)
+        const { vencimento: _, data_pagamento: __, ...nonDateDbData } = mapBoletoToDb({ 
             ...restOfBoleto, 
-            vencimento: vencimento, // Include vencimento for single update
-            dataPagamento: dataPagamento, // Include dataPagamento for single update
+            vencimento: vencimento, // Keep for reference
+            dataPagamento: dataPagamento, // Keep for reference
         }, user.id);
-
-        let query = supabase
-            .from('boletos')
-            .update(baseDbData)
-            .eq('user_id', user.id)
 
         if (scope === "this" || !updatedBoleto.recurrenceGroupId) {
             // --- Update only the current boleto ---
-            query = query.eq('id', updatedBoleto.id)
+            const dbData = mapBoletoToDb(updatedBoleto, user.id);
+            
+            const { error } = await supabase
+                .from('boletos')
+                .update(dbData)
+                .eq('id', updatedBoleto.id)
+                .eq('user_id', user.id)
+                .select()
+
+            if (error) {
+                toast({ title: "Erro", description: `Falha ao atualizar boleto: ${error.message}`, variant: "destructive" })
+                return { error }
+            }
+
+            // Update local state immediately
+            setBoletos(prev => prev.map(b => b.id === updatedBoleto.id ? updatedBoleto : b))
+
         } else {
             // --- Update this and all subsequent boletos in the recurrence group ---
             
-            // We need to update the VENCIMENTO of all future boletos to maintain the same day of the month, 
-            // but starting from the month of the updatedBoleto.
-            
-            // 1. Find all future boletos in the group (including the current one)
-            const futureBoletos = boletos.filter(b => 
-                b.recurrenceGroupId === updatedBoleto.recurrenceGroupId && 
-                b.vencimento.getTime() >= vencimento.getTime()
-            ).sort((a, b) => a.vencimento.getTime() - b.vencimento.getTime());
-
-            if (futureBoletos.length === 0) {
-                toast({ title: "Aviso", description: "Nenhum boleto futuro encontrado para atualização em grupo.", variant: "default" });
-                return { data: updatedBoleto };
-            }
-
-            // 2. Perform the update on the database for non-date fields
-            const { vencimento: _, data_pagamento: __, ...nonDateDbData } = baseDbData;
-            
+            // 1. Update non-date fields for all future boletos in the group
             const { error: updateError } = await supabase
                 .from('boletos')
                 .update(nonDateDbData)
                 .eq('recurrence_group_id', updatedBoleto.recurrenceGroupId)
-                .gte('vencimento', vencimento.toISOString().split('T')[0])
-                .eq('user_id', user.id); // Safety check
+                .gte('vencimento', format(vencimento, 'yyyy-MM-dd')) // Use formatted date for comparison
+                .eq('user_id', user.id); 
 
             if (updateError) {
                 toast({ title: "Erro", description: `Falha ao atualizar campos não-data dos boletos recorrentes: ${updateError.message}`, variant: "destructive" });
                 return { error: updateError };
             }
 
+            // 2. Fetch all future boletos again to get their current dates
+            const { data: futureBoletosData, error: fetchError } = await supabase
+                .from('boletos')
+                .select('*')
+                .eq('recurrence_group_id', updatedBoleto.recurrenceGroupId)
+                .gte('vencimento', format(vencimento, 'yyyy-MM-dd'))
+                .eq('user_id', user.id)
+                .order('vencimento', { ascending: true });
+
+            if (fetchError || !futureBoletosData) {
+                console.error("Erro ao buscar boletos futuros para ajuste de data:", fetchError);
+                // Proceed to fetch all to sync state, but warn user
+                toast({ title: "Aviso", description: "Campos atualizados, mas houve erro ao ajustar datas futuras.", variant: "default" });
+                await fetchBoletos();
+                return { data: updatedBoleto };
+            }
+
             // 3. Handle VENCIMENTO update separately for each future boleto
             const dayOfMonth = getDate(vencimento);
-            const month = getMonth(vencimento);
-            const year = getYear(vencimento);
             
-            // We iterate over the future boletos and update their dates sequentially
-            for (let i = 0; i < futureBoletos.length; i++) {
-                const currentBoleto = futureBoletos[i];
+            for (let i = 0; i < futureBoletosData.length; i++) {
+                const currentDbBoleto = futureBoletosData[i];
                 
                 // Calculate the target date: start from the updated month/year and add 'i' months
-                let targetDate = setDate(setMonth(setYear(vencimento, year), month), dayOfMonth);
+                let targetDate = setDate(vencimento, dayOfMonth);
                 targetDate = addMonths(targetDate, i);
                 
                 // Ensure the date is set to noon to prevent timezone issues on save
@@ -262,23 +278,22 @@ export function useBoletos() {
                 const { error: dateError } = await supabase
                     .from('boletos')
                     .update({
-                        vencimento: correctedTargetDate.toISOString().split('T')[0],
+                        vencimento: format(correctedTargetDate, 'yyyy-MM-dd'),
                         // Only update data_pagamento for the current boleto if it was changed
-                        ...(currentBoleto.id === updatedBoleto.id && { data_pagamento: dataPagamento?.toISOString().split('T')[0] || null })
+                        ...(currentDbBoleto.id === updatedBoleto.id && { data_pagamento: dataPagamento ? format(dataPagamento, 'yyyy-MM-dd') : null })
                     })
-                    .eq('id', currentBoleto.id)
+                    .eq('id', currentDbBoleto.id)
                     .eq('user_id', user.id);
 
                 if (dateError) {
-                    console.error(`Erro ao atualizar data do boleto ${currentBoleto.id}:`, dateError);
-                    // Continue loop but log error
+                    console.error(`Erro ao atualizar data do boleto ${currentDbBoleto.id}:`, dateError);
                 }
             }
+            
+            // Re-fetch all boletos to ensure all affected recurring items are updated in state
+            await fetchBoletos()
         }
 
-        // Re-fetch all boletos to ensure all affected recurring items are updated in state
-        await fetchBoletos()
-        
         toast({ title: "Sucesso", description: `Boleto(s) atualizado(s) com sucesso.` })
         return { data: updatedBoleto }
     }
@@ -289,11 +304,12 @@ export function useBoletos() {
         const currentBoleto = boletos.find(b => b.id === boletoId);
         if (!currentBoleto) return { error: { message: "Boleto não encontrado." } }
 
-        const paymentDate = newStatus === 'paid' ? (customPaymentDate || setHours(new Date(), 12)) : undefined;
+        // Ensure paymentDate is fixed at noon if provided
+        const paymentDate = newStatus === 'paid' ? (customPaymentDate ? setHours(customPaymentDate, 12) : setHours(new Date(), 12)) : undefined;
         
         const dbData = {
             status: newStatus,
-            data_pagamento: paymentDate ? paymentDate.toISOString().split('T')[0] : null,
+            data_pagamento: paymentDate ? format(paymentDate, 'yyyy-MM-dd') : null,
         }
 
         const { data, error } = await supabase
