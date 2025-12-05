@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Loader2 } from "lucide-react"
-import { fetchCNPJData, formatCNPJ, formatCPF, isValidCNPJ } from "@/lib/cnpj-api"
+import { fetchCNPJData, formatCNPJ, formatCPF, isValidCNPJ, formatPhone } from "@/lib/formatters" // Importando de formatters
 
 type NewClientModalProps = {
     open: boolean
@@ -86,7 +86,10 @@ export function NewClientModal({ open, onOpenChange, onSubmit }: NewClientModalP
 
         setCnpjError("")
 
-        if (!isValidCNPJ(formData.cnpj)) {
+        // Remove formatting before validation
+        const cleanCNPJ = formData.cnpj.replace(/\D/g, '')
+
+        if (!isValidCNPJ(cleanCNPJ)) {
             setCnpjError("CNPJ inválido")
             return
         }
@@ -183,8 +186,9 @@ export function NewClientModal({ open, onOpenChange, onSubmit }: NewClientModalP
                                     <Input
                                         id="pf-phone"
                                         value={formData.phone}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, phone: formatPhone(e.target.value) }))}
                                         placeholder="(00) 00000-0000"
+                                        maxLength={15}
                                         required
                                     />
                                 </div>
@@ -265,8 +269,9 @@ export function NewClientModal({ open, onOpenChange, onSubmit }: NewClientModalP
                                         <Input
                                             id="pj-contato-responsavel"
                                             value={formData.contatoResponsavel}
-                                            onChange={(e) => setFormData(prev => ({ ...prev, contatoResponsavel: e.target.value }))}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, contatoResponsavel: formatPhone(e.target.value) }))}
                                             placeholder="(00) 00000-0000"
+                                            maxLength={15}
                                         />
                                     </div>
                                 </div>
@@ -287,8 +292,9 @@ export function NewClientModal({ open, onOpenChange, onSubmit }: NewClientModalP
                                     <Input
                                         id="pj-phone"
                                         value={formData.phone}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, phone: formatPhone(e.target.value) }))}
                                         placeholder="(00) 00000-0000"
+                                        maxLength={15}
                                         required
                                     />
                                 </div>

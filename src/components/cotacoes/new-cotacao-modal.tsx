@@ -32,7 +32,7 @@ import {
     Commission, // Importando Commission type
 } from "@/types/cotacao"
 import { useRepresentations } from "@/hooks/data/useRepresentations"
-import { fetchCNPJData, formatCNPJ, formatCPF, isValidCNPJ } from "@/lib/cnpj-api"
+import { fetchCNPJData, formatCNPJ, formatCPF, isValidCNPJ, formatCurrencyInput, parseCurrencyToFloat } from "@/lib/formatters" // Importando formatters
 import { VehicleService } from "@/services/VehicleService"
 import type { PlacaData } from "@/types/vehicle"
 import { useToast } from "@/hooks/use-toast"
@@ -92,33 +92,49 @@ export function NewCotacaoModal({ isOpen, onClose, onSubmit }: NewCotacaoModalPr
     const [chassi, setChassi] = useState("")
     const [renavam, setRenavam] = useState("")
     const [codigoFipe, setCodigoFipe] = useState("")
-    const [valorFipe, setValorFipe] = useState("")
+    
+    // Currency fields (formatted for display)
+    const [valorFipeFormatted, setValorFipeFormatted] = useState("")
+    const [valorPatrimonioFormatted, setValorPatrimonioFormatted] = useState("")
+    const [valorTotalFormatted, setValorTotalFormatted] = useState("")
+    const [danosMateriaisFormatted, setDanosMateriaisFormatted] = useState("")
+    const [danosCorporaisFormatted, setDanosCorporaisFormatted] = useState("")
+    const [danosMoraisFormatted, setDanosMoraisFormatted] = useState("")
+    const [appFormatted, setAppFormatted] = useState("")
+    const [valorSeguradoFormatted, setValorSeguradoFormatted] = useState("")
+    const [anuidadeFormatted, setAnuidadeFormatted] = useState("")
+    const [comissaoValueFormatted, setComissaoValueFormatted] = useState("")
 
-    // Residencial fields
-    const [valorPatrimonio, setValorPatrimonio] = useState("")
+    // Raw values for submission (stored as strings)
+    const [valorFipeRaw, setValorFipeRaw] = useState("")
+    const [valorPatrimonioRaw, setValorPatrimonioRaw] = useState("")
+    const [valorTotalRaw, setValorTotalRaw] = useState("")
+    const [danosMateriaisRaw, setDanosMateriaisRaw] = useState("")
+    const [danosCorporaisRaw, setDanosCorporaisRaw] = useState("")
+    const [danosMoraisRaw, setDanosMoraisRaw] = useState("")
+    const [appRaw, setAppRaw] = useState("")
+    const [valorSeguradoRaw, setValorSeguradoRaw] = useState("")
+    const [anuidadeRaw, setAnuidadeRaw] = useState("")
+    const [comissaoValueRaw, setComissaoValueRaw] = useState("")
+
+
+    // Other fields
     const [endereco, setEndereco] = useState("")
-
-    // Carga fields
-    const [valorTotal, setValorTotal] = useState("")
-
-    // Terceiros fields
-    const [danosMateriais, setDanosMateriais] = useState("")
-    const [danosCorporais, setDanosCorporais] = useState("")
-    const [danosMorais, setDanosMorais] = useState("")
-    const [app, setApp] = useState("")
-
-    // Outros fields
     const [descricao, setDescricao] = useState("")
-    const [valorSegurado, setValorSegurado] = useState("")
-
-    // Payment fields
-    const [anuidade, setAnuidade] = useState("")
     const [parcelas, setParcelas] = useState<PaymentInstallments>(1)
-
-    // Commission fields
     const [comissaoType, setComissaoType] = useState<CommissionType>("recorrente_indeterminada")
-    const [comissaoValue, setComissaoValue] = useState("")
     const [comissaoInstallments, setComissaoInstallments] = useState("")
+
+    // Helper to handle currency input changes
+    const handleCurrencyChange = (e: React.ChangeEvent<HTMLInputElement>, setFormatted: React.Dispatch<React.SetStateAction<string>>, setRaw: React.Dispatch<React.SetStateAction<string>>) => {
+        const rawValue = e.target.value;
+        const formattedValue = formatCurrencyInput(rawValue);
+        setFormatted(formattedValue);
+        
+        // Update raw state with the float value converted back to string for storage
+        const floatValue = parseCurrencyToFloat(formattedValue);
+        setRaw(floatValue > 0 ? floatValue.toFixed(2) : "");
+    }
 
     // CPF/CNPJ lookup
     useEffect(() => {
@@ -161,7 +177,11 @@ export function NewCotacaoModal({ isOpen, onClose, onSubmit }: NewCotacaoModalPr
                 setChassi(data.chassi || "");
                 setRenavam(data.renavam || "");
                 setCodigoFipe(data.fipeCode || "");
-                setValorFipe(data.fipeValue || "");
+                
+                const fipeValue = data.fipeValue || "";
+                setValorFipeRaw(fipeValue);
+                setValorFipeFormatted(fipeValue ? formatCurrencyInput(fipeValue) : "");
+
                 toast({ title: "Sucesso", description: "Dados do veículo carregados." })
             } else {
                 setPlacaError('Placa não encontrada na base de dados externa. Preencha manualmente.');
@@ -173,7 +193,8 @@ export function NewCotacaoModal({ isOpen, onClose, onSubmit }: NewCotacaoModalPr
                 setChassi("");
                 setRenavam("");
                 setCodigoFipe("");
-                setValorFipe("");
+                setValorFipeRaw("");
+                setValorFipeFormatted("");
             }
 
         } catch (error) {
@@ -189,7 +210,8 @@ export function NewCotacaoModal({ isOpen, onClose, onSubmit }: NewCotacaoModalPr
             setChassi("");
             setRenavam("");
             setCodigoFipe("");
-            setValorFipe("");
+            setValorFipeRaw("");
+            setValorFipeFormatted("");
         } finally {
             setIsLoadingPlaca(false)
         }
@@ -216,36 +238,36 @@ export function NewCotacaoModal({ isOpen, onClose, onSubmit }: NewCotacaoModalPr
                     chassi,
                     renavam,
                     codigoFipe,
-                    valorFipe: parseFloat(valorFipe),
+                    valorFipe: parseCurrencyToFloat(valorFipeFormatted),
                 }
                 break
             case "residencial":
                 asset = {
                     type: "residencial",
-                    valorPatrimonio: parseFloat(valorPatrimonio),
+                    valorPatrimonio: parseCurrencyToFloat(valorPatrimonioFormatted),
                     endereco,
                 }
                 break
             case "carga":
                 asset = {
                     type: "carga",
-                    valorTotal: parseFloat(valorTotal),
+                    valorTotal: parseCurrencyToFloat(valorTotalFormatted),
                 }
                 break
             case "terceiros":
                 asset = {
                     type: "terceiros",
-                    danosMateriais: parseFloat(danosMateriais),
-                    danosCorporais: parseFloat(danosCorporais),
-                    danosMorais: parseFloat(danosMorais),
-                    app: parseFloat(app),
+                    danosMateriais: parseCurrencyToFloat(danosMateriaisFormatted),
+                    danosCorporais: parseCurrencyToFloat(danosCorporaisFormatted),
+                    danosMorais: parseCurrencyToFloat(danosMoraisFormatted),
+                    app: parseCurrencyToFloat(appFormatted),
                 }
                 break
             case "outros":
                 asset = {
                     type: "outros",
                     descricao,
-                    valorSegurado: parseFloat(valorSegurado),
+                    valorSegurado: parseCurrencyToFloat(valorSeguradoFormatted),
                 }
                 break
         }
@@ -254,7 +276,7 @@ export function NewCotacaoModal({ isOpen, onClose, onSubmit }: NewCotacaoModalPr
 
         const commissionData: Commission = {
             type: comissaoType,
-            value: parseFloat(comissaoValue),
+            value: parseCurrencyToFloat(comissaoValueFormatted),
             installments:
                 comissaoType === "recorrente_determinada" ? parseInt(comissaoInstallments) : undefined,
         }
@@ -267,7 +289,7 @@ export function NewCotacaoModal({ isOpen, onClose, onSubmit }: NewCotacaoModalPr
             representacaoId: representacaoId || undefined,
             representacaoNome: selectedPartner?.name,
             asset,
-            anuidade: parseFloat(anuidade),
+            anuidade: parseCurrencyToFloat(anuidadeFormatted),
             parcelas,
             comissao: commissionData, // Corrigido: Passando o objeto Commission
         }
@@ -293,21 +315,32 @@ export function NewCotacaoModal({ isOpen, onClose, onSubmit }: NewCotacaoModalPr
         setChassi("")
         setRenavam("")
         setCodigoFipe("")
-        setValorFipe("")
-        setValorPatrimonio("")
+        setValorFipeFormatted("")
+        setValorPatrimonioFormatted("")
         setEndereco("")
-        setValorTotal("")
-        setDanosMateriais("")
-        setDanosCorporais("")
-        setDanosMorais("")
-        setApp("")
+        setValorTotalFormatted("")
+        setDanosMateriaisFormatted("")
+        setDanosCorporaisFormatted("")
+        setDanosMoraisFormatted("")
+        setAppFormatted("")
         setDescricao("")
-        setValorSegurado("")
-        setAnuidade("")
+        setValorSeguradoFormatted("")
+        setAnuidadeFormatted("")
         setParcelas(1)
         setComissaoType("recorrente_indeterminada")
-        setComissaoValue("")
+        setComissaoValueFormatted("")
         setComissaoInstallments("")
+        // Reset raw values
+        setValorFipeRaw("")
+        setValorPatrimonioRaw("")
+        setValorTotalRaw("")
+        setDanosMateriaisRaw("")
+        setDanosCorporaisRaw("")
+        setDanosMoraisRaw("")
+        setAppRaw("")
+        setValorSeguradoRaw("")
+        setAnuidadeRaw("")
+        setComissaoValueRaw("")
         onClose()
     }
 
@@ -364,8 +397,8 @@ export function NewCotacaoModal({ isOpen, onClose, onSubmit }: NewCotacaoModalPr
                             <Label htmlFor="cpfCnpj">{clientType === "PF" ? "CPF" : "CNPJ"} *</Label>
                             <Input
                                 id="cpfCnpj"
-                                value={cpfCnpj}
-                                onChange={(e) => setCpfCnpj(e.target.value)}
+                                value={clientType === "PF" ? formatCPF(cpfCnpj) : formatCNPJ(cpfCnpj)}
+                                onChange={(e) => setCpfCnpj(e.target.value.replace(/\D/g, ''))}
                                 placeholder={clientType === "PF" ? "000.000.000-00" : "00.000.000/0000-00"}
                             />
                             <p className="text-xs text-muted-foreground">
@@ -511,10 +544,10 @@ export function NewCotacaoModal({ isOpen, onClose, onSubmit }: NewCotacaoModalPr
                                     <div className="space-y-2 col-span-2">
                                         <Label>Valor FIPE (R$) *</Label>
                                         <Input
-                                            type="number"
-                                            value={valorFipe}
-                                            onChange={(e) => setValorFipe(e.target.value)}
-                                            placeholder="0.00"
+                                            type="text"
+                                            value={valorFipeFormatted}
+                                            onChange={(e) => handleCurrencyChange(e, setValorFipeFormatted, setValorFipeRaw)}
+                                            placeholder="0,00"
                                         />
                                     </div>
                                 </div>
@@ -525,10 +558,10 @@ export function NewCotacaoModal({ isOpen, onClose, onSubmit }: NewCotacaoModalPr
                                     <div className="space-y-2">
                                         <Label>Valor do Patrimônio (R$) *</Label>
                                         <Input
-                                            type="number"
-                                            value={valorPatrimonio}
-                                            onChange={(e) => setValorPatrimonio(e.target.value)}
-                                            placeholder="0.00"
+                                            type="text"
+                                            value={valorPatrimonioFormatted}
+                                            onChange={(e) => handleCurrencyChange(e, setValorPatrimonioFormatted, setValorPatrimonioRaw)}
+                                            placeholder="0,00"
                                         />
                                     </div>
                                     <div className="space-y-2">
@@ -547,10 +580,10 @@ export function NewCotacaoModal({ isOpen, onClose, onSubmit }: NewCotacaoModalPr
                                 <div className="space-y-2">
                                     <Label>Valor Total (R$) *</Label>
                                     <Input
-                                        type="number"
-                                        value={valorTotal}
-                                        onChange={(e) => setValorTotal(e.target.value)}
-                                        placeholder="0.00"
+                                        type="text"
+                                        value={valorTotalFormatted}
+                                        onChange={(e) => handleCurrencyChange(e, setValorTotalFormatted, setValorTotalRaw)}
+                                        placeholder="0,00"
                                     />
                                 </div>
                             )}
@@ -560,37 +593,37 @@ export function NewCotacaoModal({ isOpen, onClose, onSubmit }: NewCotacaoModalPr
                                     <div className="space-y-2">
                                         <Label>Danos Materiais (R$) *</Label>
                                         <Input
-                                            type="number"
-                                            value={danosMateriais}
-                                            onChange={(e) => setDanosMateriais(e.target.value)}
-                                            placeholder="0.00"
+                                            type="text"
+                                            value={danosMateriaisFormatted}
+                                            onChange={(e) => handleCurrencyChange(e, setDanosMateriaisFormatted, setDanosMateriaisRaw)}
+                                            placeholder="0,00"
                                         />
                                     </div>
                                     <div className="space-y-2">
                                         <Label>Danos Corporais (R$) *</Label>
                                         <Input
-                                            type="number"
-                                            value={danosCorporais}
-                                            onChange={(e) => setDanosCorporais(e.target.value)}
-                                            placeholder="0.00"
+                                            type="text"
+                                            value={danosCorporaisFormatted}
+                                            onChange={(e) => handleCurrencyChange(e, setDanosCorporaisFormatted, setDanosCorporaisRaw)}
+                                            placeholder="0,00"
                                         />
                                     </div>
                                     <div className="space-y-2">
                                         <Label>Danos Morais (R$) *</Label>
                                         <Input
-                                            type="number"
-                                            value={danosMorais}
-                                            onChange={(e) => setDanosMorais(e.target.value)}
-                                            placeholder="0.00"
+                                            type="text"
+                                            value={danosMoraisFormatted}
+                                            onChange={(e) => handleCurrencyChange(e, setDanosMoraisFormatted, setDanosMoraisRaw)}
+                                            placeholder="0,00"
                                         />
                                     </div>
                                     <div className="space-y-2">
                                         <Label>APP (R$) *</Label>
                                         <Input
-                                            type="number"
-                                            value={app}
-                                            onChange={(e) => setApp(e.target.value)}
-                                            placeholder="0.00"
+                                            type="text"
+                                            value={appFormatted}
+                                            onChange={(e) => handleCurrencyChange(e, setAppFormatted, setAppRaw)}
+                                            placeholder="0,00"
                                         />
                                     </div>
                                 </div>
@@ -610,10 +643,10 @@ export function NewCotacaoModal({ isOpen, onClose, onSubmit }: NewCotacaoModalPr
                                     <div className="space-y-2">
                                         <Label>Valor Segurado (R$) *</Label>
                                         <Input
-                                            type="number"
-                                            value={valorSegurado}
-                                            onChange={(e) => setValorSegurado(e.target.value)}
-                                            placeholder="0.00"
+                                            type="text"
+                                            value={valorSeguradoFormatted}
+                                            onChange={(e) => handleCurrencyChange(e, setValorSeguradoFormatted, setValorSeguradoRaw)}
+                                            placeholder="0,00"
                                         />
                                     </div>
                                 </div>
@@ -629,10 +662,10 @@ export function NewCotacaoModal({ isOpen, onClose, onSubmit }: NewCotacaoModalPr
                                 <div className="space-y-2">
                                     <Label>Anuidade (R$) *</Label>
                                     <Input
-                                        type="number"
-                                        value={anuidade}
-                                        onChange={(e) => setAnuidade(e.target.value)}
-                                        placeholder="0.00"
+                                        type="text"
+                                        value={anuidadeFormatted}
+                                        onChange={(e) => handleCurrencyChange(e, setAnuidadeFormatted, setAnuidadeRaw)}
+                                        placeholder="0,00"
                                     />
                                 </div>
                                 <div className="space-y-2">
@@ -678,10 +711,10 @@ export function NewCotacaoModal({ isOpen, onClose, onSubmit }: NewCotacaoModalPr
                                 <div className="space-y-2">
                                     <Label>Valor da Comissão (R$) *</Label>
                                     <Input
-                                        type="number"
-                                        value={comissaoValue}
-                                        onChange={(e) => setComissaoValue(e.target.value)}
-                                        placeholder="0.00"
+                                        type="text"
+                                        value={comissaoValueFormatted}
+                                        onChange={(e) => handleCurrencyChange(e, setComissaoValueFormatted, setComissaoValueRaw)}
+                                        placeholder="0,00"
                                     />
                                 </div>
                                 {comissaoType === "recorrente_determinada" && (
@@ -707,7 +740,7 @@ export function NewCotacaoModal({ isOpen, onClose, onSubmit }: NewCotacaoModalPr
                     </Button>
                     <Button
                         onClick={handleSubmit}
-                        disabled={!cpfCnpj || !razaoSocialNome || !anuidade || !comissaoValue}
+                        disabled={!cpfCnpj || !razaoSocialNome || !anuidadeRaw || !comissaoValueRaw}
                     >
                         <Save className="mr-2 h-4 w-4" />
                         Salvar Cotação

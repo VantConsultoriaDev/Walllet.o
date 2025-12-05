@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/popover"
 import { RecurrenceActionDialog } from "./recurrence-action-dialog"
 import { useRepresentations } from "@/hooks/data/useRepresentations"
+import { formatCurrencyInput, parseCurrencyToFloat } from "@/lib/formatters" // Importando formatters
 
 export type TransactionType = "income" | "expense"
 
@@ -60,7 +61,7 @@ export function NewTransactionModal({ open, onOpenChange, onSubmit, onDelete, tr
 
     const [type, setType] = useState<TransactionType>("income")
     const [description, setDescription] = useState("")
-    const [amount, setAmount] = useState("")
+    const [amountFormatted, setAmountFormatted] = useState("") // Stored as formatted string
     const [category, setCategory] = useState("")
     const [date, setDate] = useState<Date | undefined>(new Date())
     const [isRecurrent, setIsRecurrent] = useState(false)
@@ -75,7 +76,7 @@ export function NewTransactionModal({ open, onOpenChange, onSubmit, onDelete, tr
             if (transactionToEdit) {
                 setType(transactionToEdit.type)
                 setDescription(transactionToEdit.description)
-                setAmount(transactionToEdit.amount.toString().replace(".", ","))
+                setAmountFormatted(formatCurrencyInput(transactionToEdit.amount.toString()))
                 setCategory(transactionToEdit.category)
                 setDate(transactionToEdit.date)
                 setIsRecurrent(transactionToEdit.isRecurrent)
@@ -84,7 +85,7 @@ export function NewTransactionModal({ open, onOpenChange, onSubmit, onDelete, tr
             } else {
                 setType("income")
                 setDescription("")
-                setAmount("")
+                setAmountFormatted("")
                 setCategory("")
                 setDate(new Date())
                 setIsRecurrent(false)
@@ -95,7 +96,7 @@ export function NewTransactionModal({ open, onOpenChange, onSubmit, onDelete, tr
     }, [open, transactionToEdit])
 
     const handleSaveClick = () => {
-        if (!description || !amount || !category || !date) return
+        if (!description || !amountFormatted || !category || !date) return
 
         if (transactionToEdit?.isRecurrent) {
             setPendingAction("save")
@@ -130,11 +131,12 @@ export function NewTransactionModal({ open, onOpenChange, onSubmit, onDelete, tr
 
     const submitTransaction = (scope?: "this" | "all") => {
         const representacaoNome = representacaoId ? partners.find(r => r.id === representacaoId)?.name : undefined
+        const floatAmount = parseCurrencyToFloat(amountFormatted)
 
         const newTransaction: Transaction = {
             id: transactionToEdit?.id || Math.random().toString(36).substr(2, 9),
             description,
-            amount: parseFloat(amount.replace(",", ".")),
+            amount: floatAmount,
             type,
             category,
             date: date!,
@@ -177,10 +179,10 @@ export function NewTransactionModal({ open, onOpenChange, onSubmit, onDelete, tr
                             <div className="space-y-2">
                                 <Label>Valor (R$)</Label>
                                 <Input
-                                    type="number"
+                                    type="text" // Changed to text for formatting
                                     placeholder="0,00"
-                                    value={amount}
-                                    onChange={(e) => setAmount(e.target.value)}
+                                    value={amountFormatted}
+                                    onChange={(e) => setAmountFormatted(formatCurrencyInput(e.target.value))}
                                 />
                             </div>
                         </div>
@@ -309,7 +311,7 @@ export function NewTransactionModal({ open, onOpenChange, onSubmit, onDelete, tr
                                 <X className="mr-2 h-4 w-4" />
                                 Cancelar
                             </Button>
-                            <Button onClick={handleSaveClick} disabled={!description || !amount || !category || !date}>
+                            <Button onClick={handleSaveClick} disabled={!description || !amountFormatted || !category || !date}>
                                 <Save className="mr-2 h-4 w-4" />
                                 Salvar
                             </Button>

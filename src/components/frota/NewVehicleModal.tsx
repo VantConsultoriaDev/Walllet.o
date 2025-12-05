@@ -22,7 +22,8 @@ import { VehicleService } from "@/services/VehicleService"
 import type { PlacaData } from "@/types/vehicle"
 import { useToast } from "@/hooks/use-toast"
 import type { Vehicle, VehicleType } from "@/hooks/data/useVehicles"
-import { ConfirmationDialog } from "@/components/ui/confirmation-dialog" // Importando o novo componente
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
+import { formatCurrencyInput, parseCurrencyToFloat } from "@/lib/formatters" // Importando formatters
 
 type NewVehicleModalProps = {
     open: boolean
@@ -46,21 +47,29 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, onDelete, vehicl
     const [placaError, setPlacaError] = useState("")
     const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false) // Novo estado para o modal de confirmação
     
-    // Reset form when modal opens/closes or when editing a different vehicle
+    // State for formatted currency inputs (since they are stored as strings in formData)
+    const [fipeValueFormatted, setFipeValueFormatted] = useState("")
+    const [bodyValueFormatted, setBodyValueFormatted] = useState("")
+    const [contractValueFormatted, setContractValueFormatted] = useState("")
+
+    // Sync form data and formatted values when modal opens/closes or when editing a different vehicle
     useEffect(() => {
         if (open) {
             if (vehicleToEdit) {
                 setType(vehicleToEdit.type)
                 setFormData(vehicleToEdit)
+                setFipeValueFormatted(vehicleToEdit.fipeValue ? formatCurrencyInput(vehicleToEdit.fipeValue) : "")
+                setBodyValueFormatted(vehicleToEdit.bodyValue ? formatCurrencyInput(vehicleToEdit.bodyValue) : "")
+                setContractValueFormatted(vehicleToEdit.value ? formatCurrencyInput(vehicleToEdit.value) : "")
             } else {
-                // Reset para novo veículo, garantindo que o ano não seja preenchido automaticamente
+                // Reset para novo veículo
                 setFormData({ 
                     status: "active",
                     clientId: clientId,
                     plate: "",
                     brand: "",
                     model: "",
-                    year: undefined, // <-- Inicializa como undefined
+                    year: undefined,
                     color: "",
                     renavam: "",
                     chassi: "",
@@ -71,6 +80,9 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, onDelete, vehicl
                     value: "",
                 });
                 setType("CARRO")
+                setFipeValueFormatted("")
+                setBodyValueFormatted("")
+                setContractValueFormatted("")
             }
             setPlacaError("")
         } 
@@ -83,6 +95,20 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, onDelete, vehicl
         const parsed = parseInt(value);
         return isNaN(parsed) ? fallback : parsed;
     };
+
+    // Handler for currency input changes
+    const handleCurrencyChange = (e: React.ChangeEvent<HTMLInputElement>, setter: React.Dispatch<React.SetStateAction<string>>, field: keyof Partial<Vehicle>) => {
+        const rawValue = e.target.value;
+        const formattedValue = formatCurrencyInput(rawValue);
+        setter(formattedValue);
+        
+        // Update formData with the raw float value converted back to string for storage
+        const floatValue = parseCurrencyToFloat(formattedValue);
+        setFormData(prev => ({ 
+            ...prev, 
+            [field]: floatValue > 0 ? floatValue.toFixed(2) : "" 
+        }));
+    }
 
     // --- CONSULTA API PLACA ---
     const handlePlacaConsultation = useCallback(async (placa: string) => {
@@ -123,6 +149,10 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, onDelete, vehicl
                     setType(detectedType)
                 }
                 
+                // Formata o valor FIPE para exibição
+                const fipeValue = data.fipeValue || "";
+                setFipeValueFormatted(fipeValue ? formatCurrencyInput(fipeValue) : "");
+
                 // Atualiza os dados
                 setFormData(prev => ({
                     ...prev,
@@ -135,7 +165,7 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, onDelete, vehicl
                     chassi: data.chassi ? forceUpperCase(data.chassi) : "",
                     renavam: data.renavam || "",
                     fipeCode: data.fipeCode || "", // <-- Garantindo que o fipeCode seja mapeado
-                    fipeValue: data.fipeValue || "",
+                    fipeValue: fipeValue, // Armazena o valor bruto (string)
                     bodyType: data.categoria?.includes("CAMINHAO") ? data.categoria : "",
                 }))
                 toast({ title: "Sucesso", description: "Dados da placa carregados automaticamente." })
@@ -154,6 +184,7 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, onDelete, vehicl
                     fipeValue: "",
                     bodyType: "",
                 }))
+                setFipeValueFormatted("")
             }
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'Falha ao consultar placa. Verifique a configuração da API.';
@@ -172,6 +203,7 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, onDelete, vehicl
                 fipeValue: "",
                 bodyType: "",
             }))
+            setFipeValueFormatted("")
         } finally {
             setLoading(false);
         }
@@ -204,6 +236,10 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, onDelete, vehicl
                 ...formData,
                 clientId: formData.clientId,
                 year: finalYear,
+                // Ensure values are stored as strings (or undefined)
+                fipeValue: formData.fipeValue || undefined,
+                bodyValue: formData.bodyValue || undefined,
+                value: formData.value || undefined,
             } as Vehicle)
             onOpenChange(false)
         } else {
@@ -268,9 +304,10 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, onDelete, vehicl
                 <div className="space-y-2">
                     <Label>Valor Contrato (R$)</Label>
                     <Input 
-                        value={formData.value || ""} 
-                        onChange={e => setFormData({ ...formData, value: e.target.value })} 
-                        placeholder="0.00"
+                        value={contractValueFormatted} 
+                        onChange={(e) => handleCurrencyChange(e, setContractValueFormatted, 'value')}
+                        placeholder="0,00"
+                        type="text"
                     />
                 </div>
             )}
@@ -283,7 +320,12 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, onDelete, vehicl
                 </div>
                 <div className="space-y-2">
                     <Label>Valor Fipe (R$)</Label>
-                    <Input value={formData.fipeValue || ""} onChange={e => setFormData({ ...formData, fipeValue: e.target.value })} />
+                    <Input 
+                        value={fipeValueFormatted} 
+                        onChange={(e) => handleCurrencyChange(e, setFipeValueFormatted, 'fipeValue')}
+                        placeholder="0,00"
+                        type="text"
+                    />
                 </div>
             </div>
         </div>
@@ -367,7 +409,12 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, onDelete, vehicl
                                         </div>
                                         <div className="space-y-2">
                                             <Label>Valor Carroceria</Label>
-                                            <Input value={formData.bodyValue || ""} onChange={e => setFormData({ ...formData, bodyValue: e.target.value })} />
+                                            <Input 
+                                                value={bodyValueFormatted} 
+                                                onChange={(e) => handleCurrencyChange(e, setBodyValueFormatted, 'bodyValue')}
+                                                placeholder="0,00"
+                                                type="text"
+                                            />
                                         </div>
                                     </div>
                                     {renderFipeFields()}
@@ -378,7 +425,12 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, onDelete, vehicl
                                 <div className="space-y-4">
                                     <div className="space-y-2">
                                         <Label>Valor (Carreta) (R$)</Label>
-                                        <Input value={formData.value || ""} onChange={e => setFormData({ ...formData, value: e.target.value })} />
+                                        <Input 
+                                            value={contractValueFormatted} 
+                                            onChange={(e) => handleCurrencyChange(e, setContractValueFormatted, 'value')}
+                                            placeholder="0,00"
+                                            type="text"
+                                        />
                                     </div>
                                 </div>
                             )}

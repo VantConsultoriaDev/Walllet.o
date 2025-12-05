@@ -33,6 +33,7 @@ import { useBoletos } from "@/hooks/data/useBoletos"
 import { RecurrenceActionDialog } from "../financeiro/recurrence-action-dialog"
 import { v4 as uuidv4 } from 'uuid'
 import { BoletoDetailsModal } from "./boleto-details-modal"
+import { formatCurrencyInput, parseCurrencyToFloat } from "@/lib/formatters" // Importando formatters
 
 interface ClientFinanceiroProps {
     client: any
@@ -41,48 +42,6 @@ interface ClientFinanceiroProps {
 
 type SortField = "vencimento" | "valor" | "placas" | "representacao"
 type SortDirection = "asc" | "desc" | null
-
-// Utility function to format currency input
-const formatCurrencyInput = (value: string): string => {
-    // 1. Remove all non-digit characters except comma
-    let cleanValue = value.replace(/[^\d,]/g, '')
-    
-    // 2. Ensure only one comma is present
-    const parts = cleanValue.split(',')
-    if (parts.length > 2) {
-        cleanValue = parts[0] + ',' + parts.slice(1).join('')
-    }
-
-    // 3. Remove leading zeros unless it's "0," or just "0"
-    if (cleanValue.length > 1 && cleanValue.startsWith('0') && !cleanValue.startsWith('0,')) {
-        cleanValue = cleanValue.substring(1)
-    }
-
-    // Simple BRL formatting simulation: 
-    // Remove all non-digits, treat as cents, then format.
-    const digits = cleanValue.replace(/\D/g, '')
-    if (digits.length === 0) return ""
-
-    // Treat as cents
-    let number = parseInt(digits, 10) / 100
-    
-    return number.toLocaleString('pt-BR', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-        useGrouping: true,
-    })
-}
-
-// Utility function to extract float value from formatted string
-const parseCurrencyToFloat = (formattedValue: string): number => {
-    // Remove R$, dots used for thousands, and replace comma with dot for decimals
-    const cleanValue = formattedValue
-        .replace(/[R$\s.]/g, '')
-        .replace(',', '.')
-    
-    return parseFloat(cleanValue) || 0
-}
-
 
 export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProps) {
     const { partners, loading: representationsLoading } = useRepresentations()
@@ -222,7 +181,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                 recurrenceType: isRecurring ? recurrenceType : undefined,
                 recurrenceMonths: isRecurring && recurrenceType === "limited" ? parseInt(recurrenceMonths) : undefined,
                 recurrenceGroupId,
-                comissaoRecorrente: comissaoRecorrente ? parseFloat(comissaoRecorrente) : undefined,
+                comissaoRecorrente: comissaoRecorrente ? parseCurrencyToFloat(comissaoRecorrente) : undefined,
                 comissaoTipo: comissaoRecorrente ? comissaoTipo : undefined,
                 clientId: client.id,
                 clientName: client.name,
@@ -698,10 +657,10 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                                         </Label>
                                         <Input
                                             id="comissao-valor"
-                                            type="number"
+                                            type="text" // Changed to text for formatting
                                             placeholder="0,00"
                                             value={comissaoRecorrente}
-                                            onChange={(e) => setComissaoRecorrente(e.target.value)}
+                                            onChange={(e) => setComissaoRecorrente(formatCurrencyInput(e.target.value))}
                                         />
                                     </div>
                                     <div className="grid gap-2">
