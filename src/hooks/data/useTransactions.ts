@@ -12,6 +12,56 @@ export function useTransactions() {
     const [loading, setLoading] = useState(true)
     const [isRefetching, setIsRefetching] = useState(false)
 
+    // --- Core CRUD Functions (Defined first for stability) ---
+
+    const updateTransaction = useCallback(async (updatedTransaction: Transaction) => {
+        if (!user) return { error: { message: "Usuário não autenticado" } }
+
+        const { id, ...updateData } = updatedTransaction;
+
+        const { error } = await supabase
+            .from('transactions')
+            .update({
+                ...updateData,
+                amount: updatedTransaction.amount.toFixed(2),
+                date: updatedTransaction.date.toISOString().split('T')[0],
+            })
+            .eq('id', id)
+            .select()
+
+        if (error) {
+            toast({ title: "Erro", description: "Falha ao atualizar transação.", variant: "destructive" })
+            return { error }
+        }
+
+        setTransactions(prev => prev.map(t => t.id === id ? updatedTransaction : t))
+        // Note: We skip the toast here if called internally by addExpectedCommissionTransaction
+        if (!updatedTransaction.description.includes("Comissão Esperada Boleto")) {
+            toast({ title: "Sucesso", description: "Transação atualizada com sucesso." })
+        }
+        return { data: updatedTransaction }
+    }, [user, toast])
+
+    const deleteTransaction = useCallback(async (id: string) => {
+        if (!user) return { error: { message: "Usuário não autenticado" } }
+
+        const { error } = await supabase
+            .from('transactions')
+            .delete()
+            .eq('id', id)
+
+        if (error) {
+            toast({ title: "Erro", description: "Falha ao excluir transação.", variant: "destructive" })
+            return { error }
+        }
+
+        setTransactions(prev => prev.filter(t => t.id !== id))
+        toast({ title: "Sucesso", description: "Transação excluída com sucesso." })
+        return { data: true }
+    }, [user, toast])
+
+    // --- Fetching Logic ---
+
     const fetchTransactions = useCallback(async () => {
         if (!user) {
             setLoading(false)
@@ -59,6 +109,8 @@ export function useTransactions() {
     useEffect(() => {
         fetchTransactions()
     }, [user, fetchTransactions])
+
+    // --- Add Logic ---
 
     const addTransaction = useCallback(async (newTransaction: Omit<Transaction, 'id'>) => {
         if (!user) return { error: { message: "Usuário não autenticado" } }
@@ -181,7 +233,8 @@ export function useTransactions() {
             if (existingTransaction.amount !== amount) {
                 // Se o valor mudou, atualiza a transação existente.
                 const updatedTransaction = { ...existingTransaction, amount: amount };
-                await updateTransaction(updatedTransaction);
+                // Chamada para a função de atualização definida acima
+                await updateTransaction(updatedTransaction); 
                 console.log(`Comissão ESPERADA para Boleto #${boletoId} atualizada.`);
                 return { data: updatedTransaction };
             }
@@ -224,53 +277,7 @@ export function useTransactions() {
 
         setTransactions(prev => [addedTransaction, ...prev])
         return { data: addedTransaction }
-    }, [user, transactions, updateTransaction]) // Adicionando transactions e updateTransaction como dependências
-
-    const updateTransaction = useCallback(async (updatedTransaction: Transaction) => {
-        if (!user) return { error: { message: "Usuário não autenticado" } }
-
-        const { id, ...updateData } = updatedTransaction;
-
-        const { error } = await supabase
-            .from('transactions')
-            .update({
-                ...updateData,
-                amount: updatedTransaction.amount.toFixed(2),
-                date: updatedTransaction.date.toISOString().split('T')[0],
-            })
-            .eq('id', id)
-            .select()
-
-        if (error) {
-            toast({ title: "Erro", description: "Falha ao atualizar transação.", variant: "destructive" })
-            return { error }
-        }
-
-        setTransactions(prev => prev.map(t => t.id === id ? updatedTransaction : t))
-        // Note: We skip the toast here if called internally by addExpectedCommissionTransaction
-        if (!updatedTransaction.description.includes("Comissão Esperada Boleto")) {
-            toast({ title: "Sucesso", description: "Transação atualizada com sucesso." })
-        }
-        return { data: updatedTransaction }
-    }, [user, toast])
-
-    const deleteTransaction = useCallback(async (id: string) => {
-        if (!user) return { error: { message: "Usuário não autenticado" } }
-
-        const { error } = await supabase
-            .from('transactions')
-            .delete()
-            .eq('id', id)
-
-        if (error) {
-            toast({ title: "Erro", description: "Falha ao excluir transação.", variant: "destructive" })
-            return { error }
-        }
-
-        setTransactions(prev => prev.filter(t => t.id !== id))
-        toast({ title: "Sucesso", description: "Transação excluída com sucesso." })
-        return { data: true }
-    }, [user, toast])
+    }, [user, transactions, updateTransaction]) // updateTransaction agora é uma dependência estável
 
     return { 
         transactions, 
