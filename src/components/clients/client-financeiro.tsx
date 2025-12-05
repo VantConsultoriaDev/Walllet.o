@@ -265,15 +265,18 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
         const recurrenceGroupId = isRecurring ? uuidv4() : undefined
         
         const monthsToGenerate = isRecurring
-            ? (recurrenceType === "indefinite" ? 24 : parseInt(recurrenceMonths))
+            ? (recurrenceType === "indefinite" ? 12 : parseInt(recurrenceMonths)) // FIX: Generate only 12 months initially for indefinite, or the specified number for limited
             : 1
 
         const boletosToSave: Omit<Boleto, 'id' | 'representacao' | 'dueDate'>[] = []
 
         for (let i = 0; i < monthsToGenerate; i++) {
+            // Ensure the date is set to noon (12h) to prevent timezone issues on save
+            const correctedVencimento = setHours(addMonths(vencimento, i), 12);
+
             boletosToSave.push({
                 valor: floatValor,
-                vencimento: addMonths(vencimento, i),
+                vencimento: correctedVencimento,
                 placas: selectedPlates,
                 representacaoId: representacaoId, // Save ID
                 status: "pending",
@@ -515,7 +518,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                                 <Calendar 
                                     mode="single" 
                                     selected={explicitDateFrom} 
-                                    onSelect={(date) => handleDateRangeChange(explicitDateFrom, date)} 
+                                    onSelect={(date) => handleDateRangeChange(date, explicitDateTo)} 
                                 />
                             </PopoverContent>
                         </Popover>
@@ -719,7 +722,8 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                                         mode="single"
                                         selected={vencimento}
                                         onSelect={(date) => {
-                                            setVencimento(date)
+                                            // Ensure date is set to noon (12h) to prevent timezone issues on save
+                                            setVencimento(setHours(date!, 12))
                                             setIsCalendarOpen(false)
                                         }}
                                         initialFocus
@@ -861,7 +865,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
 
                                     <p className="text-xs text-muted-foreground">
                                         {recurrenceType === "indefinite"
-                                            ? "Serão gerados boletos continuamente (simulado 24 meses)."
+                                            ? "Serão gerados boletos continuamente (lote inicial de 12 meses)."
                                             : `Serão criados ${recurrenceMonths} boletos mensais a partir da data de vencimento.`}
                                     </p>
                                 </div>
