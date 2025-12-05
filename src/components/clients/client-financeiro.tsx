@@ -108,7 +108,11 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
     const [comissaoTipo, setComissaoTipo] = useState<"percentual" | "valor">("valor")
     const [openPlateSelect, setOpenPlateSelect] = useState(false)
     const [plateSearch, setPlateSearch] = useState("")
-    const [isCalendarOpen, setIsCalendarOpen] = useState(false)
+    
+    // FIX: Renomeando o estado do calendário do filtro para evitar conflito com o modal
+    const [isFilterCalendarOpen, setIsFilterCalendarOpen] = useState(false) 
+    // FIX: Novo estado para o calendário do modal de Novo Boleto
+    const [isNewBoletoCalendarOpen, setIsNewBoletoCalendarOpen] = useState(false) 
     // --- End New Boleto Form State ---
 
 
@@ -501,7 +505,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
 
                     {/* Date Range Filter */}
                     <div className="flex gap-2 w-full md:w-auto">
-                        <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                        <Popover open={isFilterCalendarOpen} onOpenChange={setIsFilterCalendarOpen}>
                             <PopoverTrigger asChild>
                                 <Button 
                                     variant={activeFilterType === "range" && explicitDateFrom ? "default" : "outline"} 
@@ -517,12 +521,12 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                                     selected={explicitDateFrom} 
                                     onSelect={(date) => {
                                         handleDateRangeChange(date, explicitDateTo)
-                                        setIsCalendarOpen(false)
+                                        setIsFilterCalendarOpen(false)
                                     }} 
                                 />
                             </PopoverContent>
                         </Popover>
-                        <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                        <Popover open={isFilterCalendarOpen} onOpenChange={setIsFilterCalendarOpen}>
                             <PopoverTrigger asChild>
                                 <Button 
                                     variant={activeFilterType === "range" && explicitDateTo ? "default" : "outline"} 
@@ -538,7 +542,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                                     selected={explicitDateTo} 
                                     onSelect={(date) => {
                                         handleDateRangeChange(explicitDateFrom, date)
-                                        setIsCalendarOpen(false)
+                                        setIsFilterCalendarOpen(false)
                                     }} 
                                 />
                             </PopoverContent>
@@ -706,7 +710,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                         </div>
                         <div className="grid gap-2">
                             <Label>Vencimento</Label>
-                            <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                            <Popover open={isNewBoletoCalendarOpen} onOpenChange={setIsNewBoletoCalendarOpen}>
                                 <PopoverTrigger asChild>
                                     <Button
                                         variant={"outline"}
@@ -726,7 +730,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                                         onSelect={(date) => {
                                             // Ensure date is set to noon (12h) to prevent timezone issues on save
                                             setVencimento(setHours(date!, 12))
-                                            setIsCalendarOpen(false) // <-- FECHA O POPOVER AQUI
+                                            setIsNewBoletoCalendarOpen(false) // <-- FECHA O POPOVER AQUI
                                         }}
                                         initialFocus
                                     />
