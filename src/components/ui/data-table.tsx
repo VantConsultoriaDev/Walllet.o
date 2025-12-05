@@ -1,19 +1,15 @@
-import * as React from "react"
 import {
     ColumnDef,
-    ColumnFiltersState,
-    SortingState,
-    VisibilityState,
     flexRender,
     getCoreRowModel,
-    getFacetedRowModel,
-    getFacetedUniqueValues,
     getFilteredRowModel,
     getPaginationRowModel,
     getSortedRowModel,
     useReactTable,
+    type SortingState,
+    type ColumnFiltersState,
 } from "@tanstack/react-table"
-import { X } from "lucide-react"
+import { useState } from "react"
 
 import {
     Table,
@@ -23,17 +19,16 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-
 import { DataTablePagination } from "./data-table-pagination"
 import { DataTableToolbar, DataTableFilterConfig } from "./data-table-toolbar"
 
 interface DataTableProps<TData, TValue> {
     columns: ColumnDef<TData, TValue>[]
     data: TData[]
-    filters?: DataTableFilterConfig[]
+    filters: DataTableFilterConfig[]
     onRowClick?: (row: TData) => void
+    globalFilter: string
+    setGlobalFilter: (value: string) => void
 }
 
 export function DataTable<TData, TValue>({
@@ -41,40 +36,42 @@ export function DataTable<TData, TValue>({
     data,
     filters,
     onRowClick,
+    globalFilter,
+    setGlobalFilter,
 }: DataTableProps<TData, TValue>) {
-    const [rowSelection, setRowSelection] = React.useState({})
-    const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
-    const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
-    const [sorting, setSorting] = React.useState<SortingState>([])
-    const [globalFilter, setGlobalFilter] = React.useState("")
+    const [sorting, setSorting] = useState<SortingState>([])
+    const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
 
     const table = useReactTable({
         data,
         columns,
+        getCoreRowModel: getCoreRowModel(),
+        getPaginationRowModel: getPaginationRowModel(),
+        getSortedRowModel: getSortedRowModel(),
+        getFilteredRowModel: getFilteredRowModel(),
+        onSortingChange: setSorting,
+        onColumnFiltersChange: setColumnFilters,
+        onGlobalFilterChange: setGlobalFilter,
         state: {
             sorting,
-            columnVisibility,
-            rowSelection,
             columnFilters,
             globalFilter,
         },
-        enableRowSelection: true,
-        onRowSelectionChange: setRowSelection,
-        onSortingChange: setSorting,
-        onColumnFiltersChange: setColumnFilters,
-        onColumnVisibilityChange: setColumnVisibility,
-        onGlobalFilterChange: setGlobalFilter,
-        getCoreRowModel: getCoreRowModel(),
-        getFilteredRowModel: getFilteredRowModel(),
-        getPaginationRowModel: getPaginationRowModel(),
-        getSortedRowModel: getSortedRowModel(),
-        getFacetedRowModel: getFacetedRowModel(),
-        getFacetedUniqueValues: getFacetedUniqueValues(),
+        initialState: {
+            pagination: {
+                pageSize: 10,
+            },
+        },
     })
 
     return (
         <div className="space-y-4">
-            <DataTableToolbar table={table} filters={filters} />
+            <DataTableToolbar 
+                table={table} 
+                filters={filters} 
+                globalFilter={globalFilter}
+                setGlobalFilter={setGlobalFilter}
+            />
             <div className="rounded-md border">
                 <Table>
                     <TableHeader>
@@ -82,7 +79,7 @@ export function DataTable<TData, TValue>({
                             <TableRow key={headerGroup.id}>
                                 {headerGroup.headers.map((header) => {
                                     return (
-                                        <TableHead key={header.id} colSpan={header.colSpan}>
+                                        <TableHead key={header.id}>
                                             {header.isPlaceholder
                                                 ? null
                                                 : flexRender(
@@ -101,26 +98,20 @@ export function DataTable<TData, TValue>({
                                 <TableRow
                                     key={row.id}
                                     data-state={row.getIsSelected() && "selected"}
-                                    onClick={() => onRowClick?.(row.original)}
                                     className={onRowClick ? "cursor-pointer hover:bg-muted/50" : ""}
+                                    onClick={() => onRowClick && onRowClick(row.original)}
                                 >
                                     {row.getVisibleCells().map((cell) => (
                                         <TableCell key={cell.id}>
-                                            {flexRender(
-                                                cell.column.columnDef.cell,
-                                                cell.getContext()
-                                            )}
+                                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
                                         </TableCell>
                                     ))}
                                 </TableRow>
                             ))
                         ) : (
                             <TableRow>
-                                <TableCell
-                                    colSpan={columns.length}
-                                    className="h-24 text-center"
-                                >
-                                    Sem resultados.
+                                <TableCell colSpan={columns.length} className="h-24 text-center">
+                                    Nenhum resultado encontrado.
                                 </TableCell>
                             </TableRow>
                         )}
