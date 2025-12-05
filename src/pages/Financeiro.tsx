@@ -194,9 +194,7 @@ export default function Financeiro() {
         let totalComissaoConfirmada = 0;
         let totalDespesas = 0;
 
-        // 1. Faturamento (Soma dos valores dos boletos PAGOS listados)
-        // 2. Comissão Confirmada (Soma das comissões dos boletos PAGOS listados)
-        // 3. Comissão Esperada (Soma das comissões dos boletos PENDENTES/VENCIDOS listados)
+        // Itera sobre as linhas filtradas
         filteredRows.forEach(row => {
             if (row.isBoleto) {
                 const boleto = row as Boleto & { isBoleto: true };
@@ -209,25 +207,24 @@ export default function Financeiro() {
                         : boleto.comissaoRecorrente;
                 }
 
+                // 1. Faturamento (Boletos Pagos)
                 if (boleto.status === 'paid') {
                     totalFaturamento += boleto.valor;
+                    // 3. Comissão Confirmada (Comissão de Boletos Pagos)
                     totalComissaoConfirmada += commissionAmount;
-                } else {
-                    totalComissaoEsperada += commissionAmount;
                 }
+                
+                // 2. Comissão Esperada (Comissão de TODOS os boletos listados)
+                totalComissaoEsperada += commissionAmount;
+
             } else {
                 const transaction = row as Transaction & { isBoleto: false };
+                // 4. Despesas
                 if (transaction.type === 'expense') {
                     totalDespesas += transaction.amount;
                 }
-                // Transações de Receita (que não são comissão de boleto) são ignoradas nos KPIs de Faturamento/Comissão
             }
         });
-
-        // 4. Despesas (Transações de Despesa no Período)
-        // Já calculadas acima, mas garantindo que transações de despesa fora do filtro de boleto sejam incluídas
-        // NOTE: A filtragem principal (filteredRows) já garante que todas as linhas (boletos e transações)
-        // estão dentro do mês/ano de referência (data de comissão/transação).
 
         return {
             faturamento: totalFaturamento,
@@ -480,7 +477,7 @@ export default function Financeiro() {
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-yellow-600">{formatCurrency(comissaoEsperada)}</div>
-                        <p className="text-xs text-muted-foreground">Comissão de boletos pendentes/vencidos</p>
+                        <p className="text-xs text-muted-foreground">Comissão de todos os boletos listados</p>
                     </CardContent>
                 </Card>
                 

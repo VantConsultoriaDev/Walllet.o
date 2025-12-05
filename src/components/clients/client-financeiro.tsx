@@ -213,6 +213,35 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
         return filteredAndSortedBoletos.reduce((sum, boleto) => sum + boleto.valor, 0)
     }, [filteredAndSortedBoletos])
 
+    // --- KPI Calculations (Local Client View) ---
+    const { comissaoEsperada, comissaoConfirmada } = useMemo(() => {
+        let totalComissaoEsperada = 0;
+        let totalComissaoConfirmada = 0;
+
+        filteredAndSortedBoletos.forEach(boleto => {
+            // Calcula o valor da comissão
+            let commissionAmount = 0;
+            if (boleto.comissaoRecorrente && boleto.comissaoTipo) {
+                commissionAmount = boleto.comissaoTipo === 'percentual'
+                    ? (boleto.valor * boleto.comissaoRecorrente) / 100
+                    : boleto.comissaoRecorrente;
+            }
+
+            // Comissão Esperada (Comissão de TODOS os boletos listados)
+            totalComissaoEsperada += commissionAmount;
+
+            // Comissão Confirmada (Comissão de Boletos Pagos)
+            if (boleto.status === 'paid') {
+                totalComissaoConfirmada += commissionAmount;
+            }
+        });
+
+        return {
+            comissaoEsperada: totalComissaoEsperada,
+            comissaoConfirmada: totalComissaoConfirmada,
+        }
+    }, [filteredAndSortedBoletos])
+
 
     const handleInputValorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const rawValue = e.target.value
@@ -426,6 +455,18 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                 <Badge variant="secondary" className="text-xs">
                     {filteredAndSortedBoletos.length} {filteredAndSortedBoletos.length === 1 ? "Boleto" : "Boletos"}
                 </Badge>
+            </div>
+
+            {/* KPIs */}
+            <div className="grid gap-4 md:grid-cols-2">
+                <div className="p-4 rounded-lg border bg-card shadow-sm">
+                    <p className="text-sm font-medium text-muted-foreground">Comissão Esperada</p>
+                    <p className="text-xl font-bold text-yellow-600">{formatCurrency(comissaoEsperada)}</p>
+                </div>
+                <div className="p-4 rounded-lg border bg-card shadow-sm">
+                    <p className="text-sm font-medium text-muted-foreground">Comissão Confirmada</p>
+                    <p className="text-xl font-bold text-green-600">{formatCurrency(comissaoConfirmada)}</p>
+                </div>
             </div>
 
             {/* Filters */}
