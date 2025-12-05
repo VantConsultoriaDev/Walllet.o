@@ -65,6 +65,47 @@ export function useTransactions() {
         toast({ title: "Sucesso", description: "Transação excluída com sucesso." })
         return { data: true }
     }, [user, toast])
+    
+    const deleteExpectedCommissionTransaction = useCallback(async (boletoId: string) => {
+        if (!user) return { error: { message: "Usuário não autenticado" } }
+
+        const descriptionPrefix = `Comissão Esperada Boleto #${boletoId}`;
+        
+        // 1. Encontrar a transação esperada no DB
+        const { data: existingData, error: fetchError } = await supabase
+            .from('transactions')
+            .select('id')
+            .like('description', `${descriptionPrefix}%`)
+            .eq('category', 'Comissão Esperada')
+            .eq('user_id', user.id);
+
+        if (fetchError) {
+            console.error("Erro ao buscar transação esperada para exclusão:", fetchError);
+            return { error: fetchError };
+        }
+
+        if (existingData && existingData.length > 0) {
+            const idsToDelete = existingData.map(d => d.id);
+            
+            // 2. Deletar do DB
+            const { error: deleteError } = await supabase
+                .from('transactions')
+                .delete()
+                .in('id', idsToDelete);
+
+            if (deleteError) {
+                console.error("Erro ao excluir transação esperada:", deleteError);
+                return { error: deleteError };
+            }
+            
+            // 3. Deletar do estado local
+            setTransactions(prev => prev.filter(t => !idsToDelete.includes(t.id)));
+            return { data: true };
+        }
+        
+        return { data: false }; // Nenhuma transação esperada encontrada
+    }, [user]);
+
 
     // --- Fetching Logic ---
 
@@ -168,7 +209,6 @@ export function useTransactions() {
     ) => {
         if (!user) return { error: { message: "Usuário não autenticado" } }
 
-        // Verifica se a transação de comissão CONFIRMADA já existe para este boleto
         const descriptionPrefix = `Comissão Boleto #${boletoId}`;
         const commissionDateString = format(commissionDueDate, 'yyyy-MM-dd'); // Usando format
         
@@ -297,7 +337,7 @@ export function useTransactions() {
 
         setTransactions(prev => [addedTransaction, ...prev])
         return { data: addedTransaction }
-    }, [user, transactions, updateTransaction]) // updateTransaction agora é uma dependência estável
+    }, [user, transactions, updateTransaction])
 
     return { 
         transactions, 
@@ -308,6 +348,7 @@ export function useTransactions() {
         addCommissionTransaction, 
         addExpectedCommissionTransaction, 
         updateTransaction, 
-        deleteTransaction 
+        deleteTransaction,
+        deleteExpectedCommissionTransaction // Exportando a nova função
     }
 }

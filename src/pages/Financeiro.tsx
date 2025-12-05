@@ -34,7 +34,7 @@ const cleanBoletoTitle = (title: string) => {
 }
 
 export default function Financeiro() {
-    const { transactions, loading: transactionsLoading, addTransaction, updateTransaction, deleteTransaction } = useTransactions()
+    const { transactions, loading: transactionsLoading, addTransaction, updateTransaction, deleteTransaction, fetchTransactions: fetchTransactionsData } = useTransactions()
     const { boletos: allBoletos, loading: boletosLoading, updateBoletoStatus, deleteBoleto, deleteRecurrenceGroup, updateBoleto } = useBoletos()
     const { partners } = useRepresentations()
     const { vehicles: allVehicles, loading: vehiclesLoading } = useVehicles() // Obtendo todos os veículos
@@ -156,49 +156,32 @@ export default function Financeiro() {
         const currentMonthStart = dateRange?.from ? startOfMonth(dateRange.from) : startOfMonth(today);
         const currentMonthEnd = dateRange?.to ? endOfMonth(dateRange.to) : endOfMonth(today);
         
-        // Mês anterior ao período selecionado
-        const previousMonthStart = subMonths(currentMonthStart, 1);
-        const previousMonthEnd = endOfMonth(previousMonthStart);
-
         let totalFaturamento = 0;
         let totalComissaoEsperada = 0;
         let totalComissaoConfirmada = 0;
         let totalDespesas = 0;
 
         // 1. Faturamento (Boletos Pagos no Período de Vencimento)
-        // 2. Comissão Esperada (Comissão de Boletos Vencendo no Período)
         allBoletos.forEach(boleto => {
             // Para KPI de Faturamento, usamos o vencimento do boleto
             const isVencimentoInPeriod = isWithinInterval(boleto.vencimento, { start: currentMonthStart, end: currentMonthEnd });
             
-            // Calcula o valor da comissão (se for percentual)
-            let commissionAmount = 0;
-            if (boleto.comissaoRecorrente && boleto.comissaoTipo) {
-                commissionAmount = boleto.comissaoTipo === 'percentual'
-                    ? (boleto.valor * boleto.comissaoRecorrente) / 100
-                    : boleto.comissaoRecorrente;
-            }
-
             if (isVencimentoInPeriod) {
                 if (boleto.status === 'paid') {
                     totalFaturamento += boleto.valor;
                 }
             }
-            
-            // Comissão Esperada: Baseada na data de EXPECTATIVA da comissão (mês seguinte ao vencimento do boleto)
-            if (commissionAmount > 0) {
-                // Passa o commissionDay para o cálculo correto
-                const expectedCommissionDate = calculateExpectedCommissionDate(boleto.vencimento, boleto.commissionDay);
-                const isExpectedCommissionInPeriod = isWithinInterval(expectedCommissionDate, { start: currentMonthStart, end: currentMonthEnd });
-                
-                if (isExpectedCommissionInPeriod) {
-                    totalComissaoEsperada += commissionAmount;
-                }
+        });
+
+        // 2. Comissão Esperada: Baseada nas transações de categoria 'Comissão Esperada'
+        transactions.filter(t => t.category === 'Comissão Esperada').forEach(t => {
+            const isExpectedCommissionInPeriod = isWithinInterval(t.date, { start: currentMonthStart, end: currentMonthEnd });
+            if (isExpectedCommissionInPeriod) {
+                totalComissaoEsperada += t.amount;
             }
         });
 
-        // 3. Comissão Confirmada (Comissão de Boletos Pagos no Mês ANTERIOR)
-        // Buscamos as transações de 'Comissão' (confirmadas) que caíram no período selecionado.
+        // 3. Comissão Confirmada: Baseada nas transações de categoria 'Comissão'
         transactions.filter(t => t.category === 'Comissão').forEach(t => {
             const isCommissionDateInPeriod = isWithinInterval(t.date, { start: currentMonthStart, end: currentMonthEnd });
             if (isCommissionDateInPeriod) {
@@ -289,17 +272,20 @@ export default function Financeiro() {
     const handleBoletoSave = async (updatedBoleto: Boleto, scope: "this" | "all") => {
         const originalBoleto = allBoletos.find(b => b.id === updatedBoleto.id);
         
-        if (originalBoleto && originalBoleto.status !== updatedBoleto.status) {
-            await updateBoletoStatus(updatedBoleto.id, updatedBoleto.status, updatedBoleto.dataPagamento);
-        } else if (originalBoleto && originalBoleto.dataPagamento?.getTime() !== updatedBoleto.dataPagamento?.getTime()) {
+        // Se o status ou a data de pagamento mudou, usamos updateBoletoStatus
+        if (originalBoleto && (originalBoleto.status !== updatedBoleto.status || originalBoleto.dataPagamento?.getTime() !== updatedBoleto.dataPagamento?.getTime())) {
             if (updatedBoleto.status === 'paid' && updatedBoleto.dataPagamento) {
                 await updateBoletoStatus(updatedBoleto.id, 'paid', updatedBoleto.dataPagamento);
             } else {
                 await updateBoletoStatus(updatedBoleto.id, 'pending');
             }
         } else {
+            // Caso contrário, é uma atualização de dados (valor, placas, etc.)
             await updateBoleto(updatedBoleto, scope)
         }
+        
+        // Forçar sincronização das transações para atualizar KPIs
+        await fetchTransactionsData();
         
         setIsEditBoletoModalOpen(false)
         setSelectedBoletoToEdit(null)
@@ -313,6 +299,10 @@ export default function Financeiro() {
         } else {
             await deleteBoleto(boleto.id)
         }
+        
+        // Forçar sincronização das transações para atualizar KPIs
+        await fetchTransactionsData();
+        
         setIsEditBoletoModalOpen(false)
         setSelectedBoletoToEdit(null)
     }
@@ -330,6 +320,10 @@ export default function Financeiro() {
             // Lógica de exclusão de transação normal
             handleTransactionDelete(pendingDeleteTransaction as Transaction, scope)
         }
+        
+        // Forçar sincronização das transações para atualizar KPIs
+        await fetchTransactionsData();
+        
         setPendingDeleteTransaction(null)
         setIsRecurrenceDialogOpen(false)
     }

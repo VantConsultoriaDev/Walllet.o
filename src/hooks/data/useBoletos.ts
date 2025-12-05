@@ -126,232 +126,12 @@ export function useBoletos() {
     const { user } = useAuth()
     const { toast } = useToast()
     // Desestruturando funções estáveis do useTransactions
-    const { addCommissionTransaction, addExpectedCommissionTransaction } = useTransactions() 
+    const { addCommissionTransaction, addExpectedCommissionTransaction, deleteExpectedCommissionTransaction } = useTransactions() 
     const [boletos, setBoletos] = useState<Boleto[]>([])
     const [loading, setLoading] = useState(true)
     const [isRefetching, setIsRefetching] = useState(false)
 
     // --- Core CRUD Functions (Defined first for stability) ---
-
-    const updateTransaction = useCallback(async (updatedTransaction: Transaction) => {
-        if (!user) return { error: { message: "Usuário não autenticado" } }
-
-        const { id, ...updateData } = updatedTransaction;
-        
-        // Ensure amount is a number before formatting
-        const numericAmount = typeof updatedTransaction.amount === 'number' ? updatedTransaction.amount : parseFloat(updatedTransaction.amount as any);
-
-        const { error } = await supabase
-            .from('transactions')
-            .update({
-                ...updateData,
-                amount: numericAmount.toFixed(2),
-                // CORREÇÃO: Usar format para garantir YYYY-MM-DD local
-                date: format(updatedTransaction.date, 'yyyy-MM-dd'),
-            })
-            .eq('id', id)
-            .select()
-
-        if (error) {
-            console.error("Erro ao atualizar transação:", error);
-            toast({ title: "Erro", description: "Falha ao atualizar transação.", variant: "destructive" })
-            return { error }
-        }
-
-        setTransactions(prev => prev.map(t => t.id === id ? updatedTransaction : t))
-        // Note: We skip the toast here if called internally by addExpectedCommissionTransaction
-        if (!updatedTransaction.description.includes("Comissão Esperada Boleto")) {
-            toast({ title: "Sucesso", description: "Transação atualizada com sucesso." })
-        }
-        return { data: updatedTransaction }
-    }, [user, toast])
-
-    const deleteTransaction = useCallback(async (id: string) => {
-        if (!user) return { error: { message: "Usuário não autenticado" } }
-
-        const { error } = await supabase
-            .from('transactions')
-            .delete()
-            .eq('id', id)
-
-        if (error) {
-            console.error("Erro ao excluir transação:", error);
-            toast({ title: "Erro", description: "Falha ao excluir transação.", variant: "destructive" })
-            return { error }
-        }
-
-        setTransactions(prev => prev.filter(t => t.id !== id))
-        toast({ title: "Sucesso", description: "Transação excluída com sucesso." })
-        return { data: true }
-    }, [user, toast])
-
-    // --- Fetching Logic ---
-
-    const fetchBoletos = useCallback(async (clientId?: string) => {
-        if (!user) {
-            setLoading(false)
-            return
-        }
-
-        // Só mostra o loading spinner na primeira carga (loading=true)
-        if (boletos.length === 0) {
-            setLoading(true)
-        } else {
-            setIsRefetching(true)
-        }
-        
-        // Fetch necessary lookup data first
-        const [{ data: clientsData }, { data: representationsData }] = await Promise.all([
-            supabase.from('clients').select('id, name').eq('user_id', user.id),
-            // Fetch commission_day here
-            supabase.from('representations').select('id, name, commission_day').eq('user_id', user.id),
-        ])
-
-        const clientMap = new Map(clientsData?.map(c => [c.id, c.name]))
-        // Map representation ID to an object containing name and commission_day
-        const representationMap = new Map(representationsData?.map(r => [r.id, { name: r.name, commissionDay: r.commission_day }]))
-
-        let query = supabase
-            .from('boletos')
-            .select('*')
-            .eq('user_id', user.id)
-            .order('vencimento', { ascending: true })
-
-        if (clientId) {
-            query = query.eq('client_id', clientId)
-        }
-
-        const { data, error } = await query
-
-        if (error) {
-            toast({
-                title: "Erro ao carregar boletos",
-                description: error.message,
-                variant: "destructive",
-            })
-            setBoletos([])
-        } else {
-            const today = parseDbDate(format(new Date(), 'yyyy-MM-dd'))!; // Use corrected date for comparison
-
-            const formattedData = data.map(dbBoleto => {
-                const clientName = clientMap.get(dbBoleto.client_id) || "Cliente Desconhecido"
-                const representationId = dbBoleto.representacao_id
-                const representationInfo = representationMap.get(representationId) || { name: "N/A", commissionDay: undefined }
-                
-                const boleto = mapDbToBoleto(dbBoleto, clientName, representationInfo)
-                
-                // Logic to mark as overdue if status is 'pending' and date is before today
-                if (boleto.status === 'pending' && isBefore(boleto.vencimento, today) && !isToday(boleto.vencimento)) {
-                    boleto.status = 'overdue'
-                }
-                return boleto
-            })
-            setBoletos(formattedData)
-            
-            // --- CRITICAL FIX: Ensure Expected Commission Transactions exist for all fetched boletos ---
-            const boletosToProcess = formattedData.filter(b => b.comissaoRecorrente && b.comissaoTipo);
-            
-            Promise.all(boletosToProcess.map(async (boleto) => {
-                let commissionAmount = boleto.comissaoRecorrente!;
-
-                if (boleto.comissaoTipo === 'percentual') {
-                    commissionAmount = (boleto.valor * boleto.comissaoRecorrente!) / 100;
-                }
-
-                if (commissionAmount > 0) {
-                    // Passa o commissionDay para o cálculo correto
-                    const expectedDueDate = calculateExpectedCommissionDate(boleto.vencimento, boleto.commissionDay);
-                    
-                    await addExpectedCommissionTransaction(
-                        boleto.id,
-                        boleto.clientName,
-                        commissionAmount,
-                        expectedDueDate,
-                        boleto.representacaoId,
-                        boleto.representacao
-                    );
-                }
-            })).catch(e => console.error("Erro ao processar comissões esperadas:", e));
-            // --- FIM CRITICAL FIX ---
-        }
-        setLoading(false)
-        setIsRefetching(false)
-        
-    }, [user, toast, addExpectedCommissionTransaction, boletos.length]) // Dependências: user, toast, addExpectedCommissionTransaction
-
-    useEffect(() => {
-        fetchBoletos()
-    }, [user, fetchBoletos])
-
-    const addBoletos = async (newBoletosData: Omit<Boleto, 'id' | 'representacao' | 'dueDate'>[]) => {
-        if (!user) return { error: { message: "Usuário não autenticado" } }
-
-        // Fetch representation info to get the commission day (needed for expected commission date calculation)
-        const repIds = [...new Set(newBoletosData.map(b => b.representacaoId).filter(Boolean))]
-        const { data: repsData } = await supabase
-            .from('representations')
-            .select('id, name, commission_day')
-            .in('id', repIds)
-        
-        const repMap = new Map(repsData?.map(r => [r.id, { name: r.name, commissionDay: r.commission_day }]))
-
-        // Prepare data for batch insertion
-        const dbData = newBoletosData.map(b => mapBoletoToDb({
-            ...b,
-            status: b.status || 'pending',
-            representacaoId: b.representacaoId,
-        }, user.id))
-
-        const { data, error } = await supabase
-            .from('boletos')
-            .insert(dbData)
-            .select()
-
-        if (error) {
-            toast({ title: "Erro", description: error.message || "Falha ao adicionar boletos.", variant: "destructive" })
-            return { error }
-        }
-        
-        // --- CRIAÇÃO DA TRANSAÇÃO DE COMISSÃO ESPERADA ---
-        const addedBoletos = data.map(dbBoleto => {
-            const clientName = newBoletosData.find(b => b.clientId === dbBoleto.client_id)?.clientName || "N/A"
-            const representationInfo = repMap.get(dbBoleto.representacao_id) || { name: "N/A", commissionDay: undefined }
-            return mapDbToBoleto(dbBoleto, clientName, representationInfo)
-        })
-
-        // Processar comissões esperadas para os boletos recém-adicionados
-        await Promise.all(addedBoletos.map(async (boleto) => {
-            if (boleto.comissaoRecorrente && boleto.comissaoTipo) {
-                let commissionAmount = boleto.comissaoRecorrente;
-
-                if (boleto.comissaoTipo === 'percentual') {
-                    commissionAmount = (boleto.valor * boleto.comissaoRecorrente) / 100;
-                }
-
-                if (commissionAmount > 0) {
-                    // Passa o commissionDay para o cálculo correto
-                    const expectedDueDate = calculateExpectedCommissionDate(boleto.vencimento, boleto.commissionDay);
-                    
-                    // Adiciona a transação de comissão esperada
-                    await addExpectedCommissionTransaction(
-                        boleto.id,
-                        boleto.clientName,
-                        commissionAmount,
-                        expectedDueDate,
-                        boleto.representacaoId,
-                        boleto.representacao
-                    );
-                }
-            }
-        }));
-        // --- FIM CRIAÇÃO DA TRANSAÇÃO DE COMISSÃO ESPERADA ---
-
-        // Re-fetch all boletos to ensure names are correctly mapped after insertion
-        await fetchBoletos() 
-        
-        toast({ title: "Sucesso", description: `${data.length} boleto(s) adicionado(s) com sucesso.` })
-        return { data: true } 
-    }
 
     const updateBoleto = async (updatedBoleto: Boleto, scope: "this" | "all" = "this") => {
         if (!user) return { error: { message: "Usuário não autenticado" } }
@@ -503,6 +283,9 @@ export function useBoletos() {
                 // Calcula a data de vencimento da comissão usando o commissionDay
                 const commissionDueDate = calculateCommissionDate(paymentDate, commissionDay);
 
+                // CRITICAL FIX: Delete the expected commission transaction first
+                await deleteExpectedCommissionTransaction(currentBoleto.id);
+
                 await addCommissionTransaction(
                     currentBoleto.id,
                     currentBoleto.clientName,
@@ -515,8 +298,42 @@ export function useBoletos() {
                 toast({ title: "Comissão Registrada", description: `Comissão de ${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(commissionAmount)} agendada para ${format(commissionDueDate, 'dd/MM/yyyy')}.`, variant: "default" })
             }
         }
+        
+        // 2. Se o status for alterado para PENDENTE, remove a transação de comissão confirmada (se existir)
+        if (newStatus !== 'paid' && currentBoleto.comissaoRecorrente && currentBoleto.comissaoTipo) {
+            const descriptionPrefix = `Comissão Boleto #${currentBoleto.id}`;
+            
+            // Busca a transação de comissão confirmada
+            const { data: existingConfirmed } = await supabase
+                .from('transactions')
+                .select('id')
+                .like('description', `${descriptionPrefix}%`)
+                .eq('category', 'Comissão')
+                .eq('user_id', user.id);
 
-        // 2. Update local state
+            if (existingConfirmed && existingConfirmed.length > 0) {
+                // Deleta a transação confirmada
+                await supabase.from('transactions').delete().in('id', existingConfirmed.map(d => d.id));
+                
+                // Recria a transação de comissão esperada
+                let commissionAmount = currentBoleto.comissaoRecorrente;
+                if (currentBoleto.comissaoTipo === 'percentual') {
+                    commissionAmount = (currentBoleto.valor * currentBoleto.comissaoRecorrente) / 100;
+                }
+                const expectedDueDate = calculateExpectedCommissionDate(currentBoleto.vencimento, commissionDay);
+                await addExpectedCommissionTransaction(
+                    currentBoleto.id,
+                    currentBoleto.clientName,
+                    commissionAmount,
+                    expectedDueDate,
+                    currentBoleto.representacaoId,
+                    currentBoleto.representacao
+                );
+            }
+        }
+
+
+        // 3. Update local state
         setBoletos(prev => prev.map(b => {
             if (b.id === boletoId) {
                 return {
@@ -534,6 +351,9 @@ export function useBoletos() {
 
     const deleteBoleto = async (id: string) => {
         if (!user) return { error: { message: "Usuário não autenticado" } }
+
+        // CRITICAL FIX: Delete associated expected commission transaction
+        await deleteExpectedCommissionTransaction(id);
 
         const { error } = await supabase
             .from('boletos')
@@ -553,6 +373,12 @@ export function useBoletos() {
 
     const deleteRecurrenceGroup = async (groupId: string) => {
         if (!user) return { error: { message: "Usuário não autenticado" } }
+
+        // 1. Find all boletos in the group to delete their expected commissions
+        const boletosInGroup = boletos.filter(b => b.recurrenceGroupId === groupId);
+        
+        // 2. Delete all associated expected commission transactions
+        await Promise.all(boletosInGroup.map(b => deleteExpectedCommissionTransaction(b.id)));
 
         const { error } = await supabase
             .from('boletos')
@@ -662,8 +488,5 @@ export function useBoletos() {
         deleteBoleto, 
         deleteRecurrenceGroup, 
         updateBoletoStatus,
-        // Exportando updateTransaction e deleteTransaction para uso interno no Financeiro.tsx
-        updateTransaction,
-        deleteTransaction,
     }
 }
