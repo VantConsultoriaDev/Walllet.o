@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
@@ -70,7 +70,7 @@ export function useVehicles() {
     const [vehicles, setVehicles] = useState<Vehicle[]>([])
     const [loading, setLoading] = useState(true)
 
-    const fetchVehicles = async () => {
+    const fetchVehicles = useCallback(async () => {
         if (!user) {
             setLoading(false)
             return
@@ -95,11 +95,11 @@ export function useVehicles() {
             setVehicles(formattedData)
         }
         setLoading(false)
-    }
+    }, [user, toast]) // Dependências: user e toast
 
     useEffect(() => {
         fetchVehicles()
-    }, [user])
+    }, [user, fetchVehicles]) // Adicionando fetchVehicles como dependência
 
     const addVehicle = async (newVehicleData: Omit<Vehicle, 'id'>) => {
         if (!user) return { error: { message: "Usuário não autenticado" } }

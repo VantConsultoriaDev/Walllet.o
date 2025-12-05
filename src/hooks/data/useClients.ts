@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
@@ -106,7 +106,7 @@ export function useClients() {
     const [clients, setClients] = useState<Client[]>([])
     const [loading, setLoading] = useState(true)
 
-    const fetchClients = async (): Promise<Client[]> => {
+    const fetchClients = useCallback(async (): Promise<Client[]> => {
         if (!user) {
             setLoading(false)
             return []
@@ -154,11 +154,11 @@ export function useClients() {
         setClients(formattedClients)
         setLoading(false)
         return formattedClients
-    }
+    }, [user, toast]) // Dependências: user e toast
 
     useEffect(() => {
         fetchClients()
-    }, [user])
+    }, [user, fetchClients]) // Adicionando fetchClients como dependência
 
     const addClient = async (newClientData: Omit<Client, 'id' | 'status' | 'vehicles'>) => {
         if (!user) return { error: { message: "Usuário não autenticado" } }
