@@ -35,6 +35,7 @@ export function ClientDetails({ client, onBack, onStatusChange, onSave, onSaveVe
     const [editingVehicle, setEditingVehicle] = useState<Vehicle | undefined>(undefined)
     const [searchTerm, setSearchTerm] = useState("")
     const [typeFilter, setTypeFilter] = useState<string>("ALL")
+    const [activeTab, setActiveTab] = useState("geral") // <-- Novo estado para a aba ativa
 
     useEffect(() => {
         setEditedClient(client)
@@ -77,14 +78,23 @@ export function ClientDetails({ client, onBack, onStatusChange, onSave, onSaveVe
     const handleSaveVehicle = async (vehicle: Vehicle) => {
         // Ensure clientId is set before saving
         const vehicleWithClient = { ...vehicle, clientId: client.id }
+        
+        // 1. Call parent handler (which updates DB and fetches new data)
         await onSaveVehicle(vehicleWithClient)
+        
+        // 2. Update local state immediately to reflect the change (assuming the parent hook will eventually update the 'client' prop)
+        // Since the parent hook (Clientes.tsx) calls fetchClients() after saving, the 'client' prop will update.
+        // We just need to ensure the modal closes and the tab stays correct.
+        
         setEditingVehicle(undefined)
         setIsAddingVehicle(false)
+        setActiveTab("frota") // <-- Mantém na aba Frota
     }
 
     const handleRemoveVehicle = async (vehicleId: string) => {
         if (window.confirm("Tem certeza que deseja excluir este veículo?")) {
             await onDeleteVehicle(vehicleId)
+            // The parent component (Clientes.tsx) handles the re-fetch and update of the 'client' prop.
         }
     }
 
@@ -177,7 +187,7 @@ export function ClientDetails({ client, onBack, onStatusChange, onSave, onSaveVe
 
             <Separator />
 
-            <Tabs defaultValue="geral" className="flex-1 flex flex-col">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
                 <TabsList className="w-full justify-start h-12 bg-muted/20 p-1">
                     <TabsTrigger value="geral" className="data-[state=active]:bg-background px-6">
                         <User className="mr-2 h-4 w-4" />
