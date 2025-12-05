@@ -94,25 +94,24 @@ export function useTransactions() {
         boletoId: string,
         clientName: string,
         amount: number,
-        commissionDueDate: Date, // Agora é a data de vencimento da comissão calculada
+        commissionDueDate: Date, // Data de vencimento da comissão confirmada
         representacaoId?: string,
         representacaoNome?: string
     ) => {
         if (!user) return { error: { message: "Usuário não autenticado" } }
 
-        // Verifica se a transação de comissão já existe para este boleto (para evitar duplicidade)
-        // Usamos a descrição e a data de vencimento da comissão para verificar se é a mesma transação.
+        // Verifica se a transação de comissão CONFIRMADA já existe para este boleto
         const descriptionPrefix = `Comissão Boleto #${boletoId}`;
         const commissionDateString = commissionDueDate.toISOString().split('T')[0];
 
-        // CRITICAL FIX: Check against the current local state first
         const existingTransaction = transactions.find(t => 
             t.description.includes(descriptionPrefix) && 
-            t.date.toISOString().split('T')[0] === commissionDateString
+            t.date.toISOString().split('T')[0] === commissionDateString &&
+            t.category === 'Comissão' // Confirmação
         );
 
         if (existingTransaction) {
-            console.log(`Comissão para Boleto #${boletoId} já existe. Pulando criação.`);
+            console.log(`Comissão CONFIRMADA para Boleto #${boletoId} já existe. Pulando criação.`);
             return { data: existingTransaction };
         }
 
@@ -120,7 +119,7 @@ export function useTransactions() {
             description: `${descriptionPrefix} - ${clientName}`,
             amount: amount,
             type: "income",
-            category: "Comissão",
+            category: "Comissão", // Categoria para CONFIRMADA
             date: commissionDueDate, // Usa a data calculada
             isRecurrent: false,
             representacaoId: representacaoId,
@@ -152,6 +151,68 @@ export function useTransactions() {
         // CRITICAL FIX: Adiciona ao estado local imediatamente
         setTransactions(prev => [addedTransaction, ...prev])
         
+        return { data: addedTransaction }
+    }
+    
+    const addExpectedCommissionTransaction = async (
+        boletoId: string,
+        clientName: string,
+        amount: number,
+        expectedDueDate: Date, // Data de vencimento da comissão esperada
+        representacaoId?: string,
+        representacaoNome?: string
+    ) => {
+        if (!user) return { error: { message: "Usuário não autenticado" } }
+
+        // Verifica se a transação de comissão ESPERADA já existe para este boleto
+        const descriptionPrefix = `Comissão Esperada Boleto #${boletoId}`;
+        const expectedDateString = expectedDueDate.toISOString().split('T')[0];
+
+        const existingTransaction = transactions.find(t => 
+            t.description.includes(descriptionPrefix) && 
+            t.date.toISOString().split('T')[0] === expectedDateString &&
+            t.category === 'Comissão Esperada' // Nova categoria
+        );
+
+        if (existingTransaction) {
+            console.log(`Comissão ESPERADA para Boleto #${boletoId} já existe. Pulando criação.`);
+            return { data: existingTransaction };
+        }
+
+        const newTransaction: Omit<Transaction, 'id'> = {
+            description: `${descriptionPrefix} - ${clientName}`,
+            amount: amount,
+            type: "income",
+            category: "Comissão Esperada", // Nova Categoria
+            date: expectedDueDate,
+            isRecurrent: false,
+            representacaoId: representacaoId,
+            representacaoNome: representacaoNome,
+        }
+
+        const { data, error } = await supabase
+            .from('transactions')
+            .insert({
+                ...newTransaction,
+                user_id: user.id,
+                amount: newTransaction.amount.toFixed(2),
+                date: newTransaction.date.toISOString().split('T')[0],
+            })
+            .select()
+            .single()
+
+        if (error) {
+            console.error("Falha ao adicionar transação de comissão esperada:", error);
+            return { error }
+        }
+
+        const addedTransaction: Transaction = {
+            ...data,
+            date: new Date(data.date),
+            amount: parseFloat(data.amount),
+        }
+
+        setTransactions(prev => [addedTransaction, ...prev])
         return { data: addedTransaction }
     }
 
@@ -198,5 +259,15 @@ export function useTransactions() {
         return { data: true }
     }
 
-    return { transactions, loading, isRefetching, fetchTransactions, addTransaction, addCommissionTransaction, updateTransaction, deleteTransaction }
+    return { 
+        transactions, 
+        loading, 
+        isRefetching, 
+        fetchTransactions, 
+        addTransaction, 
+        addCommissionTransaction, 
+        addExpectedCommissionTransaction, // Exportando a nova função
+        updateTransaction, 
+        deleteTransaction 
+    }
 }

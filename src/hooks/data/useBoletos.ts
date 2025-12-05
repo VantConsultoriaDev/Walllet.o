@@ -81,11 +81,15 @@ const calculateCommissionDate = (paymentDate: Date, commissionDay?: number): Dat
             
             // Se Sábado (6), move para Segunda (2 dias depois)
             if (dayOfWeek === 6) {
-                commissionDate = addMonths(setDate(paymentDate, 28), 1); // Garante que o mês seja o correto
+                // Se for sábado, move para o dia 28 (se o dia configurado for 26) ou 2 dias depois
+                // Simplificando: se cair no fim de semana, move para a próxima segunda-feira
+                commissionDate = addMonths(commissionDate, 0); // Mantém o mês
+                commissionDate.setDate(commissionDate.getDate() + 2); // Move para segunda
             } 
             // Se Domingo (0), move para Segunda (1 dia depois)
             else if (dayOfWeek === 0) {
-                commissionDate = addMonths(setDate(paymentDate, 27), 1); // Garante que o mês seja o correto
+                commissionDate = addMonths(commissionDate, 0); // Mantém o mês
+                commissionDate.setDate(commissionDate.getDate() + 1); // Move para segunda
             }
         }
     } else {
@@ -118,7 +122,7 @@ export function useBoletos() {
     const { user } = useAuth()
     const { toast } = useToast()
     // Desestruturando fetchTransactions do useTransactions
-    const { addCommissionTransaction } = useTransactions() 
+    const { addCommissionTransaction, addExpectedCommissionTransaction } = useTransactions() 
     const [boletos, setBoletos] = useState<Boleto[]>([])
     const [loading, setLoading] = useState(true)
     const [isRefetching, setIsRefetching] = useState(false)
@@ -195,6 +199,15 @@ export function useBoletos() {
     const addBoletos = async (newBoletosData: Omit<Boleto, 'id' | 'representacao' | 'dueDate'>[]) => {
         if (!user) return { error: { message: "Usuário não autenticado" } }
 
+        // Fetch representation info to get the commission day (needed for expected commission date calculation)
+        const repIds = [...new Set(newBoletosData.map(b => b.representacaoId).filter(Boolean))]
+        const { data: repsData } = await supabase
+            .from('representations')
+            .select('id, name')
+            .in('id', repIds)
+        
+        const repMap = new Map(repsData?.map(r => [r.id, r.name]))
+
         // Prepare data for batch insertion
         const dbData = newBoletosData.map(b => mapBoletoToDb({
             ...b,
@@ -211,6 +224,38 @@ export function useBoletos() {
             toast({ title: "Erro", description: error.message || "Falha ao adicionar boletos.", variant: "destructive" })
             return { error }
         }
+        
+        // --- CRIAÇÃO DA TRANSAÇÃO DE COMISSÃO ESPERADA ---
+        const addedBoletos = data.map(dbBoleto => {
+            const clientName = newBoletosData.find(b => b.clientId === dbBoleto.client_id)?.clientName || "N/A"
+            const representationName = repMap.get(dbBoleto.representacao_id) || "N/A"
+            return mapDbToBoleto(dbBoleto, clientName, representationName)
+        })
+
+        for (const boleto of addedBoletos) {
+            if (boleto.comissaoRecorrente && boleto.comissaoTipo) {
+                let commissionAmount = boleto.comissaoRecorrente;
+
+                if (boleto.comissaoTipo === 'percentual') {
+                    commissionAmount = (boleto.valor * boleto.comissaoRecorrente) / 100;
+                }
+
+                if (commissionAmount > 0) {
+                    const expectedDueDate = calculateExpectedCommissionDate(boleto.vencimento);
+                    
+                    // Adiciona a transação de comissão esperada
+                    await addExpectedCommissionTransaction(
+                        boleto.id,
+                        boleto.clientName,
+                        commissionAmount,
+                        expectedDueDate,
+                        boleto.representacaoId,
+                        boleto.representacao
+                    );
+                }
+            }
+        }
+        // --- FIM CRIAÇÃO DA TRANSAÇÃO DE COMISSÃO ESPERADA ---
 
         // Re-fetch all boletos to ensure names are correctly mapped after insertion
         await fetchBoletos() 
@@ -356,7 +401,7 @@ export function useBoletos() {
             return { error }
         }
 
-        // 1. Gerar Transação de Comissão se o status for 'paid' e houver comissão recorrente
+        // 1. Gerar Transação de Comissão CONFIRMADA se o status for 'paid' e houver comissão recorrente
         if (newStatus === 'paid' && currentBoleto.comissaoRecorrente && currentBoleto.comissaoTipo && paymentDate) {
             let commissionAmount = currentBoleto.comissaoRecorrente;
 
