@@ -10,20 +10,20 @@ import {
 } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Plus, ArrowDownCircle, DollarSign, Search, Wallet, TrendingUp, ArrowUpDown, Loader2, Pencil, Repeat, ArrowUp, ArrowDown } from "lucide-react"
-import { format, isWithinInterval, startOfMonth, endOfMonth, ptBR as localePtBR, isBefore, subMonths, getMonth, getYear, setMonth, setYear, setHours, isAfter } from "date-fns"
-import { DatePickerWithRange } from "@/components/ui/date-range-picker"
+import { Plus, ArrowDownCircle, DollarSign, Search, Wallet, TrendingUp, ArrowUpDown, Loader2, Pencil, Repeat, ArrowUp, ArrowDown, Filter } from "lucide-react"
+import { format, isWithinInterval, startOfMonth, endOfMonth, ptBR as localePtBR, isBefore, subMonths, getMonth, getYear, setMonth, setYear, setHours, isAfter, isSameMonth, isSameYear } from "date-fns"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { DateRange } from "react-day-picker"
 import { useTransactions } from "@/hooks/data/useTransactions"
-import { useBoletos, calculateExpectedCommissionDate } from "@/hooks/data/useBoletos" // Importando calculateExpectedCommissionDate
+import { useBoletos, calculateExpectedCommissionDate } from "@/hooks/data/useBoletos"
 import type { Boleto } from "@/types/agenda"
 import { Badge } from "@/components/ui/badge"
 import { normalizeString } from "@/lib/utils"
 import { NewTransactionModal, type Transaction } from "@/components/financeiro/new-transaction-modal"
 import { RecurrenceActionDialog } from "@/components/financeiro/recurrence-action-dialog"
 import { useRepresentations } from "@/hooks/data/useRepresentations"
-import { EditBoletoModal } from "@/components/clients/edit-boleto-modal" // Importando o modal de edição de boleto
-import { useVehicles } from "@/hooks/data/useVehicles" // Importando useVehicles para obter a lista de veículos
+import { EditBoletoModal } from "@/components/clients/edit-boleto-modal"
+import { useVehicles } from "@/hooks/data/useVehicles"
 
 // Define o tipo de dado para a tabela (Boletos + Despesas)
 type FinanceiroRow = Boleto & { isBoleto: true } | (Transaction & { isBoleto: false })
@@ -33,18 +33,32 @@ const cleanBoletoTitle = (title: string) => {
     return title.replace(/\s*-\s*Proteauto/i, '').trim();
 }
 
+const MONTH_OPTIONS = [
+    { value: 0, label: "Janeiro" },
+    { value: 1, label: "Fevereiro" },
+    { value: 2, label: "Março" },
+    { value: 3, label: "Abril" },
+    { value: 4, label: "Maio" },
+    { value: 5, label: "Junho" },
+    { value: 6, label: "Julho" },
+    { value: 7, label: "Agosto" },
+    { value: 8, label: "Setembro" },
+    { value: 9, label: "Outubro" },
+    { value: 10, label: "Novembro" },
+    { value: 11, label: "Dezembro" },
+]
+
 export default function Financeiro() {
     const { transactions, loading: transactionsLoading, addTransaction, updateTransaction, deleteTransaction, fetchTransactions: fetchTransactionsData } = useTransactions()
     const { boletos: allBoletos, loading: boletosLoading, updateBoletoStatus, deleteBoleto, deleteRecurrenceGroup, updateBoleto } = useBoletos()
     const { partners } = useRepresentations()
-    const { vehicles: allVehicles, loading: vehiclesLoading } = useVehicles() // Obtendo todos os veículos
+    const { vehicles: allVehicles, loading: vehiclesLoading } = useVehicles()
 
     const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false)
     const [editingTransaction, setEditingTransaction] = useState<Transaction | undefined>(undefined)
     const [isRecurrenceDialogOpen, setIsRecurrenceDialogOpen] = useState(false)
     const [pendingDeleteTransaction, setPendingDeleteTransaction] = useState<Transaction | null>(null)
     
-    // Estado para edição de Boleto
     const [isEditBoletoModalOpen, setIsEditBoletoModalOpen] = useState(false)
     const [selectedBoletoToEdit, setSelectedBoletoToEdit] = useState<Boleto | null>(null)
 
@@ -52,15 +66,33 @@ export default function Financeiro() {
 
     // --- Filter State ---
     const today = useMemo(() => new Date(), [])
-    const initialDateRange = useMemo(() => ({
-        from: startOfMonth(today),
-        to: endOfMonth(today),
-    }), [today])
+    const currentMonth = getMonth(today)
+    const currentYear = getYear(today)
 
-    const [dateRange, setDateRange] = useState<DateRange | undefined>(initialDateRange)
+    const [selectedMonth, setSelectedMonth] = useState<number>(currentMonth)
+    const [selectedYear, setSelectedYear] = useState<number>(currentYear)
+    const [selectedPartnerId, setSelectedPartnerId] = useState<string | "ALL">("ALL")
     const [globalFilter, setGlobalFilter] = useState("")
     const [sortField, setSortField] = useState<"date" | "valor" | "comissao" | null>("date")
     const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc")
+
+    // Calculate the date range based on selected month/year
+    const { filterStart, filterEnd } = useMemo(() => {
+        const date = setYear(setMonth(today, selectedMonth), selectedYear)
+        return {
+            filterStart: startOfMonth(date),
+            filterEnd: endOfMonth(date),
+        }
+    }, [selectedMonth, selectedYear, today])
+
+    // Generate year options dynamically
+    const yearOptions = useMemo(() => {
+        const years = []
+        for (let i = currentYear - 2; i <= currentYear + 5; i++) {
+            years.push(i)
+        }
+        return years
+    }, [currentYear])
 
     // --- Data Processing ---
 
@@ -75,35 +107,40 @@ export default function Financeiro() {
     const filteredRows = useMemo(() => {
         let result = allRows
 
-        // 1. Date Range Filter (Vencimento for Boletos, Date for Transactions)
-        if (dateRange?.from) {
-            const start = dateRange.from;
-            const end = dateRange.to ? setHours(dateRange.to, 23, 59, 59) : undefined;
+        // 1. Date Filter (Based on Commission/Transaction Date)
+        result = result.filter(row => {
+            let referenceDate: Date;
 
+            if (row.isBoleto) {
+                const boleto = row as Boleto & { isBoleto: true };
+                // Se tem comissão, a data de referência é a data de comissão esperada
+                if (boleto.comissaoRecorrente) {
+                    referenceDate = calculateExpectedCommissionDate(boleto.vencimento, boleto.commissionDay);
+                } else {
+                    // Se não tem comissão, usamos o vencimento do boleto como referência
+                    referenceDate = boleto.vencimento;
+                }
+            } else {
+                // Para transações (incluindo comissões confirmadas e despesas), usamos a data da transação
+                referenceDate = row.date;
+            }
+
+            // Filtra pelo mês/ano selecionado
+            return isSameMonth(referenceDate, filterStart) && isSameYear(referenceDate, filterStart);
+        });
+
+        // 2. Partner Filter
+        if (selectedPartnerId !== "ALL") {
             result = result.filter(row => {
                 if (row.isBoleto) {
-                    // Para boletos com comissão, filtramos pela data de comissão esperada
-                    if (row.comissaoRecorrente) {
-                        // Passa o commissionDay para o cálculo correto
-                        const expectedDate = calculateExpectedCommissionDate(row.vencimento, row.commissionDay);
-                        if (!end) return !isBefore(expectedDate, start);
-                        return isWithinInterval(expectedDate, { start, end });
-                    }
-                    
-                    // Para boletos sem comissão, filtramos pelo vencimento
-                    const vencimento = row.vencimento;
-                    if (!end) return !isBefore(vencimento, start);
-                    return isWithinInterval(vencimento, { start, end });
+                    return row.representacaoId === selectedPartnerId;
                 } else {
-                    // Filter transactions by Date
-                    const date = row.date;
-                    if (!end) return !isBefore(date, start);
-                    return isWithinInterval(date, { start, end });
+                    return row.representacaoId === selectedPartnerId;
                 }
-            })
+            });
         }
 
-        // 2. Global Search Filter
+        // 3. Global Search Filter
         if (globalFilter) {
             const filterLower = normalizeString(globalFilter)
             result = result.filter(row => {
@@ -117,7 +154,7 @@ export default function Financeiro() {
             })
         }
 
-        // 3. Sorting (Simplified for now, focusing on date)
+        // 4. Sorting
         if (sortField && sortDirection) {
             result.sort((a, b) => {
                 let aVal: any;
@@ -134,7 +171,6 @@ export default function Financeiro() {
                     aVal = a.isBoleto ? a.valor : a.amount;
                     bVal = b.isBoleto ? b.valor : b.amount;
                 } else {
-                    // Default to date if other fields are complex
                     aVal = aDate.getTime();
                     bVal = bDate.getTime();
                 }
@@ -148,54 +184,50 @@ export default function Financeiro() {
         }
 
         return result
-    }, [allRows, dateRange, globalFilter, sortField, sortDirection])
+    }, [allRows, filterStart, selectedPartnerId, globalFilter, sortField, sortDirection])
 
     // --- KPI Calculations ---
 
     const { faturamento, comissaoEsperada, comissaoConfirmada, despesas } = useMemo(() => {
-        const currentMonthStart = dateRange?.from ? startOfMonth(dateRange.from) : startOfMonth(today);
-        const currentMonthEnd = dateRange?.to ? endOfMonth(dateRange.to) : endOfMonth(today);
-        
         let totalFaturamento = 0;
         let totalComissaoEsperada = 0;
         let totalComissaoConfirmada = 0;
         let totalDespesas = 0;
 
-        // 1. Faturamento (Boletos Pagos no Período de Vencimento)
-        allBoletos.forEach(boleto => {
-            // Para KPI de Faturamento, usamos o vencimento do boleto
-            const isVencimentoInPeriod = isWithinInterval(boleto.vencimento, { start: currentMonthStart, end: currentMonthEnd });
-            
-            if (isVencimentoInPeriod) {
+        // 1. Faturamento (Soma dos valores dos boletos PAGOS listados)
+        // 2. Comissão Confirmada (Soma das comissões dos boletos PAGOS listados)
+        // 3. Comissão Esperada (Soma das comissões dos boletos PENDENTES/VENCIDOS listados)
+        filteredRows.forEach(row => {
+            if (row.isBoleto) {
+                const boleto = row as Boleto & { isBoleto: true };
+                
+                // Calcula o valor da comissão
+                let commissionAmount = 0;
+                if (boleto.comissaoRecorrente && boleto.comissaoTipo) {
+                    commissionAmount = boleto.comissaoTipo === 'percentual'
+                        ? (boleto.valor * boleto.comissaoRecorrente) / 100
+                        : boleto.comissaoRecorrente;
+                }
+
                 if (boleto.status === 'paid') {
                     totalFaturamento += boleto.valor;
+                    totalComissaoConfirmada += commissionAmount;
+                } else {
+                    totalComissaoEsperada += commissionAmount;
                 }
-            }
-        });
-
-        // 2. Comissão Esperada: Baseada nas transações de categoria 'Comissão Esperada'
-        transactions.filter(t => t.category === 'Comissão Esperada').forEach(t => {
-            const isExpectedCommissionInPeriod = isWithinInterval(t.date, { start: currentMonthStart, end: currentMonthEnd });
-            if (isExpectedCommissionInPeriod) {
-                totalComissaoEsperada += t.amount;
-            }
-        });
-
-        // 3. Comissão Confirmada: Baseada nas transações de categoria 'Comissão'
-        transactions.filter(t => t.category === 'Comissão').forEach(t => {
-            const isCommissionDateInPeriod = isWithinInterval(t.date, { start: currentMonthStart, end: currentMonthEnd });
-            if (isCommissionDateInPeriod) {
-                totalComissaoConfirmada += t.amount;
+            } else {
+                const transaction = row as Transaction & { isBoleto: false };
+                if (transaction.type === 'expense') {
+                    totalDespesas += transaction.amount;
+                }
+                // Transações de Receita (que não são comissão de boleto) são ignoradas nos KPIs de Faturamento/Comissão
             }
         });
 
         // 4. Despesas (Transações de Despesa no Período)
-        transactions.filter(t => t.type === 'expense').forEach(t => {
-            const isTransactionDateInPeriod = isWithinInterval(t.date, { start: currentMonthStart, end: currentMonthEnd });
-            if (isTransactionDateInPeriod) {
-                totalDespesas += t.amount;
-            }
-        });
+        // Já calculadas acima, mas garantindo que transações de despesa fora do filtro de boleto sejam incluídas
+        // NOTE: A filtragem principal (filteredRows) já garante que todas as linhas (boletos e transações)
+        // estão dentro do mês/ano de referência (data de comissão/transação).
 
         return {
             faturamento: totalFaturamento,
@@ -203,7 +235,7 @@ export default function Financeiro() {
             comissaoConfirmada: totalComissaoConfirmada,
             despesas: totalDespesas,
         }
-    }, [allBoletos, transactions, dateRange, today])
+    }, [filteredRows])
 
     // --- Handlers ---
 
@@ -363,7 +395,60 @@ export default function Financeiro() {
 
             {/* Filters */}
             <div className="flex flex-col md:flex-row items-center gap-3">
-                <DatePickerWithRange date={dateRange} setDate={setDateRange} />
+                {/* Month/Year Filter */}
+                <div className="flex gap-2 w-full md:w-auto">
+                    <Select
+                        value={selectedMonth.toString()}
+                        onValueChange={(v) => setSelectedMonth(parseInt(v))}
+                    >
+                        <SelectTrigger className="w-full md:w-[150px]">
+                            <Filter className="mr-2 h-4 w-4" />
+                            <SelectValue placeholder="Mês" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {MONTH_OPTIONS.map(month => (
+                                <SelectItem key={month.value} value={month.value.toString()}>
+                                    {month.label}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <Select
+                        value={selectedYear.toString()}
+                        onValueChange={(v) => setSelectedYear(parseInt(v))}
+                    >
+                        <SelectTrigger className="w-full md:w-[100px]">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {yearOptions.map(year => (
+                                <SelectItem key={year} value={year.toString()}>
+                                    {year}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+                
+                {/* Partner Filter */}
+                <Select
+                    value={selectedPartnerId}
+                    onValueChange={setSelectedPartnerId}
+                >
+                    <SelectTrigger className="w-full md:w-[200px]">
+                        <Wallet className="mr-2 h-4 w-4" />
+                        <SelectValue placeholder="Representação" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="ALL">Todas Representações</SelectItem>
+                        {partners.map(rep => (
+                            <SelectItem key={rep.id} value={rep.id}>
+                                {rep.name}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+
                 <div className="relative flex-1 w-full md:w-auto">
                     <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -395,7 +480,7 @@ export default function Financeiro() {
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-yellow-600">{formatCurrency(comissaoEsperada)}</div>
-                        <p className="text-xs text-muted-foreground">Comissão de boletos vencendo no período</p>
+                        <p className="text-xs text-muted-foreground">Comissão de boletos pendentes/vencidos</p>
                     </CardContent>
                 </Card>
                 
@@ -443,7 +528,7 @@ export default function Financeiro() {
                                         <TableHead>Categoria</TableHead>
                                         <TableHead>
                                             <Button variant="ghost" size="sm" className="h-8 px-2 hover:bg-transparent" onClick={() => handleSort("date")}>
-                                                Data
+                                                Data Ref.
                                                 {getSortIcon("date")}
                                             </Button>
                                         </TableHead>

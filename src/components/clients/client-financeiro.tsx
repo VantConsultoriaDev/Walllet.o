@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Plus, Trash2, Calendar as CalendarIcon, ArrowUpDown, ArrowUp, ArrowDown, Repeat, Search, Check, ChevronsUpDown, Loader2, Filter, Pencil, DollarSign, X } from "lucide-react"
-import { format, addMonths, getMonth, getYear, setMonth, setYear, startOfMonth, endOfMonth, subMonths, setHours, isBefore, isAfter } from "date-fns"
+import { format, addMonths, getMonth, getYear, setMonth, setYear, startOfMonth, endOfMonth, subMonths, setHours, isBefore, isAfter, isSameMonth, isSameYear } from "date-fns"
 import { ptBR as localePtBR } from "date-fns/locale" // Importação corrigida
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
@@ -80,29 +80,20 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
     // --- Filter state ---
     const today = useMemo(() => new Date(), [])
     
-    // Calculate previous month and year
-    const previousMonthDate = subMonths(today, 1)
-    const initialMonth = getMonth(previousMonthDate) // Mês anterior
-    const initialYear = getYear(previousMonthDate) // Ano do mês anterior
+    const currentMonth = getMonth(today)
+    const currentYear = getYear(today)
 
     const [searchTerm, setSearchTerm] = useState("")
     
-    // Date Range Filter (explicit range)
-    const [explicitDateFrom, setExplicitDateFrom] = useState<Date | undefined>(undefined)
-    const [explicitDateTo, setExplicitDateTo] = useState<Date | undefined>(undefined)
-
-    // Month/Year Filter (default to previous month)
-    const [selectedMonth, setSelectedMonth] = useState<number | "ALL">(initialMonth) // 0-11 or "ALL"
-    const [selectedYear, setSelectedYear] = useState<number>(initialYear)
-    
-    // State to track which filter type is currently active/preferred
-    const [activeFilterType, setActiveFilterType] = useState<"month" | "range">("month")
+    // Month/Year Filter (default to current month)
+    const [selectedMonth, setSelectedMonth] = useState<number>(currentMonth) // 0-11
+    const [selectedYear, setSelectedYear] = useState<number>(currentYear)
+    const [selectedPartnerId, setSelectedPartnerId] = useState<string | "ALL">("ALL")
 
     const [sortField, setSortField] = useState<SortField | null>("vencimento")
     const [sortDirection, setSortDirection] = useState<SortDirection>("asc")
 
     // --- New Boleto Form State ---
-    // REMOVIDO: const [title, setTitle] = useState("") 
     const [valor, setValor] = useState("") // Stored as formatted string
     const [vencimento, setVencimento] = useState<Date | undefined>(undefined) // <-- Inicializado como undefined
     const [selectedPlates, setSelectedPlates] = useState<string[]>([])
@@ -115,70 +106,27 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
     const [openPlateSelect, setOpenPlateSelect] = useState(false)
     const [plateSearch, setPlateSearch] = useState("")
     
-    // FIX: Renomeando o estado do calendário do filtro para evitar conflito com o modal
-    const [isFilterCalendarOpen, setIsFilterCalendarOpen] = useState(false) 
-    // FIX: Novo estado para o calendário do modal de Novo Boleto
     const [isNewBoletoCalendarOpen, setIsNewBoletoCalendarOpen] = useState(false) 
     // --- End New Boleto Form State ---
 
 
     // Generate year options dynamically (e.g., current year +/- 5)
     const yearOptions = useMemo(() => {
-        const currentYear = getYear(today)
         const years = []
         for (let i = currentYear - 2; i <= currentYear + 5; i++) {
             years.push(i)
         }
         return years
-    }, [today])
+    }, [currentYear])
 
-    // Effect to manage the active date filter based on month/year selection
-    const { dateFrom, dateTo } = useMemo(() => {
-        if (activeFilterType === "month" && selectedMonth !== "ALL") {
-            const date = setYear(setMonth(today, selectedMonth), selectedYear)
-            return {
-                dateFrom: startOfMonth(date),
-                dateTo: endOfMonth(date),
-            }
+    // Calculate the date range based on selected month/year
+    const { filterStart } = useMemo(() => {
+        const date = setYear(setMonth(today, selectedMonth), selectedYear)
+        return {
+            filterStart: startOfMonth(date),
         }
-        if (activeFilterType === "range" && explicitDateFrom) {
-            return {
-                dateFrom: explicitDateFrom,
-                // CRITICAL FIX: Ensure dateTo includes the entire end day
-                dateTo: explicitDateTo ? setHours(explicitDateTo, 23, 59, 59) : undefined,
-            }
-        }
-        return { dateFrom: undefined, dateTo: undefined }
-    }, [selectedMonth, selectedYear, today, activeFilterType, explicitDateFrom, explicitDateTo])
+    }, [selectedMonth, selectedYear, today])
 
-    // Handlers to set filter type preference
-    const handleMonthChange = (v: string) => {
-        setSelectedMonth(v === "ALL" ? "ALL" : parseInt(v))
-        setActiveFilterType("month")
-        setExplicitDateFrom(undefined)
-        setExplicitDateTo(undefined)
-    }
-
-    const handleYearChange = (v: string) => {
-        setSelectedYear(parseInt(v))
-        setActiveFilterType("month")
-        setExplicitDateFrom(undefined)
-        setExplicitDateTo(undefined)
-    }
-
-    const handleDateRangeChange = (from: Date | undefined, to: Date | undefined) => {
-        setExplicitDateFrom(from)
-        setExplicitDateTo(to)
-        if (from) {
-            setActiveFilterType("range")
-            setSelectedMonth("ALL") // Deactivate month filter when range is set
-        } else {
-            // If range is cleared, revert to month filter (default previous month)
-            setActiveFilterType("month") 
-            setSelectedMonth(initialMonth)
-            setSelectedYear(initialYear)
-        }
-    }
 
     const handleSort = (field: SortField) => {
         if (sortField === field) {
@@ -197,26 +145,39 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
     const filteredAndSortedBoletos = useMemo(() => {
         let result = [...clientBoletos]
 
-        // 1. Text search
+        // 1. Date Filter (Based on Commission/Transaction Date)
+        result = result.filter(boleto => {
+            let referenceDate: Date;
+
+            // Se tem comissão, a data de referência é a data de comissão esperada
+            if (boleto.comissaoRecorrente) {
+                referenceDate = calculateExpectedCommissionDate(boleto.vencimento, boleto.commissionDay);
+            } else {
+                // Se não tem comissão, usamos o vencimento do boleto como referência
+                referenceDate = boleto.vencimento;
+            }
+
+            // Filtra pelo mês/ano selecionado
+            return isSameMonth(referenceDate, filterStart) && isSameYear(referenceDate, filterStart);
+        });
+
+        // 2. Partner Filter
+        if (selectedPartnerId !== "ALL") {
+            result = result.filter(boleto => boleto.representacaoId === selectedPartnerId);
+        }
+
+        // 3. Text search
         if (searchTerm) {
             const searchLower = searchTerm.toLowerCase()
             result = result.filter(b =>
                 b.placas.some(p => p.toLowerCase().includes(searchLower)) ||
                 b.representacao.toLowerCase().includes(searchLower) ||
-                b.valor.toString().includes(searchLower)
+                b.valor.toString().includes(searchLower) ||
+                b.clientName.toLowerCase().includes(searchLower)
             )
         }
 
-        // 2. Date range filter
-        if (dateFrom) {
-            result = result.filter(b => !isBefore(b.vencimento, dateFrom))
-        }
-        if (dateTo) {
-            // Use isAfter to check if the date is strictly after the end of the range
-            result = result.filter(b => !isAfter(b.vencimento, dateTo))
-        }
-
-        // 3. Sorting
+        // 4. Sorting
         if (sortField && sortDirection) {
             result.sort((a, b) => {
                 let aVal: any = a[sortField]
@@ -245,7 +206,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
         }
 
         return result
-    }, [clientBoletos, searchTerm, dateFrom, dateTo, sortField, sortDirection])
+    }, [clientBoletos, searchTerm, filterStart, selectedPartnerId, sortField, sortDirection])
 
     // Calculate total value of filtered boletos
     const totalFilteredValue = useMemo(() => {
@@ -317,15 +278,15 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
     const handleBoletoSave = async (updatedBoleto: Boleto, scope: "this" | "all") => {
         const originalBoleto = clientBoletos.find(b => b.id === updatedBoleto.id);
         
-        if (originalBoleto && originalBoleto.status !== updatedBoleto.status) {
-            await updateBoletoStatus(updatedBoleto.id, updatedBoleto.status, updatedBoleto.dataPagamento);
-        } else if (originalBoleto && originalBoleto.dataPagamento?.getTime() !== updatedBoleto.dataPagamento?.getTime()) {
+        // Se o status ou a data de pagamento mudou, usamos updateBoletoStatus
+        if (originalBoleto && (originalBoleto.status !== updatedBoleto.status || originalBoleto.dataPagamento?.getTime() !== updatedBoleto.dataPagamento?.getTime())) {
             if (updatedBoleto.status === 'paid' && updatedBoleto.dataPagamento) {
                 await updateBoletoStatus(updatedBoleto.id, 'paid', updatedBoleto.dataPagamento);
             } else {
                 await updateBoletoStatus(updatedBoleto.id, 'pending');
             }
         } else {
+            // Caso contrário, é uma atualização de dados (valor, placas, etc.)
             await updateBoleto(updatedBoleto, scope)
         }
         
@@ -375,7 +336,6 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
     }
 
     const resetForm = () => {
-        // REMOVIDO: setTitle("") 
         setValor("")
         setVencimento(undefined)
         setSelectedPlates([])
@@ -389,11 +349,9 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
 
     const clearFilters = () => {
         setSearchTerm("")
-        setSelectedMonth(initialMonth) // Reset to default (previous month)
-        setSelectedYear(initialYear)
-        setExplicitDateFrom(undefined)
-        setExplicitDateTo(undefined)
-        setActiveFilterType("month")
+        setSelectedMonth(currentMonth)
+        setSelectedYear(currentYear)
+        setSelectedPartnerId("ALL")
         setSortField("vencimento")
         setSortDirection("asc")
     }
@@ -431,7 +389,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
         }
     }
 
-    const hasActiveFilters = searchTerm || activeFilterType === "range" || selectedMonth !== initialMonth || selectedYear !== initialYear
+    const hasActiveFilters = searchTerm || selectedPartnerId !== "ALL" || selectedMonth !== currentMonth || selectedYear !== currentYear
 
     // Determine the client's display name for the modal header
     const clientDisplayName = client.clientType === "PJ" 
@@ -487,14 +445,13 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                     <div className="flex gap-2 w-full md:w-auto">
                         <Select
                             value={selectedMonth.toString()}
-                            onValueChange={handleMonthChange}
+                            onValueChange={(v) => setSelectedMonth(parseInt(v))}
                         >
                             <SelectTrigger className="w-full md:w-[150px]">
                                 <Filter className="mr-2 h-4 w-4" />
                                 <SelectValue placeholder="Mês" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="ALL">Todos os Meses</SelectItem>
                                 {MONTH_OPTIONS.map(month => (
                                     <SelectItem key={month.value} value={month.value.toString()}>
                                         {month.label}
@@ -504,7 +461,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                         </Select>
                         <Select
                             value={selectedYear.toString()}
-                            onValueChange={handleYearChange}
+                            onValueChange={(v) => setSelectedYear(parseInt(v))}
                         >
                             <SelectTrigger className="w-full md:w-[100px]">
                                 <SelectValue />
@@ -518,61 +475,25 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                             </SelectContent>
                         </Select>
                     </div>
-
-                    {/* Date Range Filter */}
-                    <div className="flex gap-2 w-full md:w-auto">
-                        <Popover open={isFilterCalendarOpen} onOpenChange={setIsFilterCalendarOpen}>
-                            <PopoverTrigger asChild>
-                                <Button 
-                                    variant={activeFilterType === "range" && explicitDateFrom ? "default" : "outline"} 
-                                    className="gap-2 w-full md:w-auto"
-                                >
-                                    <CalendarIcon className="h-4 w-4" />
-                                    {explicitDateFrom ? format(explicitDateFrom, "dd/MM/yy") : "De"}
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0 z-[1000]">
-                                <Calendar 
-                                    mode="single" 
-                                    selected={explicitDateFrom} 
-                                    onSelect={(date) => {
-                                        handleDateRangeChange(date, explicitDateTo)
-                                        setIsFilterCalendarOpen(false)
-                                    }} 
-                                />
-                            </PopoverContent>
-                        </Popover>
-                        <Popover open={isFilterCalendarOpen} onOpenChange={setIsFilterCalendarOpen}>
-                            <PopoverTrigger asChild>
-                                <Button 
-                                    variant={activeFilterType === "range" && explicitDateTo ? "default" : "outline"} 
-                                    className="gap-2 w-full md:w-auto"
-                                >
-                                    <CalendarIcon className="h-4 w-4" />
-                                    {explicitDateTo ? format(explicitDateTo, "dd/MM/yy") : "Até"}
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0 z-[1000]">
-                                <Calendar 
-                                    mode="single" 
-                                    selected={explicitDateTo} 
-                                    onSelect={(date) => {
-                                        handleDateRangeChange(explicitDateFrom, date)
-                                        setIsFilterCalendarOpen(false)
-                                    }} 
-                                />
-                            </PopoverContent>
-                        </Popover>
-                        {(explicitDateFrom || explicitDateTo) && activeFilterType === "range" && (
-                            <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                onClick={() => handleDateRangeChange(undefined, undefined)}
-                            >
-                                <X className="h-4 w-4" />
-                            </Button>
-                        )}
-                    </div>
+                    
+                    {/* Partner Filter */}
+                    <Select
+                        value={selectedPartnerId}
+                        onValueChange={setSelectedPartnerId}
+                    >
+                        <SelectTrigger className="w-full md:w-[200px]">
+                            <Wallet className="mr-2 h-4 w-4" />
+                            <SelectValue placeholder="Representação" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="ALL">Todas Representações</SelectItem>
+                            {partners.map(rep => (
+                                <SelectItem key={rep.id} value={rep.id}>
+                                    {rep.name}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                 </div>
 
                 {hasActiveFilters && (
@@ -612,7 +533,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                                 >
                                     Valor
                                     {getSortIcon("valor")}
-                                </Button>
+                                </Output>
                             </TableHead>
                             <TableHead>
                                 <Button
@@ -955,7 +876,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
 
             {/* Edit Boleto Modal */}
             <EditBoletoModal
-                boleto={selectedBoleto}
+                boleto={selectedBoletoToEdit}
                 open={isEditModalOpen}
                 onOpenChange={setIsEditModalOpen}
                 onSave={handleBoletoSave}
