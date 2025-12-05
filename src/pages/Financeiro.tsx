@@ -545,7 +545,7 @@ export default function Financeiro() {
                                         })
                                     ) : (
                                         <TableRow>
-                                            <TableCell colSpan={8} className="h-24 text-center">
+                                            <TableCell colSpan={7} className="h-24 text-center">
                                                 Nenhuma movimentação encontrada no período.
                                             </TableCell>
                                         </TableRow>
