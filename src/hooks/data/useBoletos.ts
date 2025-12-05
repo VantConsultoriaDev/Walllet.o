@@ -52,7 +52,8 @@ const mapBoletoToDb = (boleto: Partial<Boleto>, userId: string) => ({
 export function useBoletos() {
     const { user } = useAuth()
     const { toast } = useToast()
-    const { addCommissionTransaction } = useTransactions() // Usando a nova função
+    // Desestruturando fetchTransactions do useTransactions
+    const { addCommissionTransaction, fetchTransactions } = useTransactions() 
     const [boletos, setBoletos] = useState<Boleto[]>([])
     const [loading, setLoading] = useState(true)
     const [isRefetching, setIsRefetching] = useState(false)
@@ -195,6 +196,10 @@ export function useBoletos() {
                     currentBoleto.representacaoId,
                     currentBoleto.representacao
                 );
+                
+                // FORÇA O RECARREGAMENTO DAS TRANSAÇÕES APÓS ADICIONAR A COMISSÃO
+                await fetchTransactions(); 
+
                 toast({ title: "Comissão Registrada", description: `Comissão de ${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(commissionAmount)} agendada para o próximo mês.`, variant: "default" })
             }
         }
