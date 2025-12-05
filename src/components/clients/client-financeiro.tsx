@@ -313,25 +313,19 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
         resetForm()
     }
 
-    const handleEditBoleto = async (updatedBoleto: Boleto, scope: "this" | "all") => {
-        // If the status changed (e.g., dataPagamento was added/removed), we need to call updateBoletoStatus
-        // to trigger commission logic. Otherwise, call updateBoleto for general field updates.
-        
+    // --- Funções de manipulação de Boleto para o Modal de Edição ---
+    const handleBoletoSave = async (updatedBoleto: Boleto, scope: "this" | "all") => {
         const originalBoleto = clientBoletos.find(b => b.id === updatedBoleto.id);
         
         if (originalBoleto && originalBoleto.status !== updatedBoleto.status) {
-            // Status changed (e.g., paid -> pending or pending -> paid)
             await updateBoletoStatus(updatedBoleto.id, updatedBoleto.status, updatedBoleto.dataPagamento);
         } else if (originalBoleto && originalBoleto.dataPagamento?.getTime() !== updatedBoleto.dataPagamento?.getTime()) {
-            // Status is still 'paid', but payment date changed. Re-trigger status update to recalculate commission date.
             if (updatedBoleto.status === 'paid' && updatedBoleto.dataPagamento) {
                 await updateBoletoStatus(updatedBoleto.id, 'paid', updatedBoleto.dataPagamento);
             } else {
-                // If payment date was removed, update status to pending
                 await updateBoletoStatus(updatedBoleto.id, 'pending');
             }
         } else {
-            // General update (valor, vencimento, placas, etc.)
             await updateBoleto(updatedBoleto, scope)
         }
         
@@ -358,6 +352,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
         setPendingDeleteBoleto(null)
         setIsRecurrenceDialogOpen(false)
     }
+    // --- Fim Funções de manipulação de Boleto ---
 
     const handleUpdateStatus = async (boletoId: string, newStatus: Boleto['status'], customPaymentDate?: Date) => {
         await updateBoletoStatus(boletoId, newStatus, customPaymentDate)
