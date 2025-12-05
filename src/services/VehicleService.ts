@@ -76,7 +76,7 @@ export class VehicleService {
           renavam: data.renavam || '',
           municipio: data.municipio || '',
           uf: data.uf || '',
-          fipeCode: data.codigofipe || data.codigo_fipe || '', // Mapeamento mais robusto
+          fipeCode: data.codigoFipe || data.codigofipe || data.codigo_fipe || '', // CORRIGIDO: Adicionado data.codigoFipe
           fipeValue: data.valor?.toString() || '',
       };
 
