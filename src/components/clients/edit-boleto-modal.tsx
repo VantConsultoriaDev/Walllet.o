@@ -56,6 +56,7 @@ export function EditBoletoModal({
     // Form state
     const [valor, setValor] = useState("")
     const [vencimento, setVencimento] = useState<Date | undefined>()
+    const [dataPagamento, setDataPagamento] = useState<Date | undefined>() // <-- Novo estado
     const [selectedPlates, setSelectedPlates] = useState<string[]>([])
     const [representacaoId, setRepresentacaoId] = useState("")
     const [isRecurring, setIsRecurring] = useState(false)
@@ -66,6 +67,7 @@ export function EditBoletoModal({
     const [openPlateSelect, setOpenPlateSelect] = useState(false)
     const [plateSearch, setPlateSearch] = useState("")
     const [isCalendarOpen, setIsCalendarOpen] = useState(false)
+    const [isPaymentCalendarOpen, setIsPaymentCalendarOpen] = useState(false) // <-- Novo estado
 
     // Sync state from prop
     useEffect(() => {
@@ -73,6 +75,7 @@ export function EditBoletoModal({
             // Ensure value is formatted correctly for display
             setValor(formatCurrencyInput(boleto.valor.toString()))
             setVencimento(boleto.vencimento)
+            setDataPagamento(boleto.dataPagamento) // <-- Sincroniza data de pagamento
             setSelectedPlates(boleto.placas)
             setRepresentacaoId(boleto.representacaoId || "")
             setIsRecurring(boleto.isRecurring)
@@ -109,11 +112,16 @@ export function EditBoletoModal({
         const floatValor = parseCurrencyToFloat(valor)
         const floatComissao = comissaoRecorrente ? parseCurrencyToFloat(comissaoRecorrente) : undefined
 
+        // Determine final status based on payment date
+        const finalStatus: Boleto['status'] = dataPagamento ? 'paid' : boleto.status === 'paid' ? 'pending' : boleto.status;
+
         const updatedBoleto: Boleto = {
             ...boleto,
             valor: floatValor,
             vencimento: vencimento,
             dueDate: vencimento,
+            dataPagamento: dataPagamento, // <-- Salva a data de pagamento
+            status: finalStatus, // <-- Atualiza o status
             placas: selectedPlates,
             representacaoId: representacaoId,
             representacao: partners.find(p => p.id === representacaoId)?.name || "N/A",
@@ -122,8 +130,6 @@ export function EditBoletoModal({
             recurrenceMonths: isRecurring && recurrenceType === "limited" ? parseInt(recurrenceMonths) : undefined,
             comissaoRecorrente: floatComissao,
             comissaoTipo: floatComissao ? comissaoTipo : undefined,
-            // CRITICAL FIX: If it was recurring, keep the group ID unless recurrence is explicitly turned off.
-            // If recurrence is turned off (isRecurring=false), we clear the group ID.
             recurrenceGroupId: isRecurring ? boleto.recurrenceGroupId || boleto.id : undefined,
         }
 
@@ -162,43 +168,91 @@ export function EditBoletoModal({
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
-                        <div className="grid gap-2">
-                            <Label>Valor</Label>
-                            <Input
-                                placeholder="0,00"
-                                value={valor}
-                                onChange={handleInputValorChange}
-                                type="text"
-                            />
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="grid gap-2">
+                                <Label>Valor</Label>
+                                <Input
+                                    placeholder="0,00"
+                                    value={valor}
+                                    onChange={handleInputValorChange}
+                                    type="text"
+                                />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label>Vencimento</Label>
+                                <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                                    <PopoverTrigger asChild>
+                                        <Button
+                                            variant={"outline"}
+                                            className={cn(
+                                                "justify-start text-left font-normal w-full",
+                                                !vencimento && "text-muted-foreground"
+                                            )}
+                                        >
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {vencimento ? format(vencimento, "PPP", { locale: ptBR }) : <span>Selecione uma data</span>}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0 z-[1000]">
+                                        <Calendar
+                                            mode="single"
+                                            selected={vencimento}
+                                            onSelect={(date) => {
+                                                setVencimento(date)
+                                                setIsCalendarOpen(false)
+                                            }}
+                                            initialFocus
+                                        />
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
                         </div>
+                        
+                        {/* Data de Pagamento */}
                         <div className="grid gap-2">
-                            <Label>Vencimento</Label>
-                            <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                            <Label>Data de Pagamento (Opcional)</Label>
+                            <Popover open={isPaymentCalendarOpen} onOpenChange={setIsPaymentCalendarOpen}>
                                 <PopoverTrigger asChild>
                                     <Button
                                         variant={"outline"}
                                         className={cn(
                                             "justify-start text-left font-normal w-full",
-                                            !vencimento && "text-muted-foreground"
+                                            !dataPagamento && "text-muted-foreground"
                                         )}
                                     >
                                         <CalendarIcon className="mr-2 h-4 w-4" />
-                                        {vencimento ? format(vencimento, "PPP", { locale: ptBR }) : <span>Selecione uma data</span>}
+                                        {dataPagamento ? format(dataPagamento, "PPP", { locale: ptBR }) : <span>Não Pago</span>}
                                     </Button>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-auto p-0 z-[1000]">
                                     <Calendar
                                         mode="single"
-                                        selected={vencimento}
+                                        selected={dataPagamento}
                                         onSelect={(date) => {
-                                            setVencimento(date)
-                                            setIsCalendarOpen(false)
+                                            setDataPagamento(date)
+                                            setIsPaymentCalendarOpen(false)
                                         }}
                                         initialFocus
                                     />
+                                    {dataPagamento && (
+                                        <div className="p-2">
+                                            <Button 
+                                                variant="ghost" 
+                                                size="sm" 
+                                                className="w-full text-red-500 hover:bg-red-50"
+                                                onClick={() => {
+                                                    setDataPagamento(undefined)
+                                                    setIsPaymentCalendarOpen(false)
+                                                }}
+                                            >
+                                                Remover Pagamento
+                                            </Button>
+                                        </div>
+                                    )}
                                 </PopoverContent>
                             </Popover>
                         </div>
+
                         <div className="grid gap-2">
                             <Label>Placas Vinculadas</Label>
                             <Popover open={openPlateSelect} onOpenChange={setOpenPlateSelect}>

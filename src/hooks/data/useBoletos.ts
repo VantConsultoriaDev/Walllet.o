@@ -3,7 +3,7 @@ import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
 import type { Boleto } from "@/types/agenda"
-import { addMonths, isBefore, isToday } from "date-fns"
+import { addMonths, isBefore, isToday, setDate, isWeekend } from "date-fns"
 import { v4 as uuidv4 } from 'uuid'
 import { useTransactions } from "./useTransactions" // Importando useTransactions
 
@@ -48,6 +48,38 @@ const mapBoletoToDb = (boleto: Partial<Boleto>, userId: string) => ({
     comissao_recorrente: boleto.comissaoRecorrente?.toFixed(2),
     comissao_tipo: boleto.comissaoTipo,
 })
+
+// Helper to calculate the commission date based on payment date and representation
+const calculateCommissionDate = (paymentDate: Date, representationName: string): Date => {
+    let commissionDate = addMonths(paymentDate, 1);
+    
+    if (representationName.toLowerCase().includes("proteauto")) {
+        // Set to the 26th of the next month
+        commissionDate = setDate(commissionDate, 26);
+        
+        // Check if it's a weekend (0=Sunday, 6=Saturday)
+        if (isWeekend(commissionDate)) {
+            // If Saturday, move to Monday (2 days later)
+            if (commissionDate.getDay() === 6) {
+                commissionDate = addMonths(setDate(paymentDate, 28), 1); // 26 + 2 = 28
+            } 
+            // If Sunday, move to Monday (1 day later)
+            else if (commissionDate.getDay() === 0) {
+                commissionDate = addMonths(setDate(paymentDate, 27), 1); // 26 + 1 = 27
+            }
+        }
+    }
+    // For all other representations, it defaults to the 1st of the next month (handled by addMonths(paymentDate, 1) if we set the date to 1)
+    // Since addCommissionTransaction uses this date, we ensure it's the 1st if no specific rule applies.
+    
+    // If not Proteauto, ensure it defaults to the 1st of the next month for consistency in transaction tracking
+    if (!representationName.toLowerCase().includes("proteauto")) {
+        commissionDate = setDate(commissionDate, 1);
+    }
+
+    return commissionDate;
+};
+
 
 export function useBoletos() {
     const { user } = useAuth()
@@ -188,16 +220,17 @@ export function useBoletos() {
         return { data: updatedBoleto }
     }
 
-    const updateBoletoStatus = async (boletoId: string, newStatus: Boleto['status']) => {
+    const updateBoletoStatus = async (boletoId: string, newStatus: Boleto['status'], customPaymentDate?: Date) => {
         if (!user) return { error: { message: "Usuário não autenticado" } }
 
         const currentBoleto = boletos.find(b => b.id === boletoId);
         if (!currentBoleto) return { error: { message: "Boleto não encontrado." } }
 
-        const paymentDate = new Date();
+        const paymentDate = newStatus === 'paid' ? (customPaymentDate || new Date()) : undefined;
+        
         const dbData = {
             status: newStatus,
-            data_pagamento: newStatus === 'paid' ? paymentDate.toISOString().split('T')[0] : null,
+            data_pagamento: paymentDate ? paymentDate.toISOString().split('T')[0] : null,
         }
 
         const { data, error } = await supabase
@@ -213,7 +246,7 @@ export function useBoletos() {
         }
 
         // 1. Gerar Transação de Comissão se o status for 'paid' e houver comissão recorrente
-        if (newStatus === 'paid' && currentBoleto.comissaoRecorrente && currentBoleto.comissaoTipo) {
+        if (newStatus === 'paid' && currentBoleto.comissaoRecorrente && currentBoleto.comissaoTipo && paymentDate) {
             let commissionAmount = currentBoleto.comissaoRecorrente;
 
             if (currentBoleto.comissaoTipo === 'percentual') {
@@ -222,19 +255,19 @@ export function useBoletos() {
             }
 
             if (commissionAmount > 0) {
-                // addCommissionTransaction agora atualiza o estado de transactions diretamente
+                // Calcula a data de vencimento da comissão
+                const commissionDueDate = calculateCommissionDate(paymentDate, currentBoleto.representacao);
+
                 await addCommissionTransaction(
                     currentBoleto.id,
                     currentBoleto.clientName,
                     commissionAmount,
-                    paymentDate, // Usamos a data de pagamento para calcular o mês seguinte
+                    commissionDueDate, // Passa a data de vencimento da comissão
                     currentBoleto.representacaoId,
                     currentBoleto.representacao
                 );
                 
-                // REMOVIDO: await fetchTransactions(); // Não é mais necessário, pois addCommissionTransaction atualiza o estado local
-
-                toast({ title: "Comissão Registrada", description: `Comissão de ${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(commissionAmount)} agendada para o próximo mês.`, variant: "default" })
+                toast({ title: "Comissão Registrada", description: `Comissão de ${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(commissionAmount)} agendada para ${format(commissionDueDate, 'dd/MM/yyyy')}.`, variant: "default" })
             }
         }
 
@@ -244,7 +277,7 @@ export function useBoletos() {
                 return {
                     ...b,
                     status: newStatus,
-                    dataPagamento: newStatus === 'paid' ? paymentDate : undefined,
+                    dataPagamento: paymentDate,
                 }
             }
             return b

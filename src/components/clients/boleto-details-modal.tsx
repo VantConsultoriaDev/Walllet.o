@@ -1,3 +1,4 @@
+import { useState } from "react"
 import {
     Dialog,
     DialogContent,
@@ -10,17 +11,19 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { DollarSign, Calendar, Repeat, Car, CheckCircle, AlertTriangle, X, Pencil } from "lucide-react"
+import { DollarSign, Calendar, Repeat, Car, CheckCircle, AlertTriangle, X, Pencil, CalendarIcon } from "lucide-react"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import type { Boleto } from "@/types/agenda"
 import { cn } from "@/lib/utils"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Calendar as DatePickerCalendar } from "@/components/ui/calendar"
 
 interface BoletoDetailsModalProps {
     boleto: Boleto | null
     isOpen: boolean
     onClose: () => void
-    onUpdateStatus: (boletoId: string, newStatus: Boleto['status']) => void
+    onUpdateStatus: (boletoId: string, newStatus: Boleto['status'], customPaymentDate?: Date) => void
     onDelete: (boleto: Boleto) => void // Mantido para compatibilidade, mas o botão de exclusão será movido
     onEdit: () => void // <-- Novo prop para abrir o modal de edição
 }
@@ -34,6 +37,14 @@ export function BoletoDetailsModal({
     onEdit,
 }: BoletoDetailsModalProps) {
     if (!boleto) return null
+
+    const [isPaymentDateCalendarOpen, setIsPaymentDateCalendarOpen] = useState(false)
+    const [localPaymentDate, setLocalPaymentDate] = useState<Date | undefined>(boleto.dataPagamento)
+
+    // Sync local state when boleto prop changes
+    useState(() => {
+        setLocalPaymentDate(boleto.dataPagamento)
+    }, [boleto])
 
     const formatCurrency = (value: number) => {
         return new Intl.NumberFormat("pt-BR", {
@@ -59,6 +70,16 @@ export function BoletoDetailsModal({
             ? `${boleto.comissaoRecorrente}%`
             : formatCurrency(boleto.comissaoRecorrente)
         : "N/A"
+
+    const handleMarkAsPaid = (date: Date) => {
+        onUpdateStatus(boleto.id, 'paid', date)
+        setLocalPaymentDate(date)
+    }
+
+    const handleMarkAsPending = () => {
+        onUpdateStatus(boleto.id, 'pending')
+        setLocalPaymentDate(undefined)
+    }
 
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -99,6 +120,55 @@ export function BoletoDetailsModal({
                             </div>
                         </div>
 
+                        {/* Data de Pagamento */}
+                        <div className="space-y-3">
+                            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                                Status e Pagamento
+                            </h3>
+                            <div className="grid grid-cols-2 gap-4 p-4 rounded-lg bg-slate-50 dark:bg-slate-900/50 border text-sm">
+                                <div className="col-span-2">
+                                    <p className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
+                                        <CheckCircle className="h-3 w-3 text-green-500" /> Data de Pagamento
+                                    </p>
+                                    <Popover open={isPaymentDateCalendarOpen} onOpenChange={setIsPaymentDateCalendarOpen}>
+                                        <PopoverTrigger asChild>
+                                            <Button
+                                                variant={"outline"}
+                                                className={cn(
+                                                    "justify-start text-left font-normal w-full",
+                                                    !localPaymentDate && "text-muted-foreground"
+                                                )}
+                                                disabled={boleto.status !== 'paid'}
+                                            >
+                                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                                {localPaymentDate ? format(localPaymentDate, "PPP", { locale: ptBR }) : <span>Não Pago</span>}
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-auto p-0 z-[1000]">
+                                            <DatePickerCalendar
+                                                mode="single"
+                                                selected={localPaymentDate}
+                                                onSelect={(date) => {
+                                                    if (date) {
+                                                        handleMarkAsPaid(date)
+                                                    }
+                                                    setIsPaymentDateCalendarOpen(false)
+                                                }}
+                                                initialFocus
+                                            />
+                                        </PopoverContent>
+                                    </Popover>
+                                </div>
+                                {boleto.status === 'paid' && (
+                                    <div className="col-span-2">
+                                        <Button variant="ghost" className="w-full text-red-500 hover:bg-red-50" onClick={handleMarkAsPending}>
+                                            <X className="h-4 w-4 mr-2" /> Marcar como Pendente
+                                        </Button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
                         {/* Informações de Recorrência e Representação */}
                         <div className="space-y-3">
                             <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
@@ -121,16 +191,6 @@ export function BoletoDetailsModal({
                                             : "Não"}
                                     </p>
                                 </div>
-                                {boleto.dataPagamento && (
-                                    <div className="col-span-2">
-                                        <p className="text-xs text-muted-foreground flex items-center gap-1">
-                                            <CheckCircle className="h-3 w-3 text-green-500" /> Data de Pagamento
-                                        </p>
-                                        <p className="font-medium text-green-600">
-                                            {format(boleto.dataPagamento, "dd/MM/yyyy", { locale: ptBR })}
-                                        </p>
-                                    </div>
-                                )}
                             </div>
                         </div>
 
@@ -180,7 +240,7 @@ export function BoletoDetailsModal({
                     <div className="flex gap-2">
                         {boleto.status !== 'paid' && (
                             <Button
-                                onClick={() => onUpdateStatus(boleto.id, 'paid')}
+                                onClick={() => handleMarkAsPaid(new Date())}
                                 className="gap-2 bg-green-600 hover:bg-green-700"
                             >
                                 <CheckCircle className="h-4 w-4" /> Marcar como Pago

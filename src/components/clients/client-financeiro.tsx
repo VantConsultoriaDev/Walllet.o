@@ -295,7 +295,27 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
     }
 
     const handleEditBoleto = async (updatedBoleto: Boleto, scope: "this" | "all") => {
-        await updateBoleto(updatedBoleto, scope)
+        // If the status changed (e.g., dataPagamento was added/removed), we need to call updateBoletoStatus
+        // to trigger commission logic. Otherwise, call updateBoleto for general field updates.
+        
+        const originalBoleto = clientBoletos.find(b => b.id === updatedBoleto.id);
+        
+        if (originalBoleto && originalBoleto.status !== updatedBoleto.status) {
+            // Status changed (e.g., paid -> pending or pending -> paid)
+            await updateBoletoStatus(updatedBoleto.id, updatedBoleto.status, updatedBoleto.dataPagamento);
+        } else if (originalBoleto && originalBoleto.dataPagamento?.getTime() !== updatedBoleto.dataPagamento?.getTime()) {
+            // Status is still 'paid', but payment date changed. Re-trigger status update to recalculate commission date.
+            if (updatedBoleto.status === 'paid' && updatedBoleto.dataPagamento) {
+                await updateBoletoStatus(updatedBoleto.id, 'paid', updatedBoleto.dataPagamento);
+            } else {
+                // If payment date was removed, update status to pending
+                await updateBoletoStatus(updatedBoleto.id, 'pending');
+            }
+        } else {
+            // General update (valor, vencimento, placas, etc.)
+            await updateBoleto(updatedBoleto, scope)
+        }
+        
         // Close modal is handled by EditBoletoModal internally after successful save/recurrence action
     }
 
@@ -319,12 +339,12 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
         setIsRecurrenceDialogOpen(false)
     }
 
-    const handleUpdateStatus = async (boletoId: string, newStatus: Boleto['status']) => {
-        await updateBoletoStatus(boletoId, newStatus)
+    const handleUpdateStatus = async (boletoId: string, newStatus: Boleto['status'], customPaymentDate?: Date) => {
+        await updateBoletoStatus(boletoId, newStatus, customPaymentDate)
         // Update selected boleto state in details modal
         setSelectedBoleto(prev => {
             if (!prev) return null
-            return prev.id === boletoId ? { ...prev, status: newStatus, dataPagamento: newStatus === 'paid' ? new Date() : undefined } : prev
+            return prev.id === boletoId ? { ...prev, status: newStatus, dataPagamento: newStatus === 'paid' ? (customPaymentDate || new Date()) : undefined } : prev
         })
     }
 

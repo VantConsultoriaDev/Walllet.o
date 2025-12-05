@@ -94,18 +94,20 @@ export function useTransactions() {
         boletoId: string,
         clientName: string,
         amount: number,
-        paymentDate: Date,
+        commissionDueDate: Date, // Agora é a data de vencimento da comissão calculada
         representacaoId?: string,
         representacaoNome?: string
     ) => {
         if (!user) return { error: { message: "Usuário não autenticado" } }
 
-        // A comissão deve ser registrada no mês seguinte ao pagamento.
-        const commissionDate = addMonths(paymentDate, 1);
-        
         // Verifica se a transação de comissão já existe para este boleto (para evitar duplicidade)
+        // Usamos a descrição e a data de vencimento da comissão para verificar se é a mesma transação.
+        const descriptionPrefix = `Comissão Boleto #${boletoId}`;
+        const commissionDateString = commissionDueDate.toISOString().split('T')[0];
+
         const existingTransaction = transactions.find(t => 
-            t.description.includes(`Comissão Boleto #${boletoId}`)
+            t.description.includes(descriptionPrefix) && 
+            t.date.toISOString().split('T')[0] === commissionDateString
         );
 
         if (existingTransaction) {
@@ -114,11 +116,11 @@ export function useTransactions() {
         }
 
         const newTransaction: Omit<Transaction, 'id'> = {
-            description: `Comissão Boleto #${boletoId} - ${clientName}`,
+            description: `${descriptionPrefix} - ${clientName}`,
             amount: amount,
             type: "income",
             category: "Comissão",
-            date: commissionDate,
+            date: commissionDueDate, // Usa a data calculada
             isRecurrent: false,
             representacaoId: representacaoId,
             representacaoNome: representacaoNome,
