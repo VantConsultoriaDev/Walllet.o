@@ -31,6 +31,7 @@ import {
 import { RecurrenceActionDialog } from "./recurrence-action-dialog"
 import { useRepresentations } from "@/hooks/data/useRepresentations"
 import { formatCurrencyInput, parseCurrencyToFloat } from "@/lib/formatters" // Importando formatters
+import { useToast } from "@/hooks/use-toast" // Importando useToast
 
 export type TransactionType = "income" | "expense"
 
@@ -58,6 +59,7 @@ type NewTransactionModalProps = {
 
 export function NewTransactionModal({ open, onOpenChange, onSubmit, onDelete, transactionToEdit }: NewTransactionModalProps) {
     const { partners } = useRepresentations()
+    const { toast } = useToast() // Inicializando toast
 
     const [type, setType] = useState<TransactionType>("income")
     const [description, setDescription] = useState("")
@@ -96,7 +98,16 @@ export function NewTransactionModal({ open, onOpenChange, onSubmit, onDelete, tr
     }, [open, transactionToEdit])
 
     const handleSaveClick = () => {
-        if (!description || !amountFormatted || !category || !date) return
+        if (!description || !amountFormatted || !category || !date) {
+            toast({ title: "Erro", description: "Preencha todos os campos obrigatórios.", variant: "destructive" })
+            return
+        }
+        
+        const floatAmount = parseCurrencyToFloat(amountFormatted)
+        if (floatAmount <= 0) {
+            toast({ title: "Erro", description: "O valor da transação deve ser maior que zero.", variant: "destructive" })
+            return
+        }
 
         if (transactionToEdit?.isRecurrent) {
             setPendingAction("save")
