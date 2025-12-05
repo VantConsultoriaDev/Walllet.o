@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Plus, ArrowDownCircle, DollarSign, Search, Wallet, TrendingUp, ArrowUpDown, Loader2 } from "lucide-react"
 import { NewTransactionModal, type Transaction } from "@/components/financeiro/new-transaction-modal"
-import { format, isWithinInterval, startOfMonth, endOfMonth } from "date-fns"
+import { format, isWithinInterval, startOfMonth, endOfMonth, subMonths } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import {
     ColumnDef,
@@ -49,8 +49,10 @@ export default function Financeiro() {
     const [sorting, setSorting] = useState<SortingState>([])
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
     const [globalFilter, setGlobalFilter] = useState("")
+    
+    // Default filter: Last month + Current month
     const [dateRange, setDateRange] = useState<DateRange | undefined>({
-        from: startOfMonth(new Date()),
+        from: startOfMonth(subMonths(new Date(), 1)),
         to: endOfMonth(new Date()),
     })
 
