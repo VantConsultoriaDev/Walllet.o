@@ -77,12 +77,12 @@ export default function Financeiro() {
 
             result = result.filter(row => {
                 if (row.isBoleto) {
-                    // Filter boletos by VENCIMENTO
+                    // Filter boletos by Vencimento
                     const vencimento = row.vencimento;
                     if (!end) return !isBefore(vencimento, start);
                     return isWithinInterval(vencimento, { start, end });
                 } else {
-                    // Filter transactions by DATE
+                    // Filter transactions by Date
                     const date = row.date;
                     if (!end) return !isBefore(date, start);
                     return isWithinInterval(date, { start, end });
@@ -419,7 +419,6 @@ export default function Financeiro() {
                             <Table>
                                 <TableHeader>
                                     <TableRow className="hover:bg-transparent border-b border-border">
-                                        <TableHead className="w-[40px]"></TableHead>
                                         <TableHead>Descrição / Cliente</TableHead>
                                         <TableHead>Placa(s)</TableHead>
                                         <TableHead>Categoria</TableHead>
@@ -442,7 +441,6 @@ export default function Financeiro() {
                                             </Button>
                                         </TableHead>
                                         <TableHead className="w-[100px] text-center">Status</TableHead>
-                                        <TableHead className="w-[50px]"></TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -468,9 +466,6 @@ export default function Financeiro() {
                                                         className="cursor-pointer hover:bg-muted/50 h-16"
                                                         onClick={() => handleOpenBoletoEditModal(boleto)} // Abre modal de edição de boleto
                                                     >
-                                                        <TableCell>
-                                                            {boleto.isRecurring && <Repeat className="h-4 w-4 text-blue-600 dark:text-blue-400" />}
-                                                        </TableCell>
                                                         <TableCell>
                                                             <div className="font-medium">{boleto.clientName}</div>
                                                             <div className="text-xs text-muted-foreground">{boleto.representacao}</div>
@@ -499,18 +494,6 @@ export default function Financeiro() {
                                                         <TableCell className="text-center">
                                                             {getStatusBadge(boleto.status)}
                                                         </TableCell>
-                                                        <TableCell>
-                                                            <Button 
-                                                                variant="ghost" 
-                                                                size="icon" 
-                                                                onClick={(e) => { 
-                                                                    e.stopPropagation(); 
-                                                                    handleOpenBoletoEditModal(boleto);
-                                                                }}
-                                                            >
-                                                                <Pencil className="h-4 w-4 text-muted-foreground" />
-                                                            </Button>
-                                                        </TableCell>
                                                     </TableRow>
                                                 )
                                             } else {
@@ -526,9 +509,6 @@ export default function Financeiro() {
                                                         className="cursor-pointer hover:bg-muted/50 h-16" 
                                                         onClick={() => openEditTransactionModal(transaction)} // Abre modal de edição de transação
                                                     >
-                                                        <TableCell>
-                                                            {transaction.isRecurrent && <Repeat className="h-4 w-4 text-blue-600 dark:text-blue-400" />}
-                                                        </TableCell>
                                                         <TableCell>
                                                             <div className="font-medium">{transaction.description}</div>
                                                             {transaction.representacaoNome && <div className="text-xs text-muted-foreground">{transaction.representacaoNome}</div>}
@@ -551,11 +531,6 @@ export default function Financeiro() {
                                                                 {isIncome ? 'Receita' : 'Despesa'}
                                                             </Badge>
                                                         </TableCell>
-                                                        <TableCell>
-                                                            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); openEditTransactionModal(transaction); }}>
-                                                                <Pencil className="h-4 w-4 text-muted-foreground" />
-                                                            </Button>
-                                                        </TableCell>
                                                     </TableRow>
                                                 )
                                             }
@@ -563,7 +538,7 @@ export default function Financeiro() {
                                         })
                                     ) : (
                                         <TableRow>
-                                            <TableCell colSpan={9} className="h-24 text-center">
+                                            <TableCell colSpan={8} className="h-24 text-center">
                                                 Nenhuma movimentação encontrada no período.
                                             </TableCell>
                                         </TableRow>
