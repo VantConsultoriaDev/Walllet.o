@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
     Dialog,
     DialogContent,
@@ -42,7 +42,7 @@ export function BoletoDetailsModal({
     const [localPaymentDate, setLocalPaymentDate] = useState<Date | undefined>(boleto.dataPagamento)
 
     // Sync local state when boleto prop changes
-    useState(() => {
+    useEffect(() => {
         setLocalPaymentDate(boleto.dataPagamento)
     }, [boleto])
 
