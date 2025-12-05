@@ -79,16 +79,21 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
 
     // --- Filter state ---
     const today = useMemo(() => new Date(), [])
-    const currentMonth = getMonth(today) // Mês atual
+    
+    // Calculate previous month and year
+    const previousMonthDate = subMonths(today, 1)
+    const initialMonth = getMonth(previousMonthDate) // Mês anterior
+    const initialYear = getYear(previousMonthDate) // Ano do mês anterior
+
     const [searchTerm, setSearchTerm] = useState("")
     
     // Date Range Filter (explicit range)
     const [explicitDateFrom, setExplicitDateFrom] = useState<Date | undefined>(undefined)
     const [explicitDateTo, setExplicitDateTo] = useState<Date | undefined>(undefined)
 
-    // Month/Year Filter (default to current month)
-    const [selectedMonth, setSelectedMonth] = useState<number | "ALL">(currentMonth) // 0-11 or "ALL"
-    const [selectedYear, setSelectedYear] = useState<number>(getYear(today))
+    // Month/Year Filter (default to previous month)
+    const [selectedMonth, setSelectedMonth] = useState<number | "ALL">(initialMonth) // 0-11 or "ALL"
+    const [selectedYear, setSelectedYear] = useState<number>(initialYear)
     
     // State to track which filter type is currently active/preferred
     const [activeFilterType, setActiveFilterType] = useState<"month" | "range">("month")
@@ -167,10 +172,10 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
             setActiveFilterType("range")
             setSelectedMonth("ALL") // Deactivate month filter when range is set
         } else {
-            // If range is cleared, revert to month filter (default current month)
+            // If range is cleared, revert to month filter (default previous month)
             setActiveFilterType("month") 
-            setSelectedMonth(currentMonth)
-            setSelectedYear(getYear(today))
+            setSelectedMonth(initialMonth)
+            setSelectedYear(initialYear)
         }
     }
 
@@ -378,8 +383,8 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
 
     const clearFilters = () => {
         setSearchTerm("")
-        setSelectedMonth(currentMonth) // Reset to default (current month)
-        setSelectedYear(getYear(today))
+        setSelectedMonth(initialMonth) // Reset to default (previous month)
+        setSelectedYear(initialYear)
         setExplicitDateFrom(undefined)
         setExplicitDateTo(undefined)
         setActiveFilterType("month")
@@ -420,7 +425,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
         }
     }
 
-    const hasActiveFilters = searchTerm || activeFilterType === "range" || selectedMonth !== currentMonth || selectedYear !== getYear(today)
+    const hasActiveFilters = searchTerm || activeFilterType === "range" || selectedMonth !== initialMonth || selectedYear !== initialYear
 
     if (representationsLoading || boletosLoading) {
         return (
