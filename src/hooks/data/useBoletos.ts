@@ -192,6 +192,7 @@ export function useBoletos() {
             const boletosToProcess = formattedData.filter(b => b.comissaoRecorrente && b.comissaoTipo);
             
             // Processar em paralelo para não bloquear o UI, mas garantir que todas as chamadas sejam feitas
+            // NOTE: We rely on addExpectedCommissionTransaction updating the transactions state locally.
             await Promise.all(boletosToProcess.map(async (boleto) => {
                 let commissionAmount = boleto.comissaoRecorrente!;
 
@@ -218,9 +219,8 @@ export function useBoletos() {
         setLoading(false)
         setIsRefetching(false)
         
-        // CRITICAL: Fetch all transactions again after potentially creating new expected commissions
-        await fetchAllTransactions();
-    }, [user, toast, boletos.length, addExpectedCommissionTransaction, fetchAllTransactions])
+        // REMOVIDO: await fetchAllTransactions(); // <-- REMOVIDO PARA QUEBRAR O LOOP
+    }, [user, toast, boletos.length, addExpectedCommissionTransaction])
 
     useEffect(() => {
         fetchBoletos()
@@ -290,7 +290,7 @@ export function useBoletos() {
         // Re-fetch all boletos to ensure names are correctly mapped after insertion
         await fetchBoletos() 
         
-        // NOTE: fetchAllTransactions is called inside fetchBoletos now.
+        // REMOVIDO: await fetchAllTransactions()
 
         toast({ title: "Sucesso", description: `${data.length} boleto(s) adicionado(s) com sucesso.` })
         return { data: true } 
@@ -394,8 +394,7 @@ export function useBoletos() {
             await fetchBoletos()
         }
 
-        // CRITICAL FIX: Fetch all transactions to update the Financeiro screen
-        await fetchAllTransactions()
+        // REMOVIDO: await fetchAllTransactions()
 
         toast({ title: "Sucesso", description: `Boleto(s) atualizado(s) com sucesso.` })
         return { data: updatedBoleto }
@@ -474,8 +473,7 @@ export function useBoletos() {
             return b
         }))
         
-        // CRITICAL FIX: Fetch all transactions to update the Financeiro screen
-        await fetchAllTransactions()
+        // REMOVIDO: await fetchAllTransactions()
 
         toast({ title: "Sucesso", description: `Status do boleto atualizado para ${newStatus === 'paid' ? 'Pago' : newStatus}.` })
         return { data: data }
@@ -496,8 +494,7 @@ export function useBoletos() {
 
         setBoletos(prev => prev.filter(b => b.id !== id))
         
-        // CRITICAL FIX: Fetch all transactions to update the Financeiro screen
-        await fetchAllTransactions()
+        // REMOVIDO: await fetchAllTransactions()
 
         toast({ title: "Sucesso", description: "Boleto excluído com sucesso." })
         return { data: true }
@@ -519,8 +516,7 @@ export function useBoletos() {
 
         setBoletos(prev => prev.filter(b => b.recurrenceGroupId !== groupId))
         
-        // CRITICAL FIX: Fetch all transactions to update the Financeiro screen
-        await fetchAllTransactions()
+        // REMOVIDO: await fetchAllTransactions()
 
         toast({ title: "Sucesso", description: "Grupo de boletos recorrentes excluído com sucesso." })
         return { data: true }
