@@ -533,7 +533,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                                 >
                                     Valor
                                     {getSortIcon("valor")}
-                                </Output>
+                                </Button>
                             </TableHead>
                             <TableHead>
                                 <Button
