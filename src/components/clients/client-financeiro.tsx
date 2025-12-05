@@ -21,7 +21,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Plus, Trash2, Calendar as CalendarIcon, ArrowUpDown, ArrowUp, ArrowDown, Repeat, Search, Check, ChevronsUpDown, Loader2, Filter, Pencil, DollarSign, X } from "lucide-react"
 import { format, addMonths, getMonth, getYear, setMonth, setYear, startOfMonth, endOfMonth, subMonths, setHours, isBefore, isAfter } from "date-fns"
-import { ptBR } from "date-fns/locale"
+import { ptBR as localePtBR } from "date-fns/locale" // Importação corrigida
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
 import { cn } from "@/lib/utils"
@@ -720,7 +720,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                                         )}
                                     >
                                         <CalendarIcon className="mr-2 h-4 w-4" />
-                                        {vencimento ? format(vencimento, "PPP", { locale: ptBR }) : <span>Selecione uma data</span>}
+                                        {vencimento ? format(vencimento, "PPP", { locale: localePtBR }) : <span>Selecione uma data</span>}
                                     </Button>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-auto p-0 z-[1000]">

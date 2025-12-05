@@ -12,6 +12,8 @@ import { EventModal } from "@/components/agenda/event-modal"
 import { cn } from "@/lib/utils"
 import { useEvents } from "@/hooks/data/useEvents"
 import { useBoletos } from "@/hooks/data/useBoletos"
+import { format } from "date-fns"
+import { ptBR as localePtBR } from "date-fns/locale" // Importação corrigida
 
 export default function Agenda() {
     const { events, loading: eventsLoading, addEvent, updateEvent, deleteEvent } = useEvents()
@@ -201,7 +203,7 @@ export default function Agenda() {
                                         className="flex flex-col items-start p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors text-left"
                                     >
                                         <span className="font-medium">{event.title}</span>
-                                        <span className="text-xs text-muted-foreground">{event.client} - {event.date.toLocaleDateString()}</span>
+                                        <span className="text-xs text-muted-foreground">{event.client} - {format(event.date, 'dd/MM/yyyy', { locale: localePtBR })}</span>
                                         <Badge variant="outline" className="mt-1 text-[10px]">{event.category}</Badge>
                                     </button>
                                 ))
@@ -222,7 +224,7 @@ export default function Agenda() {
                             <CardTitle className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <CalendarIcon className="h-5 w-5 text-primary" />
-                                    <span>Agenda de {date?.toLocaleDateString()}</span>
+                                    <span>Agenda de {date?.toLocaleDateString('pt-BR', { locale: localePtBR })}</span>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <Select
@@ -351,7 +353,7 @@ export default function Agenda() {
                 <Card className="col-span-5 h-full flex flex-col border-none shadow-md bg-card/50 backdrop-blur-sm">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="capitalize">
-                            {currentMonth.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+                            {currentMonth.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric', locale: localePtBR })}
                         </CardTitle>
                         <div className="flex items-center space-x-1">
                             <Button variant="ghost" size="icon" onClick={prevMonth} className="h-8 w-8">

@@ -13,7 +13,7 @@ import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { DollarSign, Calendar, Repeat, Car, CheckCircle, AlertTriangle, X, Pencil, CalendarIcon } from "lucide-react"
 import { format, setHours } from "date-fns"
-import { ptBR } from "date-fns/locale"
+import { ptBR as localePtBR } from "date-fns/locale" // Importação corrigida
 import type { Boleto } from "@/types/agenda"
 import { cn } from "@/lib/utils"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -117,7 +117,7 @@ export function BoletoDetailsModal({
                                     <Calendar className="h-3 w-3" /> Vencimento
                                 </p>
                                 <p className={cn("font-medium text-lg", boleto.status === 'overdue' && 'text-destructive')}>
-                                    {format(boleto.vencimento, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                                    {format(boleto.vencimento, "dd 'de' MMMM 'de' yyyy", { locale: localePtBR })}
                                 </p>
                             </div>
                         </div>
@@ -142,7 +142,7 @@ export function BoletoDetailsModal({
                                                 )}
                                             >
                                                 <CalendarIcon className="mr-2 h-4 w-4" />
-                                                {localPaymentDate ? format(localPaymentDate, "PPP", { locale: ptBR }) : <span>Não Pago</span>}
+                                                {localPaymentDate ? format(localPaymentDate, "PPP", { locale: localePtBR }) : <span>Não Pago</span>}
                                             </Button>
                                         </PopoverTrigger>
                                         <PopoverContent className="w-auto p-0 z-[1000]">

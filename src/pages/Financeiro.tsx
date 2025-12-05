@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Plus, ArrowDownCircle, DollarSign, Search, Wallet, TrendingUp, ArrowUpDown, Loader2 } from "lucide-react"
 import { NewTransactionModal, type Transaction } from "@/components/financeiro/new-transaction-modal"
-import { format, isWithinInterval, startOfMonth, endOfMonth, subMonths, ptBR, startOfDay, setHours } from "date-fns"
+import { format, isWithinInterval, startOfMonth, endOfMonth, ptBR, startOfDay, setHours } from "date-fns"
 import {
     ColumnDef,
     flexRender,
@@ -30,6 +30,7 @@ import type { DateRange } from "react-day-picker"
 import { useTransactions } from "@/hooks/data/useTransactions"
 import { useBoletos } from "@/hooks/data/useBoletos"
 import { calculateExpectedCommissionDate } from "@/hooks/data/useBoletos"
+import { ptBR as localePtBR } from "date-fns/locale" // Importação corrigida
 
 // Custom filter for date range
 const dateRangeFilter: FilterFn<Transaction> = (row, columnId, value: DateRange | undefined) => {
@@ -176,7 +177,7 @@ export default function Financeiro() {
                     </Button>
                 )
             },
-            cell: ({ row }) => format(row.getValue("date"), "dd/MM/yyyy", { locale: ptBR }),
+            cell: ({ row }) => format(row.getValue("date"), "dd/MM/yyyy", { locale: localePtBR }),
             filterFn: dateRangeFilter,
         },
         {

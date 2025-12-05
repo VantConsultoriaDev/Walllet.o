@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select"
 import { Plus, Trash2, Calendar as CalendarIcon, Save, X, ChevronsUpDown, Search, Loader2, Check } from "lucide-react"
 import { format, setHours } from "date-fns"
-import { ptBR } from "date-fns/locale"
+import { ptBR as localePtBR } from "date-fns/locale" // Importação corrigida
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
 import { cn } from "@/lib/utils"
@@ -203,7 +203,7 @@ export function EditBoletoModal({
                                             )}
                                         >
                                             <CalendarIcon className="mr-2 h-4 w-4" />
-                                            {vencimento ? format(vencimento, "PPP", { locale: ptBR }) : <span>Selecione uma data</span>}
+                                            {vencimento ? format(vencimento, "PPP", { locale: localePtBR }) : <span>Selecione uma data</span>}
                                         </Button>
                                     </PopoverTrigger>
                                     <PopoverContent className="w-auto p-0 z-[1000]">
@@ -234,7 +234,7 @@ export function EditBoletoModal({
                                         )}
                                     >
                                         <CalendarIcon className="mr-2 h-4 w-4" />
-                                        {dataPagamento ? format(dataPagamento, "PPP", { locale: ptBR }) : <span>Não Pago</span>}
+                                        {dataPagamento ? format(dataPagamento, "PPP", { locale: localePtBR }) : <span>Não Pago</span>}
                                     </Button>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-auto p-0 z-[1000]">
