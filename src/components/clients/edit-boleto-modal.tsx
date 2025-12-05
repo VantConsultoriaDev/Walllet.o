@@ -70,6 +70,7 @@ export function EditBoletoModal({
     // Sync state from prop
     useEffect(() => {
         if (boleto && open) {
+            // Ensure value is formatted correctly for display
             setValor(formatCurrencyInput(boleto.valor.toString()))
             setVencimento(boleto.vencimento)
             setSelectedPlates(boleto.placas)
@@ -121,7 +122,8 @@ export function EditBoletoModal({
             recurrenceMonths: isRecurring && recurrenceType === "limited" ? parseInt(recurrenceMonths) : undefined,
             comissaoRecorrente: floatComissao,
             comissaoTipo: floatComissao ? comissaoTipo : undefined,
-            // If recurrence is removed, clear the group ID
+            // CRITICAL FIX: If it was recurring, keep the group ID unless recurrence is explicitly turned off.
+            // If recurrence is turned off (isRecurring=false), we clear the group ID.
             recurrenceGroupId: isRecurring ? boleto.recurrenceGroupId || boleto.id : undefined,
         }
 
@@ -145,6 +147,7 @@ export function EditBoletoModal({
     }
 
     const handleDelete = () => {
+        // Defer deletion logic to parent (ClientFinanceiro) which handles recurrence dialog
         onDelete(boleto)
     }
 

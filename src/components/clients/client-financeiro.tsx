@@ -19,8 +19,8 @@ import {
     TableRow,
 } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
-import { Plus, Trash2, Calendar as CalendarIcon, ArrowUpDown, ArrowUp, ArrowDown, Repeat, Search, Check, ChevronsUpDown, Loader2, Filter, Pencil } from "lucide-react"
-import { format, addMonths, getMonth, getYear, setMonth, setYear, startOfMonth, endOfMonth } from "date-fns"
+import { Plus, Trash2, Calendar as CalendarIcon, ArrowUpDown, ArrowUp, ArrowDown, Repeat, Search, Check, ChevronsUpDown, Loader2, Filter, Pencil, DollarSign } from "lucide-react"
+import { format, addMonths, getMonth, getYear, setMonth, setYear, startOfMonth, endOfMonth, subMonths } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
@@ -79,27 +79,22 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
 
     // --- Filter state ---
     const today = useMemo(() => new Date(), [])
+    const previousMonth = getMonth(subMonths(today, 1)) // Mês anterior
     const [searchTerm, setSearchTerm] = useState("")
-    const [dateFrom, setDateFrom] = useState<Date>()
-    const [dateTo, setDateTo] = useState<Date>()
-    const [selectedMonth, setSelectedMonth] = useState<number | "ALL">(getMonth(today)) // 0-11 or "ALL"
+    
+    // Date Range Filter (explicit range)
+    const [explicitDateFrom, setExplicitDateFrom] = useState<Date | undefined>(undefined)
+    const [explicitDateTo, setExplicitDateTo] = useState<Date | undefined>(undefined)
+
+    // Month/Year Filter (default to previous month)
+    const [selectedMonth, setSelectedMonth] = useState<number | "ALL">(previousMonth) // 0-11 or "ALL"
     const [selectedYear, setSelectedYear] = useState<number>(getYear(today))
+    
+    // State to track which filter type is currently active/preferred
+    const [activeFilterType, setActiveFilterType] = useState<"month" | "range">("month")
+
     const [sortField, setSortField] = useState<SortField | null>("vencimento")
     const [sortDirection, setSortDirection] = useState<SortDirection>("asc")
-
-    // Form state (rest of form state remains the same)
-    const [valor, setValor] = useState("") // Stored as formatted string
-    const [vencimento, setVencimento] = useState<Date>()
-    const [selectedPlates, setSelectedPlates] = useState<string[]>([])
-    const [representacaoId, setRepresentacaoId] = useState("")
-    const [isRecurring, setIsRecurring] = useState(false)
-    const [recurrenceType, setRecurrenceType] = useState<"indefinite" | "limited">("indefinite")
-    const [recurrenceMonths, setRecurrenceMonths] = useState("12")
-    const [comissaoRecorrente, setComissaoRecorrente] = useState("")
-    const [comissaoTipo, setComissaoTipo] = useState<"percentual" | "valor">("valor")
-    const [openPlateSelect, setOpenPlateSelect] = useState(false)
-    const [plateSearch, setPlateSearch] = useState("")
-    const [isCalendarOpen, setIsCalendarOpen] = useState(false)
 
     // Generate year options dynamically (e.g., current year +/- 5)
     const yearOptions = useMemo(() => {
@@ -111,18 +106,45 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
         return years
     }, [today])
 
-    // Effect to clear date range when month/year filter is active
-    useEffect(() => {
-        if (selectedMonth !== "ALL") {
+    // Effect to manage the active date filter based on month/year selection
+    const { dateFrom, dateTo } = useMemo(() => {
+        if (activeFilterType === "month" && selectedMonth !== "ALL") {
             const date = setYear(setMonth(today, selectedMonth), selectedYear)
-            setDateFrom(startOfMonth(date))
-            setDateTo(endOfMonth(date))
-        } else {
-            setDateFrom(undefined)
-            setDateTo(undefined)
+            return {
+                dateFrom: startOfMonth(date),
+                dateTo: endOfMonth(date),
+            }
         }
-    }, [selectedMonth, selectedYear, today])
+        if (activeFilterType === "range" && explicitDateFrom) {
+            return {
+                dateFrom: explicitDateFrom,
+                dateTo: explicitDateTo,
+            }
+        }
+        return { dateFrom: undefined, dateTo: undefined }
+    }, [selectedMonth, selectedYear, today, activeFilterType, explicitDateFrom, explicitDateTo])
 
+    // Handlers to set filter type preference
+    const handleMonthChange = (v: string) => {
+        setSelectedMonth(v === "ALL" ? "ALL" : parseInt(v))
+        setActiveFilterType("month")
+    }
+
+    const handleYearChange = (v: string) => {
+        setSelectedYear(parseInt(v))
+        setActiveFilterType("month")
+    }
+
+    const handleDateRangeChange = (from: Date | undefined, to: Date | undefined) => {
+        setExplicitDateFrom(from)
+        setExplicitDateTo(to)
+        if (from) {
+            setActiveFilterType("range")
+            setSelectedMonth("ALL") // Deactivate month filter when range is set
+        } else {
+            setActiveFilterType("month") // Revert to month filter if range is cleared
+        }
+    }
 
     const handleSort = (field: SortField) => {
         if (sortField === field) {
@@ -151,7 +173,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
             )
         }
 
-        // 2. Date range filter (handles both explicit range and month/year selection)
+        // 2. Date range filter
         if (dateFrom) {
             result = result.filter(b => b.vencimento >= dateFrom)
         }
@@ -192,6 +214,12 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
 
         return result
     }, [clientBoletos, searchTerm, dateFrom, dateTo, sortField, sortDirection])
+
+    // Calculate total value of filtered boletos
+    const totalFilteredValue = useMemo(() => {
+        return filteredAndSortedBoletos.reduce((sum, boleto) => sum + boleto.valor, 0)
+    }, [filteredAndSortedBoletos])
+
 
     const handleInputValorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const rawValue = e.target.value
@@ -301,10 +329,11 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
 
     const clearFilters = () => {
         setSearchTerm("")
-        setSelectedMonth(getMonth(today))
+        setSelectedMonth(previousMonth) // Reset to default (previous month)
         setSelectedYear(getYear(today))
-        setDateFrom(undefined)
-        setDateTo(undefined)
+        setExplicitDateFrom(undefined)
+        setExplicitDateTo(undefined)
+        setActiveFilterType("month")
         setSortField("vencimento")
         setSortDirection("asc")
     }
@@ -342,7 +371,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
         }
     }
 
-    const hasActiveFilters = searchTerm || selectedMonth !== getMonth(today) || selectedYear !== getYear(today) || dateFrom || dateTo
+    const hasActiveFilters = searchTerm || activeFilterType === "range" || selectedMonth !== previousMonth || selectedYear !== getYear(today)
 
     if (representationsLoading || boletosLoading) {
         return (
@@ -362,6 +391,20 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                 </Button>
             </div>
 
+            {/* Totalizer Card */}
+            <div className="p-4 rounded-lg border bg-card shadow-sm flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <DollarSign className="h-6 w-6 text-primary" />
+                    <div>
+                        <p className="text-sm text-muted-foreground">Valor Total dos Boletos Filtrados</p>
+                        <p className="text-xl font-bold text-primary">{formatCurrency(totalFilteredValue)}</p>
+                    </div>
+                </div>
+                <Badge variant="secondary" className="text-xs">
+                    {filteredAndSortedBoletos.length} {filteredAndSortedBoletos.length === 1 ? "Boleto" : "Boletos"}
+                </Badge>
+            </div>
+
             {/* Filters */}
             <div className="space-y-3">
                 <div className="flex flex-col md:flex-row gap-3">
@@ -379,9 +422,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                     <div className="flex gap-2 w-full md:w-auto">
                         <Select
                             value={selectedMonth.toString()}
-                            onValueChange={(v) => {
-                                setSelectedMonth(v === "ALL" ? "ALL" : parseInt(v))
-                            }}
+                            onValueChange={handleMonthChange}
                         >
                             <SelectTrigger className="w-full md:w-[150px]">
                                 <Filter className="mr-2 h-4 w-4" />
@@ -398,9 +439,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                         </Select>
                         <Select
                             value={selectedYear.toString()}
-                            onValueChange={(v) => {
-                                setSelectedYear(parseInt(v))
-                            }}
+                            onValueChange={handleYearChange}
                         >
                             <SelectTrigger className="w-full md:w-[100px]">
                                 <SelectValue />
@@ -415,33 +454,56 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                         </Select>
                     </div>
 
-                    {/* Date Range Filter (Hidden if Month/Year is selected) */}
-                    {selectedMonth === "ALL" && (
-                        <div className="flex gap-2">
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                    <Button variant="outline" className="gap-2">
-                                        <CalendarIcon className="h-4 w-4" />
-                                        {dateFrom ? format(dateFrom, "dd/MM/yy") : "De"}
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0">
-                                    <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} />
-                                </PopoverContent>
-                            </Popover>
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                    <Button variant="outline" className="gap-2">
-                                        <CalendarIcon className="h-4 w-4" />
-                                        {dateTo ? format(dateTo, "dd/MM/yy") : "Até"}
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0">
-                                    <Calendar mode="single" selected={dateTo} onSelect={setDateTo} />
-                                </PopoverContent>
-                            </Popover>
-                        </div>
-                    )}
+                    {/* Date Range Filter */}
+                    <div className="flex gap-2 w-full md:w-auto">
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button 
+                                    variant={activeFilterType === "range" ? "default" : "outline"} 
+                                    className="gap-2 w-full md:w-auto"
+                                    onClick={() => setActiveFilterType("range")}
+                                >
+                                    <CalendarIcon className="h-4 w-4" />
+                                    {explicitDateFrom ? format(explicitDateFrom, "dd/MM/yy") : "De"}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0">
+                                <Calendar 
+                                    mode="single" 
+                                    selected={explicitDateFrom} 
+                                    onSelect={(date) => handleDateRangeChange(date, explicitDateTo)} 
+                                />
+                            </PopoverContent>
+                        </Popover>
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button 
+                                    variant={activeFilterType === "range" ? "default" : "outline"} 
+                                    className="gap-2 w-full md:w-auto"
+                                    onClick={() => setActiveFilterType("range")}
+                                >
+                                    <CalendarIcon className="h-4 w-4" />
+                                    {explicitDateTo ? format(explicitDateTo, "dd/MM/yy") : "Até"}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0">
+                                <Calendar 
+                                    mode="single" 
+                                    selected={explicitDateTo} 
+                                    onSelect={(date) => handleDateRangeChange(explicitDateFrom, date)} 
+                                />
+                            </PopoverContent>
+                        </Popover>
+                        {(explicitDateFrom || explicitDateTo) && activeFilterType === "range" && (
+                            <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                onClick={() => handleDateRangeChange(undefined, undefined)}
+                            >
+                                <X className="h-4 w-4" />
+                            </Button>
+                        )}
+                    </div>
                 </div>
 
                 {hasActiveFilters && (
