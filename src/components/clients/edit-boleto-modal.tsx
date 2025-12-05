@@ -18,7 +18,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
-import { Plus, Trash2, Calendar as CalendarIcon, Save, X, ChevronsUpDown, Search, Loader2 } from "lucide-react"
+import { Plus, Trash2, Calendar as CalendarIcon, Save, X, ChevronsUpDown, Search, Loader2, Check } from "lucide-react"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
