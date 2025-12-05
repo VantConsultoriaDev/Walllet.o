@@ -18,18 +18,22 @@ export function useTransactions() {
         if (!user) return { error: { message: "Usuário não autenticado" } }
 
         const { id, ...updateData } = updatedTransaction;
+        
+        // Ensure amount is a number before formatting
+        const numericAmount = typeof updatedTransaction.amount === 'number' ? updatedTransaction.amount : parseFloat(updatedTransaction.amount as any);
 
         const { error } = await supabase
             .from('transactions')
             .update({
                 ...updateData,
-                amount: updatedTransaction.amount.toFixed(2),
+                amount: numericAmount.toFixed(2),
                 date: updatedTransaction.date.toISOString().split('T')[0],
             })
             .eq('id', id)
             .select()
 
         if (error) {
+            console.error("Erro ao atualizar transação:", error);
             toast({ title: "Erro", description: "Falha ao atualizar transação.", variant: "destructive" })
             return { error }
         }
@@ -51,6 +55,7 @@ export function useTransactions() {
             .eq('id', id)
 
         if (error) {
+            console.error("Erro ao excluir transação:", error);
             toast({ title: "Erro", description: "Falha ao excluir transação.", variant: "destructive" })
             return { error }
         }
@@ -119,19 +124,23 @@ export function useTransactions() {
 
     const addTransaction = useCallback(async (newTransaction: Omit<Transaction, 'id'>) => {
         if (!user) return { error: { message: "Usuário não autenticado" } }
+        
+        // Ensure amount is a number before formatting
+        const numericAmount = typeof newTransaction.amount === 'number' ? newTransaction.amount : parseFloat(newTransaction.amount as any);
 
         const { data, error } = await supabase
             .from('transactions')
             .insert({
                 ...newTransaction,
                 user_id: user.id,
-                amount: newTransaction.amount.toFixed(2), // Ensure amount is stored as numeric/string
+                amount: numericAmount.toFixed(2), // Ensure amount is stored as numeric/string
                 date: newTransaction.date.toISOString().split('T')[0], // Store date as YYYY-MM-DD
             })
             .select()
             .single()
 
         if (error) {
+            console.error("Erro ao adicionar transação:", error);
             toast({ title: "Erro", description: "Falha ao adicionar transação.", variant: "destructive" })
             return { error }
         }
@@ -172,10 +181,12 @@ export function useTransactions() {
             console.log(`Comissão CONFIRMADA para Boleto #${boletoId} já existe. Pulando criação.`);
             return { data: existingTransaction };
         }
+        
+        const numericAmount = typeof amount === 'number' ? amount : parseFloat(amount as any);
 
         const newTransaction: Omit<Transaction, 'id'> = {
             description: `${descriptionPrefix} - ${clientName}`,
-            amount: amount,
+            amount: numericAmount,
             type: "income",
             category: "Comissão", // Categoria para CONFIRMADA
             date: commissionDueDate, // Usa a data calculada
@@ -189,7 +200,7 @@ export function useTransactions() {
             .insert({
                 ...newTransaction,
                 user_id: user.id,
-                amount: newTransaction.amount.toFixed(2),
+                amount: numericAmount.toFixed(2),
                 date: newTransaction.date.toISOString().split('T')[0],
             })
             .select()
@@ -225,6 +236,8 @@ export function useTransactions() {
         // Verifica se a transação de comissão ESPERADA já existe para este boleto
         const descriptionPrefix = `Comissão Esperada Boleto #${boletoId}`;
         const expectedDateString = expectedDueDate.toISOString().split('T')[0];
+        
+        const numericAmount = typeof amount === 'number' ? amount : parseFloat(amount as any);
 
         // 1. Tenta encontrar uma transação existente com a mesma descrição e data
         let existingTransaction = transactions.find(t => 
@@ -235,9 +248,9 @@ export function useTransactions() {
 
         if (existingTransaction) {
             // Se a transação esperada já existe, verifica se o valor mudou.
-            if (existingTransaction.amount !== amount) {
+            if (existingTransaction.amount !== numericAmount) {
                 // Se o valor mudou, atualiza a transação existente.
-                const updatedTransaction = { ...existingTransaction, amount: amount };
+                const updatedTransaction = { ...existingTransaction, amount: numericAmount };
                 // Chamada para a função de atualização definida acima
                 await updateTransaction(updatedTransaction); 
                 console.log(`Comissão ESPERADA para Boleto #${boletoId} atualizada.`);
@@ -249,7 +262,7 @@ export function useTransactions() {
 
         const newTransaction: Omit<Transaction, 'id'> = {
             description: `${descriptionPrefix} - ${clientName}`,
-            amount: amount,
+            amount: numericAmount,
             type: "income",
             category: "Comissão Esperada", // Nova Categoria
             date: expectedDueDate,
@@ -263,7 +276,7 @@ export function useTransactions() {
             .insert({
                 ...newTransaction,
                 user_id: user.id,
-                amount: newTransaction.amount.toFixed(2),
+                amount: numericAmount.toFixed(2),
                 date: newTransaction.date.toISOString().split('T')[0],
             })
             .select()
