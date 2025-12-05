@@ -22,21 +22,28 @@ import { normalizeString } from "@/lib/utils"
 import { NewTransactionModal, type Transaction } from "@/components/financeiro/new-transaction-modal"
 import { RecurrenceActionDialog } from "@/components/financeiro/recurrence-action-dialog"
 import { useRepresentations } from "@/hooks/data/useRepresentations"
+import { EditBoletoModal } from "@/components/clients/edit-boleto-modal" // Importando o modal de edição de boleto
+import { useVehicles } from "@/hooks/data/useVehicles" // Importando useVehicles para obter a lista de veículos
 
 // Define o tipo de dado para a tabela (Boletos + Despesas)
 type FinanceiroRow = Boleto & { isBoleto: true } | (Transaction & { isBoleto: false })
 
 export default function Financeiro() {
     const { transactions, loading: transactionsLoading, addTransaction, updateTransaction, deleteTransaction } = useTransactions()
-    const { boletos: allBoletos, loading: boletosLoading, updateBoletoStatus, deleteBoleto, deleteRecurrenceGroup } = useBoletos()
+    const { boletos: allBoletos, loading: boletosLoading, updateBoletoStatus, deleteBoleto, deleteRecurrenceGroup, updateBoleto } = useBoletos()
     const { partners } = useRepresentations()
+    const { vehicles: allVehicles, loading: vehiclesLoading } = useVehicles() // Obtendo todos os veículos
 
     const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false)
     const [editingTransaction, setEditingTransaction] = useState<Transaction | undefined>(undefined)
     const [isRecurrenceDialogOpen, setIsRecurrenceDialogOpen] = useState(false)
     const [pendingDeleteTransaction, setPendingDeleteTransaction] = useState<Transaction | null>(null)
+    
+    // Estado para edição de Boleto
+    const [isEditBoletoModalOpen, setIsEditBoletoModalOpen] = useState(false)
+    const [selectedBoletoToEdit, setSelectedBoletoToEdit] = useState<Boleto | null>(null)
 
-    const loading = transactionsLoading || boletosLoading;
+    const loading = transactionsLoading || boletosLoading || vehiclesLoading;
 
     // --- Filter State ---
     const today = useMemo(() => new Date(), [])
@@ -249,6 +256,60 @@ export default function Financeiro() {
             handleTransactionDelete(transaction)
         }
     }
+    
+    const handleOpenBoletoEditModal = (boleto: Boleto) => {
+        setSelectedBoletoToEdit(boleto)
+        setIsEditBoletoModalOpen(true)
+    }
+
+    const handleBoletoSave = async (updatedBoleto: Boleto, scope: "this" | "all") => {
+        // Lógica de salvamento do boleto (copiada de ClientFinanceiro)
+        const originalBoleto = allBoletos.find(b => b.id === updatedBoleto.id);
+        
+        if (originalBoleto && originalBoleto.status !== updatedBoleto.status) {
+            await updateBoletoStatus(updatedBoleto.id, updatedBoleto.status, updatedBoleto.dataPagamento);
+        } else if (originalBoleto && originalBoleto.dataPagamento?.getTime() !== updatedBoleto.dataPagamento?.getTime()) {
+            if (updatedBoleto.status === 'paid' && updatedBoleto.dataPagamento) {
+                await updateBoletoStatus(updatedBoleto.id, 'paid', updatedBoleto.dataPagamento);
+            } else {
+                await updateBoletoStatus(updatedBoleto.id, 'pending');
+            }
+        } else {
+            await updateBoleto(updatedBoleto, scope)
+        }
+        
+        setIsEditBoletoModalOpen(false)
+        setSelectedBoletoToEdit(null)
+    }
+
+    const handleBoletoDelete = async (boleto: Boleto) => {
+        if (boleto.isRecurring && boleto.recurrenceGroupId) {
+            // Se for recorrente, perguntamos o escopo
+            setPendingDeleteTransaction({ ...boleto, isBoleto: true } as any) // Reutilizando o estado de deleção
+            setIsRecurrenceDialogOpen(true)
+        } else {
+            await deleteBoleto(boleto.id)
+        }
+        setIsEditBoletoModalOpen(false)
+        setSelectedBoletoToEdit(null)
+    }
+    
+    const handleRecurrenceDeleteAction = async (scope: "this" | "all") => {
+        if (pendingDeleteTransaction?.isBoleto) {
+            const boleto = pendingDeleteTransaction as Boleto & { isBoleto: true }
+            if (scope === "all" && boleto.recurrenceGroupId) {
+                await deleteRecurrenceGroup(boleto.recurrenceGroupId)
+            } else {
+                await deleteBoleto(boleto.id)
+            }
+        } else if (pendingDeleteTransaction) {
+            // Lógica de exclusão de transação normal
+            handleTransactionDelete(pendingDeleteTransaction as Transaction, scope)
+        }
+        setPendingDeleteTransaction(null)
+        setIsRecurrenceDialogOpen(false)
+    }
+
 
     const getStatusBadge = (status: Boleto['status']) => {
         switch (status) {
@@ -398,14 +459,15 @@ export default function Financeiro() {
                                                         : boleto.comissaoRecorrente;
                                                 }
                                                 
-                                                // Encontra a representação para obter o dia de pagamento
-                                                const rep = partners.find(p => p.id === boleto.representacaoId);
-                                                
                                                 // Data de referência: Vencimento do Boleto
                                                 const displayDate = boleto.vencimento;
 
                                                 return (
-                                                    <TableRow key={boleto.id} className="cursor-pointer hover:bg-muted/50 h-16">
+                                                    <TableRow 
+                                                        key={boleto.id} 
+                                                        className="cursor-pointer hover:bg-muted/50 h-16"
+                                                        onClick={() => handleOpenBoletoEditModal(boleto)} // Abre modal de edição de boleto
+                                                    >
                                                         <TableCell>
                                                             {boleto.isRecurring && <Repeat className="h-4 w-4 text-blue-600 dark:text-blue-400" />}
                                                         </TableCell>
@@ -438,7 +500,14 @@ export default function Financeiro() {
                                                             {getStatusBadge(boleto.status)}
                                                         </TableCell>
                                                         <TableCell>
-                                                            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); /* Open Boleto Edit Modal */ }}>
+                                                            <Button 
+                                                                variant="ghost" 
+                                                                size="icon" 
+                                                                onClick={(e) => { 
+                                                                    e.stopPropagation(); 
+                                                                    handleOpenBoletoEditModal(boleto);
+                                                                }}
+                                                            >
                                                                 <Pencil className="h-4 w-4 text-muted-foreground" />
                                                             </Button>
                                                         </TableCell>
@@ -452,7 +521,11 @@ export default function Financeiro() {
                                                 const displayDate = transaction.date;
 
                                                 return (
-                                                    <TableRow key={transaction.id} className="cursor-pointer hover:bg-muted/50 h-16" onClick={() => openEditTransactionModal(transaction)}>
+                                                    <TableRow 
+                                                        key={transaction.id} 
+                                                        className="cursor-pointer hover:bg-muted/50 h-16" 
+                                                        onClick={() => openEditTransactionModal(transaction)} // Abre modal de edição de transação
+                                                    >
                                                         <TableCell>
                                                             {transaction.isRecurrent && <Repeat className="h-4 w-4 text-blue-600 dark:text-blue-400" />}
                                                         </TableCell>
@@ -509,13 +582,23 @@ export default function Financeiro() {
                 onDelete={handleDeleteTransactionClick}
                 transactionToEdit={editingTransaction}
             />
+            
+            {/* Modal de Edição de Boleto */}
+            <EditBoletoModal
+                boleto={selectedBoletoToEdit}
+                open={isEditBoletoModalOpen}
+                onOpenChange={setIsEditBoletoModalOpen}
+                onSave={handleBoletoSave}
+                onDelete={handleBoletoDelete}
+                vehicles={allVehicles}
+            />
 
-            {/* Recurrence Delete Dialog */}
+            {/* Recurrence Delete Dialog (Reutilizado para Transação e Boleto) */}
             {pendingDeleteTransaction && (
                 <RecurrenceActionDialog
                     open={isRecurrenceDialogOpen}
                     onOpenChange={setIsRecurrenceDialogOpen}
-                    onAction={(scope) => handleTransactionDelete(pendingDeleteTransaction, scope)}
+                    onAction={handleRecurrenceDeleteAction}
                     actionType="delete"
                 />
             )}
