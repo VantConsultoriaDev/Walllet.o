@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast"
 import type { Boleto } from "@/types/agenda"
 import { addMonths, isBefore, isToday } from "date-fns"
 import { v4 as uuidv4 } from 'uuid'
+import { useTransactions } from "./useTransactions" // Importando useTransactions
 
 // Helper function to map DB object to Boleto type
 const mapDbToBoleto = (dbBoleto: any, clientName: string, representationName: string): Boleto => ({
@@ -51,6 +52,7 @@ const mapBoletoToDb = (boleto: Partial<Boleto>, userId: string) => ({
 export function useBoletos() {
     const { user } = useAuth()
     const { toast } = useToast()
+    const { addCommissionTransaction } = useTransactions() // Usando a nova função
     const [boletos, setBoletos] = useState<Boleto[]>([])
     const [loading, setLoading] = useState(true)
     const [isRefetching, setIsRefetching] = useState(false)
@@ -117,6 +119,10 @@ export function useBoletos() {
         setIsRefetching(false)
     }, [user, toast, boletos.length])
 
+    useEffect(() => {
+        fetchBoletos()
+    }, [user, fetchBoletos])
+
     const addBoletos = async (newBoletosData: Omit<Boleto, 'id' | 'representacao' | 'dueDate'>[]) => {
         if (!user) return { error: { message: "Usuário não autenticado" } }
 
@@ -150,14 +156,13 @@ export function useBoletos() {
     const updateBoletoStatus = async (boletoId: string, newStatus: Boleto['status']) => {
         if (!user) return { error: { message: "Usuário não autenticado" } }
 
-        const updateData: Partial<Boleto> = { status: newStatus }
-        if (newStatus === 'paid') {
-            updateData.dataPagamento = new Date()
-        }
+        const currentBoleto = boletos.find(b => b.id === boletoId);
+        if (!currentBoleto) return { error: { message: "Boleto não encontrado." } }
 
+        const paymentDate = new Date();
         const dbData = {
             status: newStatus,
-            data_pagamento: newStatus === 'paid' ? new Date().toISOString().split('T')[0] : null,
+            data_pagamento: newStatus === 'paid' ? paymentDate.toISOString().split('T')[0] : null,
         }
 
         const { data, error } = await supabase
@@ -172,13 +177,35 @@ export function useBoletos() {
             return { error }
         }
 
-        // Update local state
+        // 1. Gerar Transação de Comissão se o status for 'paid' e houver comissão recorrente
+        if (newStatus === 'paid' && currentBoleto.comissaoRecorrente && currentBoleto.comissaoTipo) {
+            let commissionAmount = currentBoleto.comissaoRecorrente;
+
+            if (currentBoleto.comissaoTipo === 'percentual') {
+                // Calcula o valor da comissão com base no valor do boleto
+                commissionAmount = (currentBoleto.valor * currentBoleto.comissaoRecorrente) / 100;
+            }
+
+            if (commissionAmount > 0) {
+                await addCommissionTransaction(
+                    currentBoleto.id,
+                    currentBoleto.clientName,
+                    commissionAmount,
+                    paymentDate, // Usamos a data de pagamento para calcular o mês seguinte
+                    currentBoleto.representacaoId,
+                    currentBoleto.representacao
+                );
+                toast({ title: "Comissão Registrada", description: `Comissão de ${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(commissionAmount)} agendada para o próximo mês.`, variant: "default" })
+            }
+        }
+
+        // 2. Update local state
         setBoletos(prev => prev.map(b => {
             if (b.id === boletoId) {
                 return {
                     ...b,
                     status: newStatus,
-                    dataPagamento: newStatus === 'paid' ? new Date() : undefined,
+                    dataPagamento: newStatus === 'paid' ? paymentDate : undefined,
                 }
             }
             return b

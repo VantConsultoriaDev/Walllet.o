@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
 import type { Transaction } from "@/components/financeiro/new-transaction-modal"
+import { addMonths } from "date-fns"
 
 export function useTransactions() {
     const { user } = useAuth()
@@ -79,7 +80,67 @@ export function useTransactions() {
         }
 
         setTransactions(prev => [addedTransaction, ...prev])
-        toast({ title: "Sucesso", description: "Transação adicionada com sucesso." })
+        // Note: We skip the toast here if called from addCommissionTransaction to avoid spamming the user.
+        return { data: addedTransaction }
+    }
+
+    const addCommissionTransaction = async (
+        boletoId: string,
+        clientName: string,
+        amount: number,
+        paymentDate: Date,
+        representacaoId?: string,
+        representacaoNome?: string
+    ) => {
+        if (!user) return { error: { message: "Usuário não autenticado" } }
+
+        // A comissão deve ser registrada no mês seguinte ao pagamento.
+        const commissionDate = addMonths(paymentDate, 1);
+        
+        // Verifica se a transação de comissão já existe para este boleto (para evitar duplicidade)
+        const existingTransaction = transactions.find(t => 
+            t.description.includes(`Comissão Boleto #${boletoId}`)
+        );
+
+        if (existingTransaction) {
+            console.log(`Comissão para Boleto #${boletoId} já existe. Pulando criação.`);
+            return { data: existingTransaction };
+        }
+
+        const newTransaction: Omit<Transaction, 'id'> = {
+            description: `Comissão Boleto #${boletoId} - ${clientName}`,
+            amount: amount,
+            type: "income",
+            category: "Comissão",
+            date: commissionDate,
+            isRecurrent: false,
+            representacaoId: representacaoId,
+            representacaoNome: representacaoNome,
+        }
+
+        const { data, error } = await supabase
+            .from('transactions')
+            .insert({
+                ...newTransaction,
+                user_id: user.id,
+                amount: newTransaction.amount.toFixed(2),
+                date: newTransaction.date.toISOString().split('T')[0],
+            })
+            .select()
+            .single()
+
+        if (error) {
+            console.error("Falha ao adicionar transação de comissão:", error);
+            return { error }
+        }
+
+        const addedTransaction: Transaction = {
+            ...data,
+            date: new Date(data.date),
+            amount: parseFloat(data.amount),
+        }
+
+        setTransactions(prev => [addedTransaction, ...prev])
         return { data: addedTransaction }
     }
 
@@ -126,5 +187,5 @@ export function useTransactions() {
         return { data: true }
     }
 
-    return { transactions, loading, isRefetching, fetchTransactions, addTransaction, updateTransaction, deleteTransaction }
+    return { transactions, loading, isRefetching, fetchTransactions, addTransaction, addCommissionTransaction, updateTransaction, deleteTransaction }
 }
