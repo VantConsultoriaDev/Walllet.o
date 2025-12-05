@@ -15,7 +15,7 @@ import {
 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useState } from "react"
-import { Logo } from "@/components/Logo"
+import { TextLogo } from "@/components/TextLogo"
 import { useAuth } from "@/components/auth-provider" // Importando useAuth para o logout
 
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> { }
@@ -59,7 +59,7 @@ export function Sidebar({ className }: SidebarProps) {
                 <div className="px-3 py-2">
                     <div className={cn("mb-6 flex items-center gap-3", (isCollapsed && !isMobile) ? "justify-center px-0" : "px-4")}>
                         <div className="shrink-0 transition-all duration-300">
-                            <Logo iconSize={8} variant={(isCollapsed && !isMobile) ? 'icon' : 'full'} />
+                            <TextLogo variant={(isCollapsed && !isMobile) ? 'icon' : 'full'} />
                         </div>
                     </div>
 

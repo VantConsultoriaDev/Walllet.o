@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Loader2, TrendingUp, DollarSign, Sun, Moon } from "lucide-react"
 import { motion } from "framer-motion"
-import { Logo } from "@/components/Logo"
+import { TextLogo } from "@/components/TextLogo"
 import { useTheme } from "@/components/theme-provider"
 import { useToast } from "@/hooks/use-toast"
 
@@ -122,7 +122,7 @@ export default function Login() {
                 <Card className="w-full bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-slate-200 dark:border-slate-800 shadow-2xl">
                     <CardHeader className="space-y-4 text-center pb-8">
                         <div className="mx-auto mb-4 scale-125">
-                            <Logo iconSize={10} variant="full" />
+                            <TextLogo variant="full" />
                         </div>
                         <CardDescription className="text-base text-slate-600 dark:text-slate-400">
                             Acesse sua carteira segura
