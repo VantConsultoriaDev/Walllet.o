@@ -28,6 +28,11 @@ import { useVehicles } from "@/hooks/data/useVehicles" // Importando useVehicles
 // Define o tipo de dado para a tabela (Boletos + Despesas)
 type FinanceiroRow = Boleto & { isBoleto: true } | (Transaction & { isBoleto: false })
 
+// Função utilitária para limpar o nome do cliente/título
+const cleanBoletoTitle = (title: string) => {
+    return title.replace(/\s*-\s*Proteauto/i, '').trim();
+}
+
 export default function Financeiro() {
     const { transactions, loading: transactionsLoading, addTransaction, updateTransaction, deleteTransaction } = useTransactions()
     const { boletos: allBoletos, loading: boletosLoading, updateBoletoStatus, deleteBoleto, deleteRecurrenceGroup, updateBoleto } = useBoletos()
@@ -500,8 +505,8 @@ export default function Financeiro() {
                                                         </TableCell>
                                                         <TableCell>
                                                             <div className="font-medium">
-                                                                {/* Exibe o nome do cliente (do boleto) */}
-                                                                {boleto.clientName}
+                                                                {/* Exibe o nome do cliente (do boleto), limpando o sufixo se existir */}
+                                                                {cleanBoletoTitle(boleto.clientName)}
                                                             </div>
                                                             <div className="text-xs text-muted-foreground">{boleto.representacao}</div>
                                                         </TableCell>
