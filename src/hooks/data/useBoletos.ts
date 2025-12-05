@@ -187,10 +187,40 @@ export function useBoletos() {
                 return boleto
             })
             setBoletos(formattedData)
+            
+            // --- CRITICAL FIX: Ensure Expected Commission Transactions exist for all fetched boletos ---
+            const boletosToProcess = formattedData.filter(b => b.comissaoRecorrente && b.comissaoTipo);
+            
+            // Processar em paralelo para não bloquear o UI, mas garantir que todas as chamadas sejam feitas
+            await Promise.all(boletosToProcess.map(async (boleto) => {
+                let commissionAmount = boleto.comissaoRecorrente!;
+
+                if (boleto.comissaoTipo === 'percentual') {
+                    commissionAmount = (boleto.valor * boleto.comissaoRecorrente!) / 100;
+                }
+
+                if (commissionAmount > 0) {
+                    const expectedDueDate = calculateExpectedCommissionDate(boleto.vencimento);
+                    
+                    // Esta função irá criar ou atualizar a transação esperada
+                    await addExpectedCommissionTransaction(
+                        boleto.id,
+                        boleto.clientName,
+                        commissionAmount,
+                        expectedDueDate,
+                        boleto.representacaoId,
+                        boleto.representacao
+                    );
+                }
+            }));
+            // --- FIM CRITICAL FIX ---
         }
         setLoading(false)
         setIsRefetching(false)
-    }, [user, toast, boletos.length])
+        
+        // CRITICAL: Fetch all transactions again after potentially creating new expected commissions
+        await fetchAllTransactions();
+    }, [user, toast, boletos.length, addExpectedCommissionTransaction, fetchAllTransactions])
 
     useEffect(() => {
         fetchBoletos()
@@ -260,8 +290,7 @@ export function useBoletos() {
         // Re-fetch all boletos to ensure names are correctly mapped after insertion
         await fetchBoletos() 
         
-        // CRITICAL FIX: Fetch all transactions to update the Financeiro screen
-        await fetchAllTransactions()
+        // NOTE: fetchAllTransactions is called inside fetchBoletos now.
 
         toast({ title: "Sucesso", description: `${data.length} boleto(s) adicionado(s) com sucesso.` })
         return { data: true } 
