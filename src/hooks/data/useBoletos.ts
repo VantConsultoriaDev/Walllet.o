@@ -154,6 +154,40 @@ export function useBoletos() {
         return { data: true } 
     }
 
+    const updateBoleto = async (updatedBoleto: Boleto, scope: "this" | "all" = "this") => {
+        if (!user) return { error: { message: "Usuário não autenticado" } }
+
+        const dbData = mapBoletoToDb(updatedBoleto, user.id)
+        
+        let query = supabase
+            .from('boletos')
+            .update(dbData)
+            .eq('user_id', user.id)
+
+        if (scope === "this" || !updatedBoleto.recurrenceGroupId) {
+            // Update only the current boleto
+            query = query.eq('id', updatedBoleto.id)
+        } else {
+            // Update this and all subsequent boletos in the recurrence group
+            query = query
+                .eq('recurrence_group_id', updatedBoleto.recurrenceGroupId)
+                .gte('vencimento', updatedBoleto.vencimento.toISOString().split('T')[0])
+        }
+
+        const { error } = await query.select()
+
+        if (error) {
+            toast({ title: "Erro", description: `Falha ao atualizar boleto(s): ${error.message}`, variant: "destructive" })
+            return { error }
+        }
+
+        // Re-fetch all boletos to ensure all affected recurring items are updated in state
+        await fetchBoletos()
+        
+        toast({ title: "Sucesso", description: `Boleto(s) atualizado(s) com sucesso.` })
+        return { data: updatedBoleto }
+    }
+
     const updateBoletoStatus = async (boletoId: string, newStatus: Boleto['status']) => {
         if (!user) return { error: { message: "Usuário não autenticado" } }
 
@@ -337,5 +371,5 @@ export function useBoletos() {
         fetchBoletos()
     }, [user, fetchBoletos])
 
-    return { boletos, loading, isRefetching, fetchBoletos, addBoletos, deleteBoleto, deleteRecurrenceGroup, updateBoletoStatus }
+    return { boletos, loading, isRefetching, fetchBoletos, addBoletos, updateBoleto, deleteBoleto, deleteRecurrenceGroup, updateBoletoStatus }
 }

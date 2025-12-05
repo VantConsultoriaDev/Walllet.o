@@ -19,7 +19,7 @@ import {
     TableRow,
 } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
-import { Plus, Trash2, Calendar as CalendarIcon, ArrowUpDown, ArrowUp, ArrowDown, Repeat, Search, Check, ChevronsUpDown, Loader2, Filter } from "lucide-react"
+import { Plus, Trash2, Calendar as CalendarIcon, ArrowUpDown, ArrowUp, ArrowDown, Repeat, Search, Check, ChevronsUpDown, Loader2, Filter, Pencil } from "lucide-react"
 import { format, addMonths, getMonth, getYear, setMonth, setYear, startOfMonth, endOfMonth } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -33,6 +33,7 @@ import { useBoletos } from "@/hooks/data/useBoletos"
 import { RecurrenceActionDialog } from "../financeiro/recurrence-action-dialog"
 import { v4 as uuidv4 } from 'uuid'
 import { BoletoDetailsModal } from "./boleto-details-modal"
+import { EditBoletoModal } from "./edit-boleto-modal" // <-- Novo Import
 import { formatCurrencyInput, parseCurrencyToFloat } from "@/lib/formatters" // Importando formatters
 
 interface ClientFinanceiroProps {
@@ -60,12 +61,16 @@ const MONTH_OPTIONS = [
 
 export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProps) {
     const { partners, loading: representationsLoading } = useRepresentations()
-    const { boletos: allBoletos, loading: boletosLoading, addBoletos, deleteBoleto, deleteRecurrenceGroup, updateBoletoStatus } = useBoletos()
+    const { boletos: allBoletos, loading: boletosLoading, addBoletos, updateBoleto, deleteBoleto, deleteRecurrenceGroup, updateBoletoStatus } = useBoletos()
 
     const [isNewBoletoOpen, setIsNewBoletoOpen] = useState(false)
     const [isRecurrenceDialogOpen, setIsRecurrenceDialogOpen] = useState(false)
     const [pendingDeleteBoleto, setPendingDeleteBoleto] = useState<Boleto | null>(null)
+    
+    // State for modals
     const [selectedBoleto, setSelectedBoleto] = useState<Boleto | null>(null)
+    const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false)
 
     // Filter boletos specific to this client
     const clientBoletos = useMemo(() => {
@@ -237,6 +242,11 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
         resetForm()
     }
 
+    const handleEditBoleto = async (updatedBoleto: Boleto, scope: "this" | "all") => {
+        await updateBoleto(updatedBoleto, scope)
+        // Close modal is handled by EditBoletoModal internally after successful save/recurrence action
+    }
+
     const handleDeleteClick = (boleto: Boleto) => {
         if (boleto.isRecurring && boleto.recurrenceGroupId) {
             setPendingDeleteBoleto(boleto)
@@ -259,7 +269,22 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
 
     const handleUpdateStatus = async (boletoId: string, newStatus: Boleto['status']) => {
         await updateBoletoStatus(boletoId, newStatus)
-        setSelectedBoleto(prev => prev ? { ...prev, status: newStatus, dataPagamento: newStatus === 'paid' ? new Date() : undefined } : null)
+        // Update selected boleto state in details modal
+        setSelectedBoleto(prev => {
+            if (!prev) return null
+            return prev.id === boletoId ? { ...prev, status: newStatus, dataPagamento: newStatus === 'paid' ? new Date() : undefined } : prev
+        })
+    }
+
+    const handleRowClick = (boleto: Boleto) => {
+        setSelectedBoleto(boleto)
+        setIsDetailsModalOpen(true)
+    }
+
+    const handleOpenEditModal = (boleto: Boleto) => {
+        setSelectedBoleto(boleto)
+        setIsDetailsModalOpen(false) // Close details modal
+        setIsEditModalOpen(true) // Open edit modal
     }
 
     const resetForm = () => {
@@ -355,7 +380,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                         <Select
                             value={selectedMonth.toString()}
                             onValueChange={(v) => {
-                                setSelectedMonth(parseInt(v) as number | "ALL")
+                                setSelectedMonth(v === "ALL" ? "ALL" : parseInt(v))
                             }}
                         >
                             <SelectTrigger className="w-full md:w-[150px]">
@@ -503,7 +528,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                                     <TableRow 
                                         key={boleto.id} 
                                         className="cursor-pointer hover:bg-muted/50"
-                                        onClick={() => setSelectedBoleto(boleto)}
+                                        onClick={() => handleRowClick(boleto)}
                                     >
                                         <TableCell>
                                             <div className="flex items-center gap-1">
@@ -538,10 +563,10 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                                                 size="icon"
                                                 onClick={(e) => {
                                                     e.stopPropagation()
-                                                    handleDeleteClick(boleto)
+                                                    handleOpenEditModal(boleto)
                                                 }}
                                             >
-                                                <Trash2 className="h-4 w-4 text-destructive" />
+                                                <Pencil className="h-4 w-4 text-muted-foreground" />
                                             </Button>
                                         </TableCell>
                                     </TableRow>
@@ -783,10 +808,21 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
             {/* Boleto Details Modal */}
             <BoletoDetailsModal
                 boleto={selectedBoleto}
-                isOpen={!!selectedBoleto}
-                onClose={() => setSelectedBoleto(null)}
+                isOpen={isDetailsModalOpen}
+                onClose={() => setIsDetailsModalOpen(false)}
                 onUpdateStatus={handleUpdateStatus}
                 onDelete={handleDeleteClick}
+                onEdit={() => handleOpenEditModal(selectedBoleto!)} // Passa a função para abrir o modal de edição
+            />
+
+            {/* Edit Boleto Modal */}
+            <EditBoletoModal
+                boleto={selectedBoleto}
+                open={isEditModalOpen}
+                onOpenChange={setIsEditModalOpen}
+                onSave={handleEditBoleto}
+                onDelete={handleDeleteClick}
+                vehicles={vehicles}
             />
 
             {/* Recurrence Delete Dialog */}

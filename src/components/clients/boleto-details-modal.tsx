@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { DollarSign, Calendar, Repeat, Car, CheckCircle, AlertTriangle, X } from "lucide-react"
+import { DollarSign, Calendar, Repeat, Car, CheckCircle, AlertTriangle, X, Pencil } from "lucide-react"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import type { Boleto } from "@/types/agenda"
@@ -21,7 +21,8 @@ interface BoletoDetailsModalProps {
     isOpen: boolean
     onClose: () => void
     onUpdateStatus: (boletoId: string, newStatus: Boleto['status']) => void
-    onDelete: (boleto: Boleto) => void
+    onDelete: (boleto: Boleto) => void // Mantido para compatibilidade, mas o botão de exclusão será movido
+    onEdit: () => void // <-- Novo prop para abrir o modal de edição
 }
 
 export function BoletoDetailsModal({
@@ -30,6 +31,7 @@ export function BoletoDetailsModal({
     onClose,
     onUpdateStatus,
     onDelete,
+    onEdit,
 }: BoletoDetailsModalProps) {
     if (!boleto) return null
 
@@ -169,11 +171,11 @@ export function BoletoDetailsModal({
 
                 <DialogFooter className="p-6 pt-4 border-t flex justify-between">
                     <Button
-                        variant="destructive"
-                        onClick={() => onDelete(boleto)}
+                        variant="outline"
+                        onClick={onEdit}
                         className="gap-2"
                     >
-                        <X className="h-4 w-4" /> Excluir Boleto
+                        <Pencil className="h-4 w-4" /> Editar Boleto
                     </Button>
                     <div className="flex gap-2">
                         {boleto.status !== 'paid' && (
