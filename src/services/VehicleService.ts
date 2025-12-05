@@ -37,6 +37,7 @@ const mapPlacaDataToCache = (data: PlacaData, userId: string) => ({
     chassi: data.chassi,
     fipe_code: data.fipeCode,
     fipe_value: data.fipeValue,
+    cached_at: new Date().toISOString(), // <-- Explicitly set cached_at
     // body_type, body_value, value are not directly from PlacaData, 
     // they are specific to the Vehicle model, so we omit them here.
 });
