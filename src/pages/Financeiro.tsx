@@ -445,13 +445,7 @@ export default function Financeiro() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {filteredRows.length === 0 ? (
-                                        <TableRow>
-                                            <TableCell colSpan={8} className="h-24 text-center">
-                                                Nenhuma movimentação encontrada no período.
-                                            </TableCell>
-                                        </TableRow>
-                                    ) : (
+                                    {filteredRows.length > 0 ? (
                                         filteredRows.map((row) => {
                                             if (row.isBoleto) {
                                                 const boleto = row as Boleto & { isBoleto: true }
