@@ -19,7 +19,7 @@ import {
     TableRow,
 } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
-import { Plus, Trash2, Calendar as CalendarIcon, ArrowUpDown, ArrowUp, ArrowDown, Repeat, Search, Check, ChevronsUpDown, Loader2, Filter, Pencil, DollarSign } from "lucide-react"
+import { Plus, Trash2, Calendar as CalendarIcon, ArrowUpDown, ArrowUp, ArrowDown, Repeat, Search, Check, ChevronsUpDown, Loader2, Filter, Pencil, DollarSign, X } from "lucide-react"
 import { format, addMonths, getMonth, getYear, setMonth, setYear, startOfMonth, endOfMonth, subMonths } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -482,7 +482,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                         <Popover>
                             <PopoverTrigger asChild>
                                 <Button 
-                                    variant={activeFilterType === "range" ? "default" : "outline"} 
+                                    variant={activeFilterType === "range" && explicitDateFrom ? "default" : "outline"} 
                                     className="gap-2 w-full md:w-auto"
                                     onClick={() => handleDateRangeChange(explicitDateFrom, explicitDateTo)} // Trigger re-evaluation
                                 >
@@ -501,7 +501,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                         <Popover>
                             <PopoverTrigger asChild>
                                 <Button 
-                                    variant={activeFilterType === "range" ? "default" : "outline"} 
+                                    variant={activeFilterType === "range" && explicitDateTo ? "default" : "outline"} 
                                     className="gap-2 w-full md:w-auto"
                                     onClick={() => handleDateRangeChange(explicitDateFrom, explicitDateTo)} // Trigger re-evaluation
                                 >
