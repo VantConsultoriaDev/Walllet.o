@@ -35,10 +35,11 @@ import { v4 as uuidv4 } from 'uuid'
 import { BoletoDetailsModal } from "./boleto-details-modal"
 import { EditBoletoModal } from "./edit-boleto-modal" // <-- Novo Import
 import { formatCurrencyInput, parseCurrencyToFloat } from "@/lib/formatters" // Importando formatters
+import type { Vehicle } from "@/hooks/data/useVehicles" // <-- Importando o tipo Vehicle completo
 
 interface ClientFinanceiroProps {
     client: any
-    vehicles: { plate: string; model: string }[]
+    vehicles: Vehicle[] // <-- CORRIGIDO: Usando o tipo Vehicle completo
 }
 
 type SortField = "vencimento" | "valor" | "placas" | "representacao"
@@ -494,7 +495,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                                 <Calendar 
                                     mode="single" 
                                     selected={explicitDateFrom} 
-                                    onSelect={(date) => handleDateRangeChange(date, explicitDateTo)} 
+                                    onSelect={(date) => handleDateRangeChange(explicitDateFrom, date)} 
                                 />
                             </PopoverContent>
                         </Popover>
