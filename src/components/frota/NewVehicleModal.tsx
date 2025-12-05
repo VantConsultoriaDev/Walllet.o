@@ -61,9 +61,9 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, onDelete, vehicl
                 setType("CARRO")
             }
             setPlacaError("")
-        } else {
-            setLoading(false)
-        }
+        } 
+        // Always reset loading state when modal state changes, especially when closing
+        setLoading(false)
     }, [open, vehicleToEdit, clientId])
 
     // Helper for safe integer parsing, defaulting to a fallback number
@@ -162,6 +162,7 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, onDelete, vehicl
                 bodyType: "",
             }))
         } finally {
+            // CRITICAL FIX: Ensure loading is always set to false here
             setLoading(false);
         }
     }, [toast, formData.type, type]) // Adicionado formData.type e type como dependências
@@ -363,31 +364,31 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, onDelete, vehicl
                                         <Label>Valor (Carreta) (R$)</Label>
                                         <Input value={formData.value || ""} onChange={e => setFormData({ ...formData, value: e.target.value })} />
                                     </div>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    <DialogFooter className="flex justify-between sm:justify-between">
-                        {vehicleToEdit && (
-                            <Button variant="destructive" onClick={handleDeleteClick}>
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Excluir Veículo
-                            </Button>
+                            </div>
                         )}
-                        <div className="flex gap-2">
-                            <Button variant="outline" onClick={() => onOpenChange(false)}>
-                                <X className="mr-2 h-4 w-4" />
-                                Cancelar
-                            </Button>
-                            <Button onClick={handleSubmit} disabled={!formData.plate || !formData.brand || !formData.model || loading}>
-                                <Save className="mr-2 h-4 w-4" />
-                                Salvar Veículo
-                            </Button>
-                        </div>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+                    </div>
+                </div>
+
+                <DialogFooter className="flex justify-between sm:justify-between">
+                    {vehicleToEdit && (
+                        <Button variant="destructive" onClick={handleDeleteClick}>
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Excluir Veículo
+                        </Button>
+                    )}
+                    <div className="flex gap-2">
+                        <Button variant="outline" onClick={() => onOpenChange(false)}>
+                            <X className="mr-2 h-4 w-4" />
+                            Cancelar
+                        </Button>
+                        <Button onClick={handleSubmit} disabled={!formData.plate || !formData.brand || !formData.model || loading}>
+                            <Save className="mr-2 h-4 w-4" />
+                            Salvar Veículo
+                        </Button>
+                    </div>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
 
             {/* Confirmation Dialog */}
             <ConfirmationDialog
