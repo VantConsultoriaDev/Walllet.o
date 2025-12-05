@@ -3,7 +3,7 @@ import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
 import type { Boleto } from "@/types/agenda"
-import { addMonths, isBefore, isToday, setDate, isWeekend, format, setHours, getDay, getDate, getMonth, getYear, nextMonday } from "date-fns"
+import { addMonths, isBefore, isToday, setDate, isWeekend, format, setHours, getDay, getDate, getMonth, getYear, nextMonday, startOfDay } from "date-fns"
 import { v4 as uuidv4 } from 'uuid'
 import { useTransactions } from "./useTransactions" // Importando useTransactions
 
@@ -200,7 +200,7 @@ export function useBoletos() {
             }
             
             // 4. Check for overdue status (only if not paid)
-            if (boleto.status !== 'paid' && isBefore(boleto.vencimento, setHours(new Date(), 0, 0, 0))) {
+            if (boleto.status !== 'paid' && isBefore(boleto.vencimento, startOfDay(new Date()))) {
                 boleto.status = 'overdue';
             }
 

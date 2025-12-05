@@ -19,7 +19,7 @@ import {
     TableRow,
 } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
-import { Plus, Trash2, Calendar as CalendarIcon, ArrowUpDown, ArrowUp, ArrowDown, Repeat, Search, Check, ChevronsUpDown, Loader2, Filter, Pencil, DollarSign, X } from "lucide-react"
+import { Plus, Trash2, Calendar as CalendarIcon, ArrowUpDown, ArrowUp, ArrowDown, Repeat, Search, Check, ChevronsUpDown, Loader2, Filter, Pencil, DollarSign, X, Wallet } from "lucide-react"
 import { format, addMonths, getMonth, getYear, setMonth, setYear, startOfMonth, endOfMonth, subMonths, setHours, isBefore, isAfter, isSameMonth, isSameYear } from "date-fns"
 import { ptBR as localePtBR } from "date-fns/locale" // Importação corrigida
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -917,7 +917,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
 
             {/* Edit Boleto Modal */}
             <EditBoletoModal
-                boleto={selectedBoletoToEdit}
+                boleto={selectedBoleto}
                 open={isEditModalOpen}
                 onOpenChange={setIsEditModalOpen}
                 onSave={handleBoletoSave}

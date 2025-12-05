@@ -224,7 +224,7 @@ export default function Agenda() {
                             <CardTitle className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <CalendarIcon className="h-5 w-5 text-primary" />
-                                    <span>Agenda de {date?.toLocaleDateString('pt-BR', { locale: localePtBR })}</span>
+                                    <span>Agenda de {date?.toLocaleDateString('pt-BR', { month: 'long', day: 'numeric' })}</span>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <Select
@@ -353,7 +353,7 @@ export default function Agenda() {
                 <Card className="col-span-5 h-full flex flex-col border-none shadow-md bg-card/50 backdrop-blur-sm">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="capitalize">
-                            {currentMonth.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric', locale: localePtBR })}
+                            {currentMonth.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
                         </CardTitle>
                         <div className="flex items-center space-x-1">
                             <Button variant="ghost" size="icon" onClick={prevMonth} className="h-8 w-8">
