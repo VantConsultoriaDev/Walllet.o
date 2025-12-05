@@ -154,7 +154,7 @@ export function EditBoletoModal({
     return (
         <>
             <Dialog open={open} onOpenChange={onOpenChange}>
-                <DialogContent className="max-w-md">
+                <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle className="text-2xl">Editar Boleto</DialogTitle>
                         <DialogDescription>
@@ -178,7 +178,7 @@ export function EditBoletoModal({
                                     <Button
                                         variant={"outline"}
                                         className={cn(
-                                            "justify-start text-left font-normal",
+                                            "justify-start text-left font-normal w-full",
                                             !vencimento && "text-muted-foreground"
                                         )}
                                     >
@@ -186,7 +186,7 @@ export function EditBoletoModal({
                                         {vencimento ? format(vencimento, "PPP", { locale: ptBR }) : <span>Selecione uma data</span>}
                                     </Button>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0">
+                                <PopoverContent className="w-auto p-0 z-[1000]">
                                     <Calendar
                                         mode="single"
                                         selected={vencimento}
@@ -215,7 +215,7 @@ export function EditBoletoModal({
                                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                     </Button>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-[300px] p-0 pointer-events-auto z-[100]" align="start">
+                                <PopoverContent className="w-[300px] p-0 pointer-events-auto z-[1000]" align="start">
                                     <div className="flex items-center border-b px-3">
                                         <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
                                         <input
