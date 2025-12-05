@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Plus, Trash2, Calendar as CalendarIcon, ArrowUpDown, ArrowUp, ArrowDown, Repeat, Search, Check, ChevronsUpDown, Loader2, Filter, Pencil, DollarSign, X } from "lucide-react"
-import { format, addMonths, getMonth, getYear, setMonth, setYear, startOfMonth, endOfMonth, subMonths } from "date-fns"
+import { format, addMonths, getMonth, getYear, setMonth, setYear, startOfMonth, endOfMonth, subMonths, setHours } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
@@ -99,7 +99,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
 
     // --- New Boleto Form State ---
     const [valor, setValor] = useState("") // Stored as formatted string
-    const [vencimento, setVencimento] = useState<Date>()
+    const [vencimento, setVencimento] = useState<Date | undefined>(undefined) // <-- Inicializado como undefined
     const [selectedPlates, setSelectedPlates] = useState<string[]>([])
     const [representacaoId, setRepresentacaoId] = useState("")
     const [isRecurring, setIsRecurring] = useState(false)
@@ -709,7 +709,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                                     <Button
                                         variant={"outline"}
                                         className={cn(
-                                            "justify-start text-left font-normal",
+                                            "justify-start text-left font-normal w-full",
                                             !vencimento && "text-muted-foreground"
                                         )}
                                     >
@@ -724,7 +724,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                                         onSelect={(date) => {
                                             // Ensure date is set to noon (12h) to prevent timezone issues on save
                                             setVencimento(setHours(date!, 12))
-                                            setIsCalendarOpen(false)
+                                            setIsCalendarOpen(false) // <-- FECHA O POPOVER AQUI
                                         }}
                                         initialFocus
                                     />
@@ -910,7 +910,9 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setIsNewBoletoOpen(false)}>Cancelar</Button>
-                        <Button onClick={handleAddBoleto}>Salvar</Button>
+                        <Button onClick={handleAddBoleto} disabled={!valor || !vencimento || selectedPlates.length === 0 || !representacaoId}>
+                            Salvar
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
