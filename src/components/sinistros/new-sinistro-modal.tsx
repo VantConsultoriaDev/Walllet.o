@@ -29,7 +29,7 @@ import { ptBR } from "date-fns/locale"
 import { cn } from "@/lib/utils"
 import { ClaimType, ThirdParty, ThirdPartyAssetType, CLAIM_TYPE_LABELS } from "@/types/sinistro"
 import { useClients, type Client } from "@/hooks/data/useClients"
-import type { Vehicle } from "@/components/frota/new-vehicle-modal"
+import type { Vehicle } from "@/hooks/data/useVehicles" // CORRIGIDO: Importando de useVehicles
 
 interface NewSinistroModalProps {
     isOpen: boolean

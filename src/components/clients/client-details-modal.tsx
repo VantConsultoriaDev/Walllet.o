@@ -22,7 +22,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Building2, User, Phone, Mail, MapPin, Car, FileText, Pencil, Save, X, Plus, Trash2 } from "lucide-react"
 import { ClientFinanceiro } from "./client-financeiro"
-import type { Vehicle } from "@/components/frota/new-vehicle-modal"
+import type { Vehicle } from "@/hooks/data/useVehicles" // CORRIGIDO: Importando de useVehicles
 import type { Client } from "@/hooks/data/useClients" // Import Client type from hook
 
 type ClientDetailsModalProps = {
