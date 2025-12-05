@@ -53,7 +53,7 @@ export function useBoletos() {
     const { user } = useAuth()
     const { toast } = useToast()
     // Desestruturando fetchTransactions do useTransactions
-    const { addCommissionTransaction, fetchTransactions } = useTransactions() 
+    const { addCommissionTransaction } = useTransactions() 
     const [boletos, setBoletos] = useState<Boleto[]>([])
     const [loading, setLoading] = useState(true)
     const [isRefetching, setIsRefetching] = useState(false)
@@ -222,6 +222,7 @@ export function useBoletos() {
             }
 
             if (commissionAmount > 0) {
+                // addCommissionTransaction agora atualiza o estado de transactions diretamente
                 await addCommissionTransaction(
                     currentBoleto.id,
                     currentBoleto.clientName,
@@ -231,8 +232,7 @@ export function useBoletos() {
                     currentBoleto.representacao
                 );
                 
-                // FORÇA O RECARREGAMENTO DAS TRANSAÇÕES APÓS ADICIONAR A COMISSÃO
-                await fetchTransactions(); 
+                // REMOVIDO: await fetchTransactions(); // Não é mais necessário, pois addCommissionTransaction atualiza o estado local
 
                 toast({ title: "Comissão Registrada", description: `Comissão de ${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(commissionAmount)} agendada para o próximo mês.`, variant: "default" })
             }

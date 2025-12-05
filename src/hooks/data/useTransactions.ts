@@ -15,9 +15,13 @@ export function useTransactions() {
     const fetchTransactions = useCallback(async () => {
         if (!user) {
             setLoading(false)
+            console.log("fetchTransactions: User not authenticated.")
             return
         }
 
+        console.log("fetchTransactions: Starting data fetch...")
+
+        // Only show full loading spinner if the list is empty
         if (transactions.length === 0) {
             setLoading(true)
         } else {
@@ -31,6 +35,7 @@ export function useTransactions() {
             .order('date', { ascending: false })
 
         if (error) {
+            console.error("fetchTransactions Error:", error)
             toast({
                 title: "Erro ao carregar transações",
                 description: error.message,
@@ -45,10 +50,11 @@ export function useTransactions() {
                 amount: parseFloat(t.amount),
             })) as Transaction[]
             setTransactions(formattedData)
+            console.log(`fetchTransactions: Successfully loaded ${formattedData.length} transactions.`)
         }
         setLoading(false)
         setIsRefetching(false)
-    }, [user, toast, transactions.length])
+    }, [user, toast]) // Removed transactions.length dependency
 
     useEffect(() => {
         fetchTransactions()
@@ -140,7 +146,9 @@ export function useTransactions() {
             amount: parseFloat(data.amount),
         }
 
+        // Adiciona ao estado local imediatamente
         setTransactions(prev => [addedTransaction, ...prev])
+        
         return { data: addedTransaction }
     }
 
