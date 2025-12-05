@@ -53,16 +53,27 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, onDelete, vehicl
                 setType(vehicleToEdit.type)
                 setFormData(vehicleToEdit)
             } else {
+                // Reset para novo veículo, garantindo que o ano não seja preenchido automaticamente
                 setFormData({ 
                     status: "active",
                     clientId: clientId,
-                    year: new Date().getFullYear(),
+                    plate: "",
+                    brand: "",
+                    model: "",
+                    year: undefined, // <-- Inicializa como undefined
+                    color: "",
+                    renavam: "",
+                    chassi: "",
+                    fipeCode: "",
+                    fipeValue: "",
+                    bodyType: "",
+                    bodyValue: "",
+                    value: "",
                 });
                 setType("CARRO")
             }
             setPlacaError("")
         } 
-        // Always reset loading state when modal state changes, especially when closing
         setLoading(false)
     }, [open, vehicleToEdit, clientId])
 
@@ -118,8 +129,8 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, onDelete, vehicl
                     plate: placaLimpa,
                     brand: data.marca || "",
                     model: data.modelo || "",
-                    // Usando 'ano' da API para o campo 'year'
-                    year: safeParseInt(data.ano, prev.year || new Date().getFullYear()), 
+                    // CORREÇÃO: Usar safeParseInt com fallback para undefined se a API não retornar ano válido
+                    year: safeParseInt(data.ano, undefined), 
                     color: data.cor || "",
                     chassi: data.chassi ? forceUpperCase(data.chassi) : "",
                     renavam: data.renavam || "",
@@ -135,7 +146,7 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, onDelete, vehicl
                     plate: placaLimpa,
                     brand: "",
                     model: "",
-                    year: prev.year, // Mantém o ano se já foi preenchido
+                    year: undefined, // <-- Limpa o ano se a consulta falhar
                     color: "",
                     chassi: "",
                     renavam: "",
@@ -153,7 +164,7 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, onDelete, vehicl
                 plate: placaLimpa,
                 brand: "",
                 model: "",
-                year: prev.year,
+                year: undefined, // <-- Limpa o ano em caso de erro
                 color: "",
                 chassi: "",
                 renavam: "",
@@ -162,7 +173,6 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, onDelete, vehicl
                 bodyType: "",
             }))
         } finally {
-            // CRITICAL FIX: Ensure loading is always set to false here
             setLoading(false);
         }
     }, [toast, formData.type, type]) // Adicionado formData.type e type como dependências
@@ -182,7 +192,8 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, onDelete, vehicl
         }
 
         if (formData.plate && formData.brand && formData.model) {
-            const finalYear = formData.year || new Date().getFullYear();
+            // Se o ano não foi preenchido pela API ou manualmente, usamos o ano atual como fallback APENAS no submit
+            const finalYear = formData.year || new Date().getFullYear(); 
 
             // CRITICAL FIX: Only include ID if editing an existing vehicle (UUID)
             const id = vehicleToEdit?.id;
@@ -227,7 +238,12 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, onDelete, vehicl
             <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
                     <Label>Ano *</Label>
-                    <Input type="number" value={formData.year || ""} onChange={e => setFormData({ ...formData, year: parseInt(e.target.value) })} required />
+                    <Input 
+                        type="number" 
+                        value={formData.year || ""} 
+                        onChange={e => setFormData({ ...formData, year: parseInt(e.target.value) })} 
+                        required 
+                    />
                 </div>
                 <div className="space-y-2">
                     <Label>Cor</Label>
@@ -364,31 +380,31 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, onDelete, vehicl
                                         <Label>Valor (Carreta) (R$)</Label>
                                         <Input value={formData.value || ""} onChange={e => setFormData({ ...formData, value: e.target.value })} />
                                     </div>
-                            </div>
-                        )}
+                                </div>
+                            )}
+                        </div>
                     </div>
-                </div>
 
-                <DialogFooter className="flex justify-between sm:justify-between">
-                    {vehicleToEdit && (
-                        <Button variant="destructive" onClick={handleDeleteClick}>
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Excluir Veículo
-                        </Button>
-                    )}
-                    <div className="flex gap-2">
-                        <Button variant="outline" onClick={() => onOpenChange(false)}>
-                            <X className="mr-2 h-4 w-4" />
-                            Cancelar
-                        </Button>
-                        <Button onClick={handleSubmit} disabled={!formData.plate || !formData.brand || !formData.model || loading}>
-                            <Save className="mr-2 h-4 w-4" />
-                            Salvar Veículo
-                        </Button>
-                    </div>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+                    <DialogFooter className="flex justify-between sm:justify-between">
+                        {vehicleToEdit && (
+                            <Button variant="destructive" onClick={handleDeleteClick}>
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Excluir Veículo
+                            </Button>
+                        )}
+                        <div className="flex gap-2">
+                            <Button variant="outline" onClick={() => onOpenChange(false)}>
+                                <X className="mr-2 h-4 w-4" />
+                                Cancelar
+                            </Button>
+                            <Button onClick={handleSubmit} disabled={!formData.plate || !formData.brand || !formData.model || loading}>
+                                <Save className="mr-2 h-4 w-4" />
+                                Salvar Veículo
+                            </Button>
+                        </div>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             {/* Confirmation Dialog */}
             <ConfirmationDialog
