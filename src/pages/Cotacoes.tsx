@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Plus, LayoutGrid, List, Loader2 } from "lucide-react"
+import { Plus, LayoutGrid, List, Loader2, Search } from "lucide-react"
 import { CotacaoColumn } from "@/components/cotacoes/cotacao-column"
 import { CotacaoModal } from "@/components/cotacoes/cotacao-modal"
 import { NewCotacaoModal } from "@/components/cotacoes/new-cotacao-modal"
@@ -32,6 +32,7 @@ export default function Cotacoes() {
     const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban")
     const [selectedCotacao, setSelectedCotacao] = useState<Cotacao | null>(null)
     const [isNewCotacaoModalOpen, setIsNewCotacaoModalOpen] = useState(false)
+    const [globalFilter, setGlobalFilter] = useState("") // Novo estado de busca global
 
     const filters: DataTableFilterConfig[] = [
         {
@@ -165,12 +166,41 @@ export default function Cotacoes() {
         addQuotation(newQuotation)
     }
 
+    const filteredQuotations = useMemo(() => {
+        if (!globalFilter) return quotations
+        const filterLower = normalizeString(globalFilter)
+        
+        return quotations.filter(cotacao => {
+            const asset = cotacao.asset
+            let assetDetails = ""
+            if (asset.type === "veiculo") {
+                assetDetails = `${asset.placa} ${asset.marca} ${asset.modelo}`
+            } else if (asset.type === "residencial") {
+                assetDetails = asset.endereco
+            } else if (asset.type === "outros") {
+                assetDetails = asset.descricao
+            }
+
+            const searchFields = [
+                cotacao.razaoSocialNome,
+                cotacao.cpfCnpj,
+                cotacao.nomeFantasia,
+                cotacao.representacaoNome,
+                ASSET_TYPE_LABELS[asset.type],
+                assetDetails,
+                cotacao.anuidade.toString(),
+            ].filter(Boolean).join(" ")
+            
+            return normalizeString(searchFields).includes(filterLower)
+        })
+    }, [quotations, globalFilter])
+
     const cotacoesByStatus = useMemo(() => {
         return COLUMNS.reduce((acc, column) => {
-            acc[column.status] = quotations.filter((cotacao) => cotacao.status === column.status)
+            acc[column.status] = filteredQuotations.filter((cotacao) => cotacao.status === column.status)
             return acc
         }, {} as Record<CotacaoStatus, Cotacao[]>)
-    }, [quotations])
+    }, [filteredQuotations])
 
     if (loading) {
         return (
@@ -185,6 +215,17 @@ export default function Cotacoes() {
             <div className="flex items-center justify-between mb-6">
                 <h2 className="text-3xl font-bold tracking-tight">Cotações</h2>
                 <div className="flex items-center gap-2">
+                    {/* Search Input */}
+                    <div className="relative w-full md:w-64">
+                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Buscar cliente, placa, valor..."
+                            value={globalFilter}
+                            onChange={(e) => setGlobalFilter(e.target.value)}
+                            className="pl-8"
+                        />
+                    </div>
+                    
                     <div className="flex items-center border rounded-md bg-background">
                         <Button
                             variant={viewMode === "kanban" ? "secondary" : "ghost"}
@@ -230,7 +271,14 @@ export default function Cotacoes() {
                     </div>
                 </div>
             ) : (
-                <DataTable columns={columns} data={quotations} filters={filters} onRowClick={handleCardClick} />
+                <DataTable 
+                    columns={columns} 
+                    data={quotations} 
+                    filters={filters} 
+                    onRowClick={handleCardClick} 
+                    globalFilter={globalFilter}
+                    setGlobalFilter={setGlobalFilter}
+                />
             )}
 
             <NewCotacaoModal

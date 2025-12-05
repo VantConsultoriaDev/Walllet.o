@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Plus, LayoutGrid, List, Calendar as CalendarIcon, X, Loader2 } from "lucide-react"
+import { Plus, LayoutGrid, List, Calendar as CalendarIcon, X, Loader2, Search } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
 import { KanbanColumn } from "@/components/sinistros/kanban-column"
@@ -36,6 +36,12 @@ export default function Sinistros() {
     const { claims, loading, addClaim, updateClaimStatus, addComment } = useClaims()
     const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban")
     const [selectedClaim, setSelectedClaim] = useState<Claim | null>(null)
+    const [isModalOpen, setIsModalOpen] = useState(false)
+    const [isNewSinistroModalOpen, setIsNewSinistroModalOpen] = useState(false)
+
+    const [dateFrom, setDateFrom] = useState<Date>()
+    const [dateTo, setDateTo] = useState<Date>()
+    const [globalFilter, setGlobalFilter] = useState("") // Novo estado de busca global
 
     const filters: DataTableFilterConfig[] = [
         {
@@ -154,11 +160,6 @@ export default function Sinistros() {
             },
         },
     ]
-    const [isModalOpen, setIsModalOpen] = useState(false)
-    const [isNewSinistroModalOpen, setIsNewSinistroModalOpen] = useState(false)
-
-    const [dateFrom, setDateFrom] = useState<Date>()
-    const [dateTo, setDateTo] = useState<Date>()
 
     const handleDrop = (claimId: string, newStatus: ClaimStatus) => {
         updateClaimStatus(claimId, newStatus)
@@ -199,6 +200,7 @@ export default function Sinistros() {
     const filteredClaims = useMemo(() => {
         let result = claims
 
+        // 1. Date filter
         if (dateFrom) {
             result = result.filter(c => c.date >= dateFrom)
         }
@@ -206,8 +208,27 @@ export default function Sinistros() {
             result = result.filter(c => c.date <= dateTo)
         }
 
+        // 2. Global search filter
+        if (globalFilter) {
+            const filterLower = normalizeString(globalFilter)
+            result = result.filter(claim => {
+                const searchFields = [
+                    claim.clientName,
+                    claim.clientPlate,
+                    claim.driverName,
+                    claim.driverCpf,
+                    CLAIM_TYPE_LABELS[claim.type],
+                    CLAIM_STATUS_LABELS[claim.status],
+                    claim.description,
+                    ...claim.thirdParties.map(tp => tp.name),
+                ].filter(Boolean).join(" ")
+                
+                return normalizeString(searchFields).includes(filterLower)
+            })
+        }
+
         return result
-    }, [claims, dateFrom, dateTo])
+    }, [claims, dateFrom, dateTo, globalFilter])
 
     const claimsByStatus = useMemo(() => {
         return COLUMNS.reduce((acc, column) => {
@@ -229,6 +250,17 @@ export default function Sinistros() {
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-4">
                 <h2 className="text-3xl font-bold tracking-tight">Sinistros</h2>
                 <div className="flex flex-col sm:flex-row items-center gap-2 w-full md:w-auto">
+                    {/* Search Input */}
+                    <div className="relative w-full sm:w-64">
+                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Buscar sinistro, cliente, placa..."
+                            value={globalFilter}
+                            onChange={(e) => setGlobalFilter(e.target.value)}
+                            className="pl-8"
+                        />
+                    </div>
+
                     <div className="flex items-center gap-2 w-full sm:w-auto">
                         <Popover>
                             <PopoverTrigger asChild>
@@ -306,7 +338,14 @@ export default function Sinistros() {
                     </div>
                 </div>
             ) : (
-                <DataTable columns={columns} data={filteredClaims} filters={filters} onRowClick={handleCardClick} />
+                <DataTable 
+                    columns={columns} 
+                    data={filteredClaims} 
+                    filters={filters} 
+                    onRowClick={handleCardClick} 
+                    globalFilter={globalFilter}
+                    setGlobalFilter={setGlobalFilter}
+                />
             )}
 
             <SinistroModal

@@ -1,6 +1,6 @@
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { Button } from "@/components/ui/button"
-import { Plus, LayoutGrid, List, Loader2 } from "lucide-react"
+import { Plus, LayoutGrid, List, Loader2, Search } from "lucide-react"
 import { ClientCard } from "@/components/clients/client-card"
 import { NewClientModal } from "@/components/clients/new-client-modal"
 import { ClientDetails } from "@/components/clients/client-details"
@@ -13,6 +13,7 @@ import { normalizeString } from "@/lib/utils"
 import { useClients, type Client } from "@/hooks/data/useClients"
 import { useVehicles } from "@/hooks/data/useVehicles"
 import type { Vehicle } from "@/hooks/data/useVehicles" // Importando Vehicle do hook correto
+import { Input } from "@/components/ui/input" // Importando Input
 
 export default function Clientes() {
     const { clients, loading: clientsLoading, addClient, updateClient, fetchClients } = useClients()
@@ -21,6 +22,7 @@ export default function Clientes() {
     const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
     const [selectedClient, setSelectedClient] = useState<Client | null>(null)
     const [newClientModalOpen, setNewClientModalOpen] = useState(false)
+    const [globalFilter, setGlobalFilter] = useState("") // Novo estado de busca global
 
     const loading = clientsLoading || vehiclesLoading;
 
@@ -218,6 +220,27 @@ export default function Clientes() {
         }
     }
 
+    const filteredClientsForGrid = useMemo(() => {
+        if (!globalFilter) return clients
+        const filterLower = normalizeString(globalFilter)
+        return clients.filter(client => {
+            const searchFields = [
+                client.name,
+                client.cpf,
+                client.cnpj,
+                client.email,
+                client.phone,
+                client.nomeFantasia,
+                client.razaoSocial,
+                ...client.vehicles.map(v => v.plate),
+                ...client.vehicles.map(v => v.model),
+            ].filter(Boolean).join(" ")
+            
+            return normalizeString(searchFields).includes(filterLower)
+        })
+    }, [clients, globalFilter])
+
+
     if (loading) {
         return (
             <div className="flex-1 flex items-center justify-center h-full">
@@ -231,6 +254,15 @@ export default function Clientes() {
             <div className="flex items-center justify-between space-y-2">
                 <h2 className="text-3xl font-bold tracking-tight">Clientes</h2>
                 <div className="flex items-center space-x-2">
+                    <div className="relative w-full md:w-64 mr-2">
+                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Buscar cliente..."
+                            value={globalFilter}
+                            onChange={(e) => setGlobalFilter(e.target.value)}
+                            className="pl-8"
+                        />
+                    </div>
                     <div className="flex items-center border rounded-md bg-background mr-2">
                         <Button
                             variant={viewMode === "grid" ? "secondary" : "ghost"}
@@ -272,7 +304,7 @@ export default function Clientes() {
                 <>
                     {viewMode === "grid" ? (
                         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                            {clients.map((client, index) => (
+                            {filteredClientsForGrid.map((client, index) => (
                                 <div
                                     key={client.id}
                                     style={{
@@ -287,10 +319,17 @@ export default function Clientes() {
                             ))}
                         </div>
                     ) : (
-                        <DataTable columns={columns} data={clients} filters={filters} onRowClick={setSelectedClient} />
+                        <DataTable 
+                            columns={columns} 
+                            data={clients} 
+                            filters={filters} 
+                            onRowClick={setSelectedClient} 
+                            globalFilter={globalFilter} // Passando o filtro global
+                            setGlobalFilter={setGlobalFilter} // Permitindo que o DataTableToolbar gerencie o filtro
+                        />
                     )}
 
-                    {clients.length === 0 && (
+                    {(viewMode === "grid" ? filteredClientsForGrid.length : clients.length) === 0 && (
                         <div className="text-center py-12">
                             <p className="text-muted-foreground">Nenhum cliente encontrado.</p>
                         </div>
