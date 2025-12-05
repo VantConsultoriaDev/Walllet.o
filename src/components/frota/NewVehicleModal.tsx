@@ -180,8 +180,11 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit, c
         if (formData.plate && formData.brand && formData.model) {
             const finalYear = formData.year || new Date().getFullYear();
 
+            // CRITICAL FIX: Only include ID if editing an existing vehicle (UUID)
+            const id = vehicleToEdit?.id;
+
             onSubmit({
-                id: vehicleToEdit?.id || Math.random().toString(36).substr(2, 9),
+                ...(id && { id }), // Conditionally include ID
                 type,
                 ...formData,
                 clientId: formData.clientId,
