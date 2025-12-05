@@ -3,7 +3,7 @@ import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
 import type { Boleto } from "@/types/agenda"
-import { addMonths, isBefore, isToday, setDate, isWeekend, format, setHours, getDay, getDate, getMonth, getYear } from "date-fns"
+import { addMonths, isBefore, isToday, setDate, isWeekend, format, setHours, getDay, getDate, getMonth, getYear, nextMonday } from "date-fns"
 import { v4 as uuidv4 } from 'uuid'
 import { useTransactions } from "./useTransactions" // Importando useTransactions
 
@@ -72,25 +72,16 @@ const calculateCommissionDate = (paymentDate: Date, commissionDay?: number): Dat
     let commissionDate = addMonths(setDate(paymentDate, 1), 1);
     
     if (commissionDay && commissionDay >= 1 && commissionDay <= 31) {
-        // 2. Define o dia do mês conforme configurado (Ex: dia 26)
+        // 2. Define o dia do mês conforme configurado
         commissionDate = setDate(commissionDate, commissionDay);
         
         // 3. Se cair em fim de semana, move para a próxima segunda-feira
         if (isWeekend(commissionDate)) {
-            const dayOfWeek = getDay(commissionDate);
-            
-            // Se Sábado (6), move para Segunda (2 dias depois)
-            if (dayOfWeek === 6) {
-                // Se for sábado, move para o dia 28 (se o dia configurado for 26) ou 2 dias depois
-                // Simplificando: se cair no fim de semana, move para a próxima segunda-feira
-                commissionDate = addMonths(commissionDate, 0); // Mantém o mês
-                commissionDate.setDate(commissionDate.getDate() + 2); // Move para segunda
-            } 
-            // Se Domingo (0), move para Segunda (1 dia depois)
-            else if (dayOfWeek === 0) {
-                commissionDate = addMonths(commissionDate, 0); // Mantém o mês
-                commissionDate.setDate(commissionDate.getDate() + 1); // Move para segunda
-            }
+            // nextMonday retorna a próxima segunda-feira, inclusive se for hoje.
+            // Se a data já for Sábado ou Domingo, nextMonday retorna a próxima Segunda.
+            // Se a data for Segunda a Sexta, retorna a própria data.
+            // Como já sabemos que é fim de semana, nextMonday resolve.
+            commissionDate = nextMonday(commissionDate);
         }
     } else {
         // Se não houver dia configurado, usa o 1º dia do mês seguinte (padrão)
@@ -133,9 +124,7 @@ export function useBoletos() {
             return
         }
 
-        // Removendo a dependência de boletos.length para evitar re-execução em cascata
-        // O estado de loading/refetching será controlado pela chamada externa.
-        // Se for a primeira chamada, setLoading(true).
+        // Só mostra o loading spinner na primeira carga (loading=true)
         if (boletos.length === 0) {
             setLoading(true)
         } else {
@@ -192,11 +181,8 @@ export function useBoletos() {
             setBoletos(formattedData)
             
             // --- CRITICAL FIX: Ensure Expected Commission Transactions exist for all fetched boletos ---
-            // Executar a criação/atualização de comissões esperadas de forma assíncrona e não bloqueante.
             const boletosToProcess = formattedData.filter(b => b.comissaoRecorrente && b.comissaoTipo);
             
-            // Usamos Promise.all para garantir que todas as chamadas sejam feitas, mas não bloqueamos o retorno do fetchBoletos
-            // O estado de transactions será atualizado pelo useTransactions, que não deve re-executar este fetch.
             Promise.all(boletosToProcess.map(async (boleto) => {
                 let commissionAmount = boleto.comissaoRecorrente!;
 
@@ -222,7 +208,7 @@ export function useBoletos() {
         setLoading(false)
         setIsRefetching(false)
         
-    }, [user, toast, addExpectedCommissionTransaction]) // Dependências: user, toast, addExpectedCommissionTransaction
+    }, [user, toast, addExpectedCommissionTransaction, boletos.length]) // Dependências: user, toast, addExpectedCommissionTransaction
 
     useEffect(() => {
         fetchBoletos()
