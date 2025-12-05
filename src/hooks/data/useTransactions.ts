@@ -99,8 +99,13 @@ export function useTransactions() {
                 date: new Date(t.date),
                 amount: parseFloat(t.amount),
             })) as Transaction[]
-            setTransactions(formattedData)
+            
             console.log(`fetchTransactions: Successfully loaded ${formattedData.length} transactions.`)
+            formattedData.filter(t => t.category === 'Comissão Esperada').forEach(t => {
+                console.log(`[Expected Commission] ID: ${t.id}, Date: ${t.date.toISOString().split('T')[0]}, Amount: ${t.amount}`);
+            });
+
+            setTransactions(formattedData)
         }
         setLoading(false)
         setIsRefetching(false)

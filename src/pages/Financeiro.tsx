@@ -12,8 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Plus, ArrowDownCircle, DollarSign, Search, Wallet, TrendingUp, ArrowUpDown, Loader2 } from "lucide-react"
 import { NewTransactionModal, type Transaction } from "@/components/financeiro/new-transaction-modal"
-import { format, isWithinInterval, startOfMonth, endOfMonth, subMonths } from "date-fns"
-import { ptBR } from "date-fns/locale"
+import { format, isWithinInterval, startOfMonth, endOfMonth, subMonths, ptBR, startOfDay, setHours } from "date-fns"
 import {
     ColumnDef,
     flexRender,
@@ -35,17 +34,23 @@ import { calculateExpectedCommissionDate } from "@/hooks/data/useBoletos"
 // Custom filter for date range
 const dateRangeFilter: FilterFn<Transaction> = (row, columnId, value: DateRange | undefined) => {
     if (!value?.from) return true
+    
     const rowDate = row.getValue(columnId) as Date
     
-    // Ensure rowDate is treated as a date without time component for comparison
-    const rowDateOnly = new Date(rowDate.getFullYear(), rowDate.getMonth(), rowDate.getDate());
+    // Normalize row date to start of day for accurate comparison
+    const rowDateOnly = startOfDay(rowDate);
     
-    const start = value.from;
-    const end = value.to ? new Date(value.to.getFullYear(), value.to.getMonth(), value.to.getDate(), 23, 59, 59) : undefined;
+    // Normalize filter dates to start/end of day
+    const start = startOfDay(value.from);
+    // Ensure 'to' date includes the entire day (up to 23:59:59)
+    const end = value.to ? setHours(value.to, 23, 59, 59) : undefined; 
 
     if (!end) {
+        // If only 'from' is set, check if row date is on or after 'from'
         return rowDateOnly.getTime() >= start.getTime()
     }
+    
+    // Check if row date is within the interval [start, end]
     return isWithinInterval(rowDateOnly, { start, end })
 }
 
@@ -274,32 +279,6 @@ export default function Financeiro() {
 
     const netProfit = monthlyCommissionConfirmed - monthlyExpenses
     
-    // --- OLD CALCULATION: Expected Commission (Removed as it's now handled by transactions) ---
-    // const monthlyCommissionExpected = useMemo(() => {
-    //     if (!dateRange?.from) return 0;
-
-    //     const start = dateRange.from;
-    //     const end = dateRange.to || new Date();
-
-    //     return allBoletos.reduce((sum, boleto) => {
-    //         if (boleto.comissaoRecorrente && boleto.comissaoTipo) {
-    //             const expectedDate = calculateExpectedCommissionDate(boleto.vencimento);
-                
-    //             if (isWithinInterval(expectedDate, { start, end })) {
-    //                 let commissionAmount = boleto.comissaoRecorrente;
-
-    //                 if (boleto.comissaoTipo === 'percentual') {
-    //                     commissionAmount = (boleto.valor * boleto.comissaoRecorrente) / 100;
-    //                 }
-    //                 return sum + commissionAmount;
-    //             }
-    //         }
-    //         return sum;
-    //     }, 0);
-    // }, [allBoletos, dateRange]);
-    // --- END OLD CALCULATION ---
-
-
     return (
         <div className="flex-1 space-y-4 p-4 pt-6 md:p-8 animate-in fade-in duration-500">
             <div className="flex items-center justify-between space-y-2">
