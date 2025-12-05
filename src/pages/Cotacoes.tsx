@@ -34,6 +34,8 @@ export default function Cotacoes() {
     const [isNewCotacaoModalOpen, setIsNewCotacaoModalOpen] = useState(false)
     const [globalFilter, setGlobalFilter] = useState("") // Novo estado de busca global
 
+    const hasData = quotations.length > 0;
+
     const filters: DataTableFilterConfig[] = [
         {
             columnId: "status",
@@ -246,7 +248,7 @@ export default function Cotacoes() {
                 </div>
             </div>
 
-            {loading ? (
+            {loading && !hasData ? (
                 <div className="flex-1 flex items-center justify-center h-full">
                     <Loader2 className="h-8 w-8 animate-spin text-primary" />
                 </div>

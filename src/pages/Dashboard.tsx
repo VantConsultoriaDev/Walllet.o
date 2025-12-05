@@ -76,9 +76,11 @@ export default function Dashboard() {
     const [currentMetric, setCurrentMetric] = useState("vendas")
 
     const loading = clientsLoading || transactionsLoading || quotationsLoading
+    const hasData = clients.length > 0 || transactions.length > 0 || quotations.length > 0
 
     const { kpis, chartData } = useMemo(() => {
-        if (loading) return { kpis: initialKpis, chartData: [] as MonthlyDataItem[] }
+        // Use initialKpis if no data is loaded yet
+        if (loading && !hasData) return { kpis: initialKpis, chartData: [] as MonthlyDataItem[] }
 
         const currentYear = new Date().getFullYear()
         const currentMonthIndex = new Date().getMonth()
@@ -87,22 +89,10 @@ export default function Dashboard() {
         const totalClients = clients.length
         const totalVehicles = clients.reduce((sum, client) => sum + client.vehicles.length, 0)
         
-        // NOTE: Since 'created_at' is not mapped on Client type, we use the first client's creation date as a proxy for 'new clients'
-        // For accurate data, we rely on the DB query in the hook, but here we use the data available.
-        // Assuming the client list is sorted by creation date (as per useClients hook)
         const newClientsThisMonth = clients.filter(c => {
-            // We need a date property on the client object. Since it's missing, we skip date filtering here
-            // or assume the client object has a date property (which it doesn't based on the provided type).
-            // For now, we'll use a mock date logic based on the client ID if necessary, but let's assume 
-            // the client object has a `createdAt` property (which we must add to the Client type later if needed).
-            // For now, let's use a simple filter based on the first client's creation date if available.
-            // Since we cannot modify the Client type here, we'll use a simplified count for the KPI.
             return c.status === 'active' // Simplified count for demo purposes
         }).length
 
-        // Re-calculating newClientsThisMonth based on the data structure available in the quotation hook (which has createdAt)
-        // Since clients don't have createdAt, we rely on transactions/quotations for monthly metrics.
-        
         const totalBilling = transactions
             .filter(t => t.type === 'income')
             .reduce((sum, t) => sum + t.amount, 0)
@@ -125,25 +115,19 @@ export default function Dashboard() {
         
         // --- Chart Data Aggregation ---
         const monthlyData: MonthlyDataItem[] = MONTHS.map((name, monthIndex) => {
-            // Filter clients based on their ID creation date (a rough proxy if no real date is available)
-            // Since we cannot rely on `c.created_at`, we skip client filtering by date here.
             
             const monthTransactions = transactions.filter(t => t.date.getFullYear() === currentYear && t.date.getMonth() === monthIndex)
             const monthQuotations = quotations.filter(q => q.createdAt.getFullYear() === currentYear && q.createdAt.getMonth() === monthIndex)
 
             const sales = monthQuotations.filter(q => q.status === 'cliente').length
             
-            // Calculate new clients based on quotations that became clients this month
             const newClients = monthQuotations.filter(q => q.status === 'cliente').length
             
-            // Calculate new plates based on vehicles added this month (requires vehicle creation date, which is also missing)
-            // We will use a simplified proxy: new plates = new clients * 1 (assuming 1 vehicle per new client for the chart)
             const newPlates = newClients * 1 
             
             const faturamento = monthTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0)
             const comissao = monthTransactions.filter(t => t.type === 'income' && t.category === 'Comissão').reduce((sum, t) => sum + t.amount, 0)
             
-            // Simplified patrimony calculation for the chart (total value of new contracts this month)
             const patrimonio = monthQuotations.filter(q => q.status === 'cliente').reduce((sum, q) => {
                 if (q.asset.type === 'veiculo') return sum + q.asset.valorFipe
                 return sum
@@ -201,7 +185,7 @@ export default function Dashboard() {
         }
 
         return { kpis, chartData: monthlyData }
-    }, [clients, transactions, quotations, loading])
+    }, [clients, transactions, quotations, loading, hasData])
 
     const currentChartData = (chartData as MonthlyDataItem[]).map((item: MonthlyDataItem) => ({
         name: item.name,
@@ -221,7 +205,7 @@ export default function Dashboard() {
                 </div>
             </motion.div>
 
-            {loading ? (
+            {loading && !hasData ? (
                 <div className="flex items-center justify-center py-12 text-muted-foreground">
                     <Loader2 className="h-6 w-6 animate-spin mr-2" /> Carregando dados do Dashboard...
                 </div>
@@ -260,7 +244,7 @@ export default function Dashboard() {
                             gradient="from-orange-500 to-red-500"
                             index={2}
                             totalValue={kpis.novasPlacas.totalValue}
-                            totalLabel={kpis.novasPlacas.totalLabel}
+                            totalLabel={kpis.novosClientes.totalLabel}
                         />
                         <KpiCard
                             title="Faturamento"

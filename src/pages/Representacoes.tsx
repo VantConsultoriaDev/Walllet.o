@@ -13,6 +13,8 @@ export default function Representacoes() {
     const [editingPartner, setEditingPartner] = useState<Partner | null>(null)
     const [searchTerm, setSearchTerm] = useState("")
 
+    const hasData = partners.length > 0;
+
     const handleNewRepresentacao = async (formData: NewRepresentacaoFormData) => {
         if (editingPartner) {
             // Update existing partner
@@ -93,7 +95,7 @@ export default function Representacoes() {
                 </div>
             </div>
             
-            {loading ? (
+            {loading && !hasData ? (
                 <div className="flex items-center justify-center py-12 text-muted-foreground">
                     <Loader2 className="h-6 w-6 animate-spin mr-2" /> Carregando representações...
                 </div>
@@ -139,7 +141,7 @@ export default function Representacoes() {
                 </div>
             )}
             
-            {(!loading && filteredPartners.length === 0) && (
+            {(!loading || hasData) && filteredPartners.length === 0 && (
                 <div className="text-center py-12">
                     <p className="text-muted-foreground">Nenhuma representação encontrada.</p>
                 </div>

@@ -24,7 +24,7 @@ export default function Clientes() {
     const [newClientModalOpen, setNewClientModalOpen] = useState(false)
     const [globalFilter, setGlobalFilter] = useState("") // Novo estado de busca global
 
-    const loading = clientsLoading || vehiclesLoading; // Mantido para referência, mas não bloqueia a renderização
+    const loading = clientsLoading || vehiclesLoading; // Mantido para referência
 
     const filters: DataTableFilterConfig[] = [
         {
@@ -294,7 +294,8 @@ export default function Clientes() {
                 />
             ) : (
                 <>
-                    {loading && (
+                    {/* Show loading only if the list is empty */}
+                    {loading && clients.length === 0 && (
                         <div className="flex items-center justify-center py-12 text-muted-foreground">
                             <Loader2 className="h-6 w-6 animate-spin mr-2" /> Carregando clientes...
                         </div>
@@ -326,7 +327,8 @@ export default function Clientes() {
                         />
                     )}
 
-                    {(!loading && (viewMode === "grid" ? filteredClientsForGrid.length : clients.length) === 0) && (
+                    {/* Show empty state only if not loading and list is empty */}
+                    {(!loading || clients.length > 0) && (viewMode === "grid" ? filteredClientsForGrid.length : clients.length) === 0 && (
                         <div className="text-center py-12">
                             <p className="text-muted-foreground">Nenhum cliente encontrado.</p>
                         </div>

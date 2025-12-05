@@ -43,6 +43,8 @@ export default function Sinistros() {
     const [dateTo, setDateTo] = useState<Date>()
     const [globalFilter, setGlobalFilter] = useState("") // Novo estado de busca global
 
+    const hasData = claims.length > 0;
+
     const filters: DataTableFilterConfig[] = [
         {
             columnId: "status",
@@ -313,7 +315,7 @@ export default function Sinistros() {
                 </div>
             </div>
 
-            {loading ? (
+            {loading && !hasData ? (
                 <div className="flex-1 flex items-center justify-center h-full">
                     <Loader2 className="h-8 w-8 animate-spin text-primary" />
                 </div>

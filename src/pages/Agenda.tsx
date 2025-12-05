@@ -32,6 +32,7 @@ export default function Agenda() {
     const [isEventModalOpen, setIsEventModalOpen] = useState(false)
 
     const loading = eventsLoading || boletosLoading;
+    const hasData = events.length > 0 || allBoletos.length > 0;
 
     // Filter events for the selected date
     const selectedDateEvents = useMemo(() => {
@@ -257,7 +258,7 @@ export default function Agenda() {
                             </div>
 
                             {/* Unified List */}
-                            {loading ? (
+                            {loading && !hasData ? (
                                 <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground text-sm">
                                     <Loader2 className="h-6 w-6 animate-spin mb-3 text-primary" />
                                     <p>Carregando agenda...</p>

@@ -79,7 +79,7 @@ export default function Financeiro() {
     }
 
     const handleDeleteTransaction = (transaction: Transaction, scope?: "this" | "all") => {
-        if (scope === "all" && transaction.recurrenceId) {
+        if (transaction.isRecurrent) {
             // NOTE: Deleting all recurrent transactions requires a specific DB query or function.
             // For now, we only delete the current instance.
             deleteTransaction(transaction.id)
@@ -337,7 +337,7 @@ export default function Financeiro() {
                     </div>
                 </CardHeader>
                 <CardContent>
-                    {loading ? (
+                    {loading && transactions.length === 0 ? (
                         <div className="flex items-center justify-center py-12 text-muted-foreground">
                             <Loader2 className="h-6 w-6 animate-spin mr-2" /> Carregando transações...
                         </div>
