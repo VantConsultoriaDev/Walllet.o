@@ -448,6 +448,7 @@ export function ClientDetails({ client, onBack, onStatusChange, onSave, onSaveVe
                 open={isAddingVehicle}
                 onOpenChange={setIsAddingVehicle}
                 onSubmit={handleSaveVehicle}
+                onDelete={handleRemoveVehicle} // <-- Passando a função de exclusão
                 vehicleToEdit={editingVehicle}
                 clientId={client.id}
             />

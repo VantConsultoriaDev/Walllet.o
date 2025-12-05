@@ -28,7 +28,7 @@ export function VehicleCard({ type, plate, brand, model, year, status, color, on
 
     return (
         <Card
-            className="cursor-pointer hover:shadow-lg transition-all duration-300 hover:scale-[1.02] border-l-4 border-l-primary"
+            className="cursor-pointer hover:shadow-lg transition-all duration-300 hover:scale-[1.02] border-l-4 border-l-primary min-h-[180px]"
             onClick={onClick}
         >
             <CardContent className="p-4">

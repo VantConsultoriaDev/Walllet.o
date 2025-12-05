@@ -17,7 +17,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
-import { Loader2, Save, X, RefreshCw } from "lucide-react"
+import { Loader2, Save, X, RefreshCw, Trash2 } from "lucide-react"
 import { VehicleService } from "@/services/VehicleService"
 import type { PlacaData } from "@/types/vehicle"
 import { useToast } from "@/hooks/use-toast"
@@ -27,6 +27,7 @@ type NewVehicleModalProps = {
     open: boolean
     onOpenChange: (open: boolean) => void
     onSubmit: (vehicle: Vehicle) => void
+    onDelete: (vehicleId: string) => void // <-- Nova prop para exclusão
     vehicleToEdit?: Vehicle
     clientId: string // Required to link the vehicle
 }
@@ -34,7 +35,7 @@ type NewVehicleModalProps = {
 // Utility to force uppercase
 const forceUpperCase = (str: string | undefined) => str ? str.toUpperCase() : undefined;
 
-export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit, clientId }: NewVehicleModalProps) {
+export function NewVehicleModal({ open, onOpenChange, onSubmit, onDelete, vehicleToEdit, clientId }: NewVehicleModalProps) {
     const { toast } = useToast()
     const [type, setType] = useState<VehicleType>("CARRO")
     const [loading, setLoading] = useState(false)
@@ -196,6 +197,13 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit, c
         }
     }
 
+    const handleDelete = () => {
+        if (vehicleToEdit && vehicleToEdit.id && confirm("Tem certeza que deseja excluir este veículo?")) {
+            onDelete(vehicleToEdit.id)
+            onOpenChange(false)
+        }
+    }
+
     const renderCommonFields = () => (
         <>
             <div className="grid grid-cols-2 gap-4">
@@ -352,15 +360,23 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, vehicleToEdit, c
                     </div>
                 </div>
 
-                <DialogFooter>
-                    <Button variant="outline" onClick={() => onOpenChange(false)}>
-                        <X className="mr-2 h-4 w-4" />
-                        Cancelar
-                    </Button>
-                    <Button onClick={handleSubmit} disabled={!formData.plate || !formData.brand || !formData.model || loading}>
-                        <Save className="mr-2 h-4 w-4" />
-                        Salvar Veículo
-                    </Button>
+                <DialogFooter className="flex justify-between sm:justify-between">
+                    {vehicleToEdit && (
+                        <Button variant="destructive" onClick={handleDelete}>
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Excluir Veículo
+                        </Button>
+                    )}
+                    <div className="flex gap-2">
+                        <Button variant="outline" onClick={() => onOpenChange(false)}>
+                            <X className="mr-2 h-4 w-4" />
+                            Cancelar
+                        </Button>
+                        <Button onClick={handleSubmit} disabled={!formData.plate || !formData.brand || !formData.model || loading}>
+                            <Save className="mr-2 h-4 w-4" />
+                            Salvar Veículo
+                        </Button>
+                    </div>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
