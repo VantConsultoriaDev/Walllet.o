@@ -164,7 +164,7 @@ export default function Dashboard() {
                 value: formatNumber(monthlyData[currentMonthIndex]?.placas || 0),
                 description: "veículos adicionados",
                 totalValue: formatNumber(totalVehicles),
-                totalLabel: "Total de Placas",
+                totalLabel: "Total de Placas", // CORRIGIDO AQUI
             },
             faturamento: {
                 value: formatCurrency(monthlyData[currentMonthIndex]?.faturamento || 0),
@@ -244,7 +244,7 @@ export default function Dashboard() {
                             gradient="from-orange-500 to-red-500"
                             index={2}
                             totalValue={kpis.novasPlacas.totalValue}
-                            totalLabel={kpis.novosClientes.totalLabel}
+                            totalLabel={kpis.novasPlacas.totalLabel} // CORRIGIDO AQUI
                         />
                         <KpiCard
                             title="Faturamento"
