@@ -13,6 +13,7 @@ const mapDbToPartner = (dbPartner: any): Partner => ({
     email: dbPartner.email,
     website: dbPartner.website,
     logo: dbPartner.logo_url,
+    commissionDay: dbPartner.commission_day, // Novo campo
 })
 
 // Helper function to map Partner type to DB object
@@ -23,6 +24,7 @@ const mapPartnerToDb = (partner: Partial<Partner>) => ({
     email: partner.email,
     website: partner.website,
     logo_url: partner.logo,
+    commission_day: partner.commissionDay, // Novo campo
 })
 
 export function useRepresentations() {

@@ -1,8 +1,8 @@
 import { useState, useMemo } from "react"
-import { Card, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
+import { Card, CardHeader, CardTitle, CardDescription, CardFooter, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Plus, ExternalLink, Loader2, Search } from "lucide-react"
+import { Plus, ExternalLink, Loader2, Search, Calendar } from "lucide-react"
 import { NewRepresentacaoModal, type NewRepresentacaoFormData, type Partner } from "@/components/representacoes/new-representacao-modal"
 import { useRepresentations } from "@/hooks/data/useRepresentations"
 import { normalizeString } from "@/lib/utils"
@@ -16,13 +16,19 @@ export default function Representacoes() {
     const hasData = partners.length > 0;
 
     const handleNewRepresentacao = async (formData: NewRepresentacaoFormData) => {
+        const partnerData = {
+            name: formData.nome,
+            type: formData.tipo,
+            website: formData.site,
+            commissionDay: formData.commissionDay, // Incluindo o dia
+            logo: formData.logo,
+        }
+
         if (editingPartner) {
             // Update existing partner
             const updatedPartner: Partner = {
                 ...editingPartner,
-                name: formData.nome,
-                type: formData.tipo,
-                website: formData.site,
+                ...partnerData,
                 // NOTE: Logo handling needs proper Supabase Storage implementation later
                 logo: formData.logo ? URL.createObjectURL(formData.logo) : editingPartner.logo,
             }
@@ -30,12 +36,7 @@ export default function Representacoes() {
             setEditingPartner(null)
         } else {
             // Create new partner
-            await addPartner({
-                name: formData.nome, // Corrected property name from 'nome' to 'name'
-                type: formData.tipo,
-                website: formData.site,
-                logo: formData.logo,
-            })
+            await addPartner(partnerData)
         }
     }
 
@@ -122,6 +123,14 @@ export default function Representacoes() {
                                 <CardTitle className="text-center">{partner.name}</CardTitle>
                                 <CardDescription className="text-center">{partner.type}</CardDescription>
                             </CardHeader>
+                            <CardContent className="pt-0">
+                                {partner.commissionDay && (
+                                    <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                                        <Calendar className="h-4 w-4" />
+                                        Dia de Pagamento: <span className="font-medium text-foreground">{partner.commissionDay}</span>
+                                    </div>
+                                )}
+                            </CardContent>
                             <CardFooter className="flex justify-center">
                                 {partner.website && (
                                     <Button

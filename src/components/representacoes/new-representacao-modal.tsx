@@ -26,6 +26,7 @@ export type NewRepresentacaoFormData = {
     tipo: RepresentacaoType
     site: string
     logo?: File | null
+    commissionDay?: number // Novo campo
 }
 
 export type Partner = {
@@ -36,6 +37,7 @@ export type Partner = {
     email: string
     website: string
     logo?: string
+    commissionDay?: number // Novo campo
 }
 
 interface NewRepresentacaoModalProps {
@@ -51,6 +53,7 @@ export function NewRepresentacaoModal({ isOpen, onClose, onSubmit, editingPartne
     const [site, setSite] = useState("")
     const [logo, setLogo] = useState<File | null>(null)
     const [logoPreview, setLogoPreview] = useState<string | null>(null)
+    const [commissionDay, setCommissionDay] = useState<string>("") // Novo estado
 
     // Load editing data when modal opens
     useEffect(() => {
@@ -60,6 +63,7 @@ export function NewRepresentacaoModal({ isOpen, onClose, onSubmit, editingPartne
             setSite(editingPartner.website)
             setLogoPreview(editingPartner.logo || null)
             setLogo(null)
+            setCommissionDay(editingPartner.commissionDay?.toString() || "") // Carrega o dia
         } else if (isOpen && !editingPartner) {
             // Reset for new entry
             setNome("")
@@ -67,6 +71,7 @@ export function NewRepresentacaoModal({ isOpen, onClose, onSubmit, editingPartne
             setSite("")
             setLogo(null)
             setLogoPreview(null)
+            setCommissionDay("") // Reseta o dia
         }
     }, [isOpen, editingPartner])
 
@@ -91,11 +96,15 @@ export function NewRepresentacaoModal({ isOpen, onClose, onSubmit, editingPartne
     const handleSubmit = () => {
         if (!nome.trim()) return
 
+        const day = parseInt(commissionDay)
+        const finalCommissionDay = isNaN(day) || day < 1 || day > 31 ? undefined : day
+
         const formData: NewRepresentacaoFormData = {
             nome: nome.trim(),
             tipo,
             site: site.trim(),
             logo,
+            commissionDay: finalCommissionDay,
         }
 
         onSubmit(formData)
@@ -108,6 +117,7 @@ export function NewRepresentacaoModal({ isOpen, onClose, onSubmit, editingPartne
         setSite("")
         setLogo(null)
         setLogoPreview(null)
+        setCommissionDay("")
         onClose()
     }
 
@@ -152,6 +162,23 @@ export function NewRepresentacaoModal({ isOpen, onClose, onSubmit, editingPartne
                                 <SelectItem value="Cooperativa">Cooperativa</SelectItem>
                             </SelectContent>
                         </Select>
+                    </div>
+
+                    {/* Dia de Pagamento de Comissão */}
+                    <div className="space-y-2">
+                        <Label htmlFor="commissionDay">Dia Comum de Pagamento de Comissão (1-31)</Label>
+                        <Input
+                            id="commissionDay"
+                            type="number"
+                            min="1"
+                            max="31"
+                            value={commissionDay}
+                            onChange={(e) => setCommissionDay(e.target.value)}
+                            placeholder="Ex: 26"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            Dia do mês em que as comissões recorrentes desta representação são pagas.
+                        </p>
                     </div>
 
                     {/* Site */}

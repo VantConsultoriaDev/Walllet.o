@@ -64,35 +64,39 @@ const mapBoletoToDb = (boleto: Partial<Boleto>, userId: string) => ({
 })
 
 /**
- * Calcula a data de vencimento da comissão com base na DATA DE PAGAMENTO do boleto.
- * Esta é a data em que a comissão CONFIRMADA será registrada.
+ * Calcula a data de vencimento da comissão com base na DATA DE PAGAMENTO do boleto
+ * e no dia de pagamento configurado na representação.
  */
-const calculateCommissionDate = (paymentDate: Date, representationName: string): Date => {
-    // Start with the 1st of the next month
+const calculateCommissionDate = (paymentDate: Date, commissionDay?: number): Date => {
+    // 1. Começa no 1º dia do mês seguinte ao pagamento
     let commissionDate = addMonths(setDate(paymentDate, 1), 1);
     
-    if (representationName.toLowerCase().includes("proteauto")) {
-        // Set to the 26th of the next month
-        commissionDate = setDate(commissionDate, 26);
+    if (commissionDay && commissionDay >= 1 && commissionDay <= 31) {
+        // 2. Define o dia do mês conforme configurado (Ex: dia 26)
+        commissionDate = setDate(commissionDate, commissionDay);
         
-        // Check if it's a weekend (0=Sunday, 6=Saturday)
+        // 3. Se cair em fim de semana, move para a próxima segunda-feira
         if (isWeekend(commissionDate)) {
             const dayOfWeek = getDay(commissionDate);
             
-            // If Saturday (6), move to Monday (2 days later)
+            // Se Sábado (6), move para Segunda (2 dias depois)
             if (dayOfWeek === 6) {
-                commissionDate = setDate(commissionDate, 28); 
+                commissionDate = addMonths(setDate(paymentDate, 28), 1); // Garante que o mês seja o correto
             } 
-            // If Sunday (0), move to Monday (1 day later)
+            // Se Domingo (0), move para Segunda (1 dia depois)
             else if (dayOfWeek === 0) {
-                commissionDate = setDate(commissionDate, 27); 
+                commissionDate = addMonths(setDate(paymentDate, 27), 1); // Garante que o mês seja o correto
             }
         }
+    } else {
+        // Se não houver dia configurado, usa o 1º dia do mês seguinte (padrão)
+        commissionDate = setDate(commissionDate, 1);
     }
     
-    // Ensure the returned date is fixed at noon to prevent timezone issues later
+    // Garante que a data retornada esteja fixada ao meio-dia
     return setHours(commissionDate, 12);
 };
+
 
 /**
  * Calcula a data de EXPECTATIVA da comissão com base na DATA DE VENCIMENTO do boleto.
@@ -134,11 +138,13 @@ export function useBoletos() {
         // Fetch necessary lookup data first
         const [{ data: clientsData }, { data: representationsData }] = await Promise.all([
             supabase.from('clients').select('id, name').eq('user_id', user.id),
-            supabase.from('representations').select('id, name').eq('user_id', user.id),
+            // Fetch commission_day here
+            supabase.from('representations').select('id, name, commission_day').eq('user_id', user.id),
         ])
 
         const clientMap = new Map(clientsData?.map(c => [c.id, c.name]))
-        const representationMap = new Map(representationsData?.map(r => [r.id, r.name]))
+        // Map representation ID to an object containing name and commission_day
+        const representationMap = new Map(representationsData?.map(r => [r.id, { name: r.name, commissionDay: r.commission_day }]))
 
         let query = supabase
             .from('boletos')
@@ -165,7 +171,9 @@ export function useBoletos() {
             const formattedData = data.map(dbBoleto => {
                 const clientName = clientMap.get(dbBoleto.client_id) || "Cliente Desconhecido"
                 const representationId = dbBoleto.representacao_id
-                const representationName = representationMap.get(representationId) || "N/A"
+                const representationInfo = representationMap.get(representationId)
+                const representationName = representationInfo?.name || "N/A"
+                
                 const boleto = mapDbToBoleto(dbBoleto, clientName, representationName)
                 
                 // Logic to mark as overdue if status is 'pending' and date is before today
@@ -319,6 +327,15 @@ export function useBoletos() {
         const currentBoleto = boletos.find(b => b.id === boletoId);
         if (!currentBoleto) return { error: { message: "Boleto não encontrado." } }
 
+        // Fetch representation info again to get the commission day
+        const { data: repData } = await supabase
+            .from('representations')
+            .select('commission_day')
+            .eq('id', currentBoleto.representacaoId)
+            .single()
+        
+        const commissionDay = repData?.commission_day;
+
         // Ensure paymentDate is fixed at noon if provided
         const paymentDate = newStatus === 'paid' ? (customPaymentDate ? setHours(customPaymentDate, 12) : setHours(new Date(), 12)) : undefined;
         
@@ -349,8 +366,8 @@ export function useBoletos() {
             }
 
             if (commissionAmount > 0) {
-                // Calcula a data de vencimento da comissão
-                const commissionDueDate = calculateCommissionDate(paymentDate, currentBoleto.representacao);
+                // Calcula a data de vencimento da comissão usando o commissionDay
+                const commissionDueDate = calculateCommissionDate(paymentDate, commissionDay);
 
                 await addCommissionTransaction(
                     currentBoleto.id,
