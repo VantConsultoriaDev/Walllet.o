@@ -33,4 +33,5 @@ export interface Boleto {
     recurrenceGroupId?: string
     comissaoRecorrente?: number
     comissaoTipo?: "percentual" | "valor"
+    commissionDay?: number // <-- NOVO CAMPO: Dia de pagamento da comissão da representação
 }

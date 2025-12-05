@@ -21,7 +21,7 @@ const parseDbDate = (dateString: string | null | undefined): Date | undefined =>
 };
 
 // Helper function to map DB object to Boleto type
-const mapDbToBoleto = (dbBoleto: any, clientName: string, representationName: string): Boleto => ({
+const mapDbToBoleto = (dbBoleto: any, clientName: string, representationInfo: { name: string, commissionDay?: number }): Boleto => ({
     id: dbBoleto.id,
     title: dbBoleto.title,
     valor: parseFloat(dbBoleto.valor),
@@ -32,7 +32,7 @@ const mapDbToBoleto = (dbBoleto: any, clientName: string, representationName: st
     // usamos o título do boleto como o nome do cliente.
     clientName: clientName !== "Cliente Desconhecido" ? clientName : (dbBoleto.title || "N/A"),
     placas: dbBoleto.placas || [],
-    representacao: representationName,
+    representacao: representationInfo.name,
     status: dbBoleto.status,
     dataPagamento: parseDbDate(dbBoleto.data_pagamento),
     isRecurring: dbBoleto.is_recurring,
@@ -43,6 +43,8 @@ const mapDbToBoleto = (dbBoleto: any, clientName: string, representationName: st
     comissaoTipo: dbBoleto.comissao_tipo,
     // Add representacaoId for internal use
     representacaoId: dbBoleto.representacao_id,
+    // Adicionando commissionDay para cálculo correto da data de comissão esperada
+    commissionDay: representationInfo.commissionDay, 
 })
 
 // Helper function to map Boleto type to DB object
@@ -75,14 +77,11 @@ const calculateCommissionDate = (paymentDate: Date, commissionDay?: number): Dat
     
     if (commissionDay && commissionDay >= 1 && commissionDay <= 31) {
         // 2. Define o dia do mês conforme configurado
+        // Se o dia configurado for maior que o número de dias do mês, setDate usa o último dia do mês.
         commissionDate = setDate(commissionDate, commissionDay);
         
         // 3. Se cair em fim de semana, move para a próxima segunda-feira
         if (isWeekend(commissionDate)) {
-            // nextMonday retorna a próxima segunda-feira, inclusive se for hoje.
-            // Se a data já for Sábado ou Domingo, nextMonday retorna a próxima Segunda.
-            // Se a data for Segunda a Sexta, retorna a própria data.
-            // Como já sabemos que é fim de semana, nextMonday resolve.
             commissionDate = nextMonday(commissionDate);
         }
     } else {
@@ -96,13 +95,25 @@ const calculateCommissionDate = (paymentDate: Date, commissionDay?: number): Dat
 
 
 /**
- * Calcula a data de EXPECTATIVA da comissão com base na DATA DE VENCIMENTO do boleto.
- * Esta é a data em que a comissão ESPERADA será registrada.
+ * Calcula a data de EXPECTATIVA da comissão com base na DATA DE VENCIMENTO do boleto
+ * E no dia de comissão da representação.
  */
-const calculateExpectedCommissionDate = (dueDate: Date): Date => {
-    // A comissão é esperada no 1º dia do mês seguinte ao vencimento do boleto.
+const calculateExpectedCommissionDate = (dueDate: Date, commissionDay?: number): Date => {
+    // 1. Começa no 1º dia do mês seguinte ao vencimento do boleto.
     let expectedDate = addMonths(dueDate, 1);
-    expectedDate = setDate(expectedDate, 1);
+    
+    if (commissionDay && commissionDay >= 1 && commissionDay <= 31) {
+        // 2. Define o dia do mês conforme configurado
+        expectedDate = setDate(expectedDate, commissionDay);
+        
+        // 3. Se cair em fim de semana, move para a próxima segunda-feira
+        if (isWeekend(expectedDate)) {
+            expectedDate = nextMonday(expectedDate);
+        }
+    } else {
+        // Se não houver dia configurado, usa o 1º dia do mês seguinte (padrão)
+        expectedDate = setDate(expectedDate, 1);
+    }
     
     // Fixar ao meio-dia
     return setHours(expectedDate, 12);
@@ -119,6 +130,62 @@ export function useBoletos() {
     const [boletos, setBoletos] = useState<Boleto[]>([])
     const [loading, setLoading] = useState(true)
     const [isRefetching, setIsRefetching] = useState(false)
+
+    // --- Core CRUD Functions (Defined first for stability) ---
+
+    const updateTransaction = useCallback(async (updatedTransaction: Transaction) => {
+        if (!user) return { error: { message: "Usuário não autenticado" } }
+
+        const { id, ...updateData } = updatedTransaction;
+        
+        // Ensure amount is a number before formatting
+        const numericAmount = typeof updatedTransaction.amount === 'number' ? updatedTransaction.amount : parseFloat(updatedTransaction.amount as any);
+
+        const { error } = await supabase
+            .from('transactions')
+            .update({
+                ...updateData,
+                amount: numericAmount.toFixed(2),
+                // CORREÇÃO: Usar format para garantir YYYY-MM-DD local
+                date: format(updatedTransaction.date, 'yyyy-MM-dd'),
+            })
+            .eq('id', id)
+            .select()
+
+        if (error) {
+            console.error("Erro ao atualizar transação:", error);
+            toast({ title: "Erro", description: "Falha ao atualizar transação.", variant: "destructive" })
+            return { error }
+        }
+
+        setTransactions(prev => prev.map(t => t.id === id ? updatedTransaction : t))
+        // Note: We skip the toast here if called internally by addExpectedCommissionTransaction
+        if (!updatedTransaction.description.includes("Comissão Esperada Boleto")) {
+            toast({ title: "Sucesso", description: "Transação atualizada com sucesso." })
+        }
+        return { data: updatedTransaction }
+    }, [user, toast])
+
+    const deleteTransaction = useCallback(async (id: string) => {
+        if (!user) return { error: { message: "Usuário não autenticado" } }
+
+        const { error } = await supabase
+            .from('transactions')
+            .delete()
+            .eq('id', id)
+
+        if (error) {
+            console.error("Erro ao excluir transação:", error);
+            toast({ title: "Erro", description: "Falha ao excluir transação.", variant: "destructive" })
+            return { error }
+        }
+
+        setTransactions(prev => prev.filter(t => t.id !== id))
+        toast({ title: "Sucesso", description: "Transação excluída com sucesso." })
+        return { data: true }
+    }, [user, toast])
+
+    // --- Fetching Logic ---
 
     const fetchBoletos = useCallback(async (clientId?: string) => {
         if (!user) {
@@ -169,10 +236,9 @@ export function useBoletos() {
             const formattedData = data.map(dbBoleto => {
                 const clientName = clientMap.get(dbBoleto.client_id) || "Cliente Desconhecido"
                 const representationId = dbBoleto.representacao_id
-                const representationInfo = representationMap.get(representationId)
-                const representationName = representationInfo?.name || "N/A"
+                const representationInfo = representationMap.get(representationId) || { name: "N/A", commissionDay: undefined }
                 
-                const boleto = mapDbToBoleto(dbBoleto, clientName, representationName)
+                const boleto = mapDbToBoleto(dbBoleto, clientName, representationInfo)
                 
                 // Logic to mark as overdue if status is 'pending' and date is before today
                 if (boleto.status === 'pending' && isBefore(boleto.vencimento, today) && !isToday(boleto.vencimento)) {
@@ -193,7 +259,8 @@ export function useBoletos() {
                 }
 
                 if (commissionAmount > 0) {
-                    const expectedDueDate = calculateExpectedCommissionDate(boleto.vencimento);
+                    // Passa o commissionDay para o cálculo correto
+                    const expectedDueDate = calculateExpectedCommissionDate(boleto.vencimento, boleto.commissionDay);
                     
                     await addExpectedCommissionTransaction(
                         boleto.id,
@@ -223,10 +290,10 @@ export function useBoletos() {
         const repIds = [...new Set(newBoletosData.map(b => b.representacaoId).filter(Boolean))]
         const { data: repsData } = await supabase
             .from('representations')
-            .select('id, name')
+            .select('id, name, commission_day')
             .in('id', repIds)
         
-        const repMap = new Map(repsData?.map(r => [r.id, r.name]))
+        const repMap = new Map(repsData?.map(r => [r.id, { name: r.name, commissionDay: r.commission_day }]))
 
         // Prepare data for batch insertion
         const dbData = newBoletosData.map(b => mapBoletoToDb({
@@ -248,8 +315,8 @@ export function useBoletos() {
         // --- CRIAÇÃO DA TRANSAÇÃO DE COMISSÃO ESPERADA ---
         const addedBoletos = data.map(dbBoleto => {
             const clientName = newBoletosData.find(b => b.clientId === dbBoleto.client_id)?.clientName || "N/A"
-            const representationName = repMap.get(dbBoleto.representacao_id) || "N/A"
-            return mapDbToBoleto(dbBoleto, clientName, representationName)
+            const representationInfo = repMap.get(dbBoleto.representacao_id) || { name: "N/A", commissionDay: undefined }
+            return mapDbToBoleto(dbBoleto, clientName, representationInfo)
         })
 
         // Processar comissões esperadas para os boletos recém-adicionados
@@ -262,7 +329,8 @@ export function useBoletos() {
                 }
 
                 if (commissionAmount > 0) {
-                    const expectedDueDate = calculateExpectedCommissionDate(boleto.vencimento);
+                    // Passa o commissionDay para o cálculo correto
+                    const expectedDueDate = calculateExpectedCommissionDate(boleto.vencimento, boleto.commissionDay);
                     
                     // Adiciona a transação de comissão esperada
                     await addExpectedCommissionTransaction(
@@ -584,5 +652,18 @@ export function useBoletos() {
         fetchBoletos()
     }, [user, fetchBoletos])
 
-    return { boletos, loading, isRefetching, fetchBoletos, addBoletos, updateBoleto, deleteBoleto, deleteRecurrenceGroup, updateBoletoStatus }
+    return { 
+        boletos, 
+        loading, 
+        isRefetching, 
+        fetchBoletos, 
+        addBoletos, 
+        updateBoleto, 
+        deleteBoleto, 
+        deleteRecurrenceGroup, 
+        updateBoletoStatus,
+        // Exportando updateTransaction e deleteTransaction para uso interno no Financeiro.tsx
+        updateTransaction,
+        deleteTransaction,
+    }
 }
