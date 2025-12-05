@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Plus, ArrowDownCircle, DollarSign, Search, Wallet, TrendingUp, ArrowUpDown, Loader2, Pencil, Repeat } from "lucide-react"
+import { Plus, ArrowDownCircle, DollarSign, Search, Wallet, TrendingUp, ArrowUpDown, Loader2, Pencil, Repeat, ArrowUp, ArrowDown } from "lucide-react"
 import { format, isWithinInterval, startOfMonth, endOfMonth, ptBR as localePtBR, isBefore, subMonths, getMonth, getYear, setMonth, setYear, setHours, isAfter } from "date-fns"
 import { DatePickerWithRange } from "@/components/ui/date-range-picker"
 import type { DateRange } from "react-day-picker"
