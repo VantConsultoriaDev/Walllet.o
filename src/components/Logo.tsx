@@ -17,6 +17,11 @@ export function Logo({ className, iconSize = 8, variant = 'full' }: LogoProps) {
     const height = size
     const viewBox = variant === 'full' ? "0 0 180 40" : "0 0 40 40"
 
+    // Positioning adjustments for the padlock (replacing the 'o')
+    // Full variant: Padlock starts around x=90 (after 'wallet')
+    const padlockX = variant === 'full' ? 90 : 4
+    const padlockY = variant === 'full' ? 4 : 4
+
     return (
         <div className={cn("relative flex items-center justify-center select-none", className)}>
             <svg
@@ -37,12 +42,12 @@ export function Logo({ className, iconSize = 8, variant = 'full' }: LogoProps) {
                         className="fill-slate-800 dark:fill-white transition-colors duration-300"
                         letterSpacing="-1"
                     >
-                        wallet.
+                        wallet
                     </text>
                 )}
 
                 {/* Padlock Icon - positioned as the 'o' */}
-                <g transform={variant === 'full' ? "translate(105, 4)" : "translate(4, 4)"}>
+                <g transform={`translate(${padlockX}, ${padlockY})`}>
                     {/* Shackle and Body (Primary Color) */}
                     <path
                         d="M16 2C11.5817 2 8 5.58172 8 10V14H6C4.89543 14 4 14.8954 4 16V28C4 29.1046 4.89543 30 6 30H26C27.1046 30 28 29.1046 28 28V16C28 14.8954 27.1046 14 26 14H24V10C24 5.58172 20.4183 2 16 2ZM12 10V14H20V10C20 7.79086 18.2091 6 16 6C13.7909 6 12 7.79086 12 10Z"
