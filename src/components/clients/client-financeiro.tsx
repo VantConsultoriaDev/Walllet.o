@@ -70,7 +70,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
     // State for modals
     const [selectedBoleto, setSelectedBoleto] = useState<Boleto | null>(null)
     const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
-    const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false) // Controla o modal de edição
 
     // Filter boletos specific to this client
     const clientBoletos = useMemo(() => {
@@ -330,7 +330,8 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
             await updateBoleto(updatedBoleto, scope)
         }
         
-        // Close modal is handled by EditBoletoModal internally after successful save/recurrence action
+        setIsEditModalOpen(false) // Close modal after save/recurrence action
+        setSelectedBoleto(updatedBoleto) // Update selected boleto in case details modal is open
     }
 
     const handleDeleteClick = (boleto: Boleto) => {
@@ -953,7 +954,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
 
             {/* Edit Boleto Modal */}
             <EditBoletoModal
-                boleto={selectedBoletoToEdit}
+                boleto={selectedBoleto} {/* CORRIGIDO: Usando selectedBoleto */}
                 open={isEditModalOpen}
                 onOpenChange={setIsEditModalOpen}
                 onSave={handleEditBoleto}
