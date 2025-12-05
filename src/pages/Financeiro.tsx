@@ -11,7 +11,8 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Plus, ArrowDownCircle, DollarSign, Search, Wallet, TrendingUp, ArrowUpDown, Loader2, Pencil, Repeat, ArrowUp, ArrowDown, Filter } from "lucide-react"
-import { format, isWithinInterval, startOfMonth, endOfMonth, ptBR as localePtBR, isBefore, subMonths, getMonth, getYear, setMonth, setYear, setHours, isAfter, isSameMonth, isSameYear } from "date-fns"
+import { format, isWithinInterval, startOfMonth, endOfMonth, isBefore, subMonths, getMonth, getYear, setMonth, setYear, setHours, isAfter, isSameMonth, isSameYear } from "date-fns"
+import { ptBR as localePtBR } from "date-fns/locale" // Importação correta do locale
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { DateRange } from "react-day-picker"
 import { useTransactions } from "@/hooks/data/useTransactions"
@@ -57,7 +58,7 @@ export default function Financeiro() {
     const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false)
     const [editingTransaction, setEditingTransaction] = useState<Transaction | undefined>(undefined)
     const [isRecurrenceDialogOpen, setIsRecurrenceDialogOpen] = useState(false)
-    const [pendingDeleteTransaction, setPendingDeleteTransaction] = useState<Transaction | null>(null)
+    const [pendingDeleteTransaction, setPendingDeleteTransaction] = useState<FinanceiroRow | null>(null)
     
     const [isEditBoletoModalOpen, setIsEditBoletoModalOpen] = useState(false)
     const [selectedBoletoToEdit, setSelectedBoletoToEdit] = useState<Boleto | null>(null)
@@ -98,7 +99,9 @@ export default function Financeiro() {
 
     const allRows: FinanceiroRow[] = useMemo(() => {
         const boletoRows: FinanceiroRow[] = allBoletos.map(b => ({ ...b, isBoleto: true }))
-        const transactionRows: FinanceiroRow[] = transactions.map(t => ({ ...t, isBoleto: false }))
+        
+        // Explicitly type transactionRows to allow filtering by category
+        const transactionRows = transactions.map(t => ({ ...t, isBoleto: false })) as (Transaction & { isBoleto: false })[]
         
         // Filter out expected commissions from the main list, as they are used for KPI calculation only
         return [...boletoRows, ...transactionRows.filter(t => t.category !== 'Comissão Esperada')]
@@ -285,7 +288,8 @@ export default function Financeiro() {
 
     const handleDeleteTransactionClick = (transaction: Transaction) => {
         if (transaction.isRecurrent) {
-            setPendingDeleteTransaction(transaction)
+            // Casting Transaction to FinanceiroRow for pendingDeleteTransaction state
+            setPendingDeleteTransaction({ ...transaction, isBoleto: false })
             setIsRecurrenceDialogOpen(true)
         } else {
             handleTransactionDelete(transaction)
@@ -323,7 +327,8 @@ export default function Financeiro() {
     const handleBoletoDelete = async (boleto: Boleto) => {
         if (boleto.isRecurring && boleto.recurrenceGroupId) {
             // Se for recorrente, perguntamos o escopo
-            setPendingDeleteTransaction({ ...boleto, isBoleto: true } as any) // Reutilizando o estado de deleção
+            // Casting Boleto to FinanceiroRow for pendingDeleteTransaction state
+            setPendingDeleteTransaction({ ...boleto, isBoleto: true })
             setIsRecurrenceDialogOpen(true)
         } else {
             await deleteBoleto(boleto.id)
@@ -572,7 +577,7 @@ export default function Financeiro() {
                                                         <TableCell className="w-[40px]">
                                                             <div className="flex items-center gap-1">
                                                                 {boleto.isRecurring && (
-                                                                    <Repeat className="h-4 w-4 text-blue-600 dark:text-blue-400" title="Recorrente" />
+                                                                    <Repeat className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                                                                 )}
                                                                 {boleto.comissaoRecorrente && (
                                                                     <span className="text-xs font-medium text-primary" title={`Comissão: ${formatCurrency(commissionAmount)}`}>
@@ -629,7 +634,7 @@ export default function Financeiro() {
                                                     >
                                                         <TableCell className="w-[40px]">
                                                             <div className="flex items-center gap-1">
-                                                                {transaction.isRecurrent && <Repeat className="h-4 w-4 text-blue-600 dark:text-blue-400" title="Recorrente" />}
+                                                                {transaction.isRecurrent && <Repeat className="h-4 w-4 text-blue-600 dark:text-blue-400" />}
                                                             </div>
                                                         </TableCell>
                                                         <TableCell>
