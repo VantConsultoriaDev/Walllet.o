@@ -190,15 +190,15 @@ export default function Clientes() {
         }
         
         // 1. Re-fetch clients to update the vehicle list in the global state
-        await fetchClients()
+        const updatedClients = await fetchClients()
         
         // 2. Find the updated client from the newly fetched global state
-        // We use the functional update form of setSelectedClient to ensure we get the latest 'clients' array
-        setSelectedClient(prevSelectedClient => {
-            if (!prevSelectedClient) return null;
-            const updatedClient = clients.find(c => c.id === prevSelectedClient.id);
-            return updatedClient || prevSelectedClient;
-        });
+        if (updatedClients && selectedClient) {
+            const updatedClient = updatedClients.find(c => c.id === selectedClient.id);
+            if (updatedClient) {
+                setSelectedClient(updatedClient);
+            }
+        }
     }
 
     const handleDeleteVehicle = async (vehicleId: string) => {
@@ -207,14 +207,15 @@ export default function Clientes() {
         await deleteVehicle(vehicleId);
         
         // 1. Re-fetch clients to update the vehicle list in the global state
-        await fetchClients();
+        const updatedClients = await fetchClients();
         
         // 2. Update selected client state locally to reflect changes immediately
-        setSelectedClient(prevSelectedClient => {
-            if (!prevSelectedClient) return null;
-            const updatedClient = clients.find(c => c.id === prevSelectedClient.id);
-            return updatedClient || prevSelectedClient;
-        });
+        if (updatedClients && selectedClient) {
+            const updatedClient = updatedClients.find(c => c.id === selectedClient.id);
+            if (updatedClient) {
+                setSelectedClient(updatedClient);
+            }
+        }
     }
 
     if (loading) {

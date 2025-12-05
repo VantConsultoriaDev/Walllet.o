@@ -106,10 +106,10 @@ export function useClients() {
     const [clients, setClients] = useState<Client[]>([])
     const [loading, setLoading] = useState(true)
 
-    const fetchClients = async () => {
+    const fetchClients = async (): Promise<Client[]> => {
         if (!user) {
             setLoading(false)
-            return
+            return []
         }
 
         setLoading(true)
@@ -129,7 +129,7 @@ export function useClients() {
             })
             setClients([])
             setLoading(false)
-            return
+            return []
         }
 
         // 2. Fetch all vehicles for the user
@@ -153,6 +153,7 @@ export function useClients() {
 
         setClients(formattedClients)
         setLoading(false)
+        return formattedClients
     }
 
     useEffect(() => {
