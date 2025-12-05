@@ -419,6 +419,7 @@ export default function Financeiro() {
                             <Table>
                                 <TableHeader>
                                     <TableRow className="hover:bg-transparent border-b border-border">
+                                        <TableHead className="w-[40px]"></TableHead> {/* Coluna para ícones */}
                                         <TableHead>Descrição / Cliente</TableHead>
                                         <TableHead>Placa(s)</TableHead>
                                         <TableHead>Categoria</TableHead>
@@ -444,7 +445,13 @@ export default function Financeiro() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {filteredRows.length > 0 ? (
+                                    {filteredRows.length === 0 ? (
+                                        <TableRow>
+                                            <TableCell colSpan={8} className="h-24 text-center">
+                                                Nenhuma movimentação encontrada no período.
+                                            </TableCell>
+                                        </TableRow>
+                                    ) : (
                                         filteredRows.map((row) => {
                                             if (row.isBoleto) {
                                                 const boleto = row as Boleto & { isBoleto: true }
@@ -466,11 +473,22 @@ export default function Financeiro() {
                                                         className="cursor-pointer hover:bg-muted/50 h-16"
                                                         onClick={() => handleOpenBoletoEditModal(boleto)} // Abre modal de edição de boleto
                                                     >
+                                                        <TableCell className="w-[40px]">
+                                                            <div className="flex items-center gap-1">
+                                                                {boleto.isRecurring && (
+                                                                    <Repeat className="h-4 w-4 text-blue-600 dark:text-blue-400" title="Recorrente" />
+                                                                )}
+                                                                {boleto.comissaoRecorrente && (
+                                                                    <span className="text-xs font-medium text-primary" title={`Comissão: ${formatCurrency(commissionAmount)}`}>
+                                                                        💰
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </TableCell>
                                                         <TableCell>
-                                                            <div className="font-medium flex items-center gap-2">
+                                                            <div className="font-medium">
                                                                 {/* Exibe o nome do cliente (que deve ser 'CONSTRUTORA SANTANA') */}
                                                                 {boleto.clientName}
-                                                                {boleto.isRecurring && <Repeat className="h-4 w-4 text-blue-600 dark:text-blue-400" title="Recorrente" />}
                                                             </div>
                                                             <div className="text-xs text-muted-foreground">{boleto.representacao}</div>
                                                         </TableCell>
@@ -513,10 +531,14 @@ export default function Financeiro() {
                                                         className="cursor-pointer hover:bg-muted/50 h-16" 
                                                         onClick={() => openEditTransactionModal(transaction)} // Abre modal de edição de transação
                                                     >
-                                                        <TableCell>
-                                                            <div className="font-medium flex items-center gap-2">
-                                                                {transaction.description}
+                                                        <TableCell className="w-[40px]">
+                                                            <div className="flex items-center gap-1">
                                                                 {transaction.isRecurrent && <Repeat className="h-4 w-4 text-blue-600 dark:text-blue-400" title="Recorrente" />}
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <div className="font-medium">
+                                                                {transaction.description}
                                                             </div>
                                                             {transaction.representacaoNome && <div className="text-xs text-muted-foreground">{transaction.representacaoNome}</div>}
                                                         </TableCell>
@@ -545,7 +567,7 @@ export default function Financeiro() {
                                         })
                                     ) : (
                                         <TableRow>
-                                            <TableCell colSpan={7} className="h-24 text-center">
+                                            <TableCell colSpan={8} className="h-24 text-center">
                                                 Nenhuma movimentação encontrada no período.
                                             </TableCell>
                                         </TableRow>
