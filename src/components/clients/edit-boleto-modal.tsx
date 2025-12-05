@@ -19,7 +19,7 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { Plus, Trash2, Calendar as CalendarIcon, Save, X, ChevronsUpDown, Search, Loader2, Check } from "lucide-react"
-import { format } from "date-fns"
+import { format, setHours } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
@@ -105,6 +105,12 @@ export function EditBoletoModal({
                 : [...current, plate]
         )
     }
+    
+    // Helper to correct date timezone offset
+    const correctDateOffset = (date: Date | undefined): Date | undefined => {
+        if (!date) return undefined;
+        return setHours(date, 12);
+    }
 
     const handleSubmit = () => {
         if (!valor || !vencimento || selectedPlates.length === 0 || !representacaoId) return
@@ -112,15 +118,19 @@ export function EditBoletoModal({
         const floatValor = parseCurrencyToFloat(valor)
         const floatComissao = comissaoRecorrente ? parseCurrencyToFloat(comissaoRecorrente) : undefined
 
+        // Apply timezone correction to dates before saving
+        const correctedVencimento = correctDateOffset(vencimento)!;
+        const correctedDataPagamento = correctDateOffset(dataPagamento);
+
         // Determine final status based on payment date
-        const finalStatus: Boleto['status'] = dataPagamento ? 'paid' : boleto.status === 'paid' ? 'pending' : boleto.status;
+        const finalStatus: Boleto['status'] = correctedDataPagamento ? 'paid' : boleto.status === 'paid' ? 'pending' : boleto.status;
 
         const updatedBoleto: Boleto = {
             ...boleto,
             valor: floatValor,
-            vencimento: vencimento,
-            dueDate: vencimento,
-            dataPagamento: dataPagamento, // <-- Salva a data de pagamento
+            vencimento: correctedVencimento,
+            dueDate: correctedVencimento,
+            dataPagamento: correctedDataPagamento, // <-- Salva a data de pagamento corrigida
             status: finalStatus, // <-- Atualiza o status
             placas: selectedPlates,
             representacaoId: representacaoId,

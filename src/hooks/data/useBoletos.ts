@@ -3,7 +3,7 @@ import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
 import type { Boleto } from "@/types/agenda"
-import { addMonths, isBefore, isToday, setDate, isWeekend, format } from "date-fns"
+import { addMonths, isBefore, isToday, setDate, isWeekend, format, setHours } from "date-fns"
 import { v4 as uuidv4 } from 'uuid'
 import { useTransactions } from "./useTransactions" // Importando useTransactions
 
@@ -226,7 +226,7 @@ export function useBoletos() {
         const currentBoleto = boletos.find(b => b.id === boletoId);
         if (!currentBoleto) return { error: { message: "Boleto não encontrado." } }
 
-        const paymentDate = newStatus === 'paid' ? (customPaymentDate || new Date()) : undefined;
+        const paymentDate = newStatus === 'paid' ? (customPaymentDate || setHours(new Date(), 12)) : undefined;
         
         const dbData = {
             status: newStatus,

@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { DollarSign, Calendar, Repeat, Car, CheckCircle, AlertTriangle, X, Pencil, CalendarIcon } from "lucide-react"
-import { format } from "date-fns"
+import { format, setHours } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import type { Boleto } from "@/types/agenda"
 import { cn } from "@/lib/utils"
@@ -72,8 +72,10 @@ export function BoletoDetailsModal({
         : "N/A"
 
     const handleMarkAsPaid = (date: Date) => {
-        onUpdateStatus(boleto.id, 'paid', date)
-        setLocalPaymentDate(date)
+        // Fix: Set time to noon (12h) to avoid timezone issues when saving only the date part.
+        const correctedDate = setHours(date, 12);
+        onUpdateStatus(boleto.id, 'paid', correctedDate)
+        setLocalPaymentDate(correctedDate)
     }
 
     const handleMarkAsPending = () => {
@@ -138,7 +140,6 @@ export function BoletoDetailsModal({
                                                     "justify-start text-left font-normal w-full",
                                                     !localPaymentDate && "text-muted-foreground"
                                                 )}
-                                                disabled={boleto.status !== 'paid'}
                                             >
                                                 <CalendarIcon className="mr-2 h-4 w-4" />
                                                 {localPaymentDate ? format(localPaymentDate, "PPP", { locale: ptBR }) : <span>Não Pago</span>}
