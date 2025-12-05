@@ -77,8 +77,8 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, onDelete, vehicl
         setLoading(false)
     }, [open, vehicleToEdit, clientId])
 
-    // Helper for safe integer parsing, defaulting to a fallback number
-    const safeParseInt = (value: string | undefined, fallback: number) => {
+    // Helper for safe integer parsing, defaulting to a fallback number or undefined
+    const safeParseInt = (value: string | undefined, fallback: number | undefined): number | undefined => {
         if (!value) return fallback;
         const parsed = parseInt(value);
         return isNaN(parsed) ? fallback : parsed;
