@@ -1,18 +1,125 @@
 import type { PlacaData } from "@/types/vehicle";
+import { supabase } from "@/integrations/supabase/client";
+import { isBefore, subDays } from "date-fns";
 
 // Lendo o token da variável de ambiente
 const API_TOKEN = import.meta.env.VITE_API_BRASIL_TOKEN;
+const CACHE_DURATION_DAYS = 30;
+
+// Helper function to map DB cache object to PlacaData
+const mapCacheToPlacaData = (cache: any): PlacaData => ({
+    placa: cache.plate,
+    marca: cache.brand || '',
+    modelo: cache.model || '',
+    ano: cache.year?.toString() || '',
+    anoModelo: cache.year?.toString() || '',
+    cor: cache.color || '',
+    combustivel: '', // Not stored in cache, but required by PlacaData
+    categoria: cache.type || '', // Using 'type' as a proxy for category
+    chassi: cache.chassi || '',
+    renavam: cache.renavam || '',
+    municipio: '', // Not stored in cache
+    uf: '', // Not stored in cache
+    fipeCode: cache.fipe_code || '',
+    fipeValue: cache.fipe_value || '',
+});
+
+// Helper function to map PlacaData to DB cache object
+const mapPlacaDataToCache = (data: PlacaData, userId: string) => ({
+    user_id: userId,
+    plate: data.placa,
+    type: data.categoria,
+    brand: data.marca,
+    model: data.modelo,
+    year: parseInt(data.ano) || null,
+    color: data.cor,
+    renavam: data.renavam,
+    chassi: data.chassi,
+    fipe_code: data.fipeCode,
+    fipe_value: data.fipeValue,
+    // body_type, body_value, value are not directly from PlacaData, 
+    // they are specific to the Vehicle model, so we omit them here.
+});
+
 
 export class VehicleService {
   // Usando o caminho do proxy configurado no vite.config.ts
   private static readonly API_URL = '/api-brasil/api/v2/consulta/veiculos/credits';
 
   /**
-   * Consulta dados da placa usando a API da ApiBrasil via fetch.
+   * Salva os dados da placa no cache do Supabase.
+   */
+  private static async saveToCache(data: PlacaData, userId: string) {
+    const dbData = mapPlacaDataToCache(data, userId);
+    
+    // Tenta inserir. Se a placa já existir (UNIQUE constraint), tenta atualizar.
+    const { error } = await supabase
+        .from('vehicle_cache')
+        .upsert(dbData, { onConflict: 'plate' })
+        .eq('user_id', userId);
+
+    if (error) {
+        console.error("Erro ao salvar cache da placa:", error);
+    }
+  }
+
+  /**
+   * Busca dados da placa no cache do Supabase.
+   */
+  private static async getFromCache(placa: string, userId: string): Promise<PlacaData | null> {
+    const cacheLimit = subDays(new Date(), CACHE_DURATION_DAYS);
+
+    const { data, error } = await supabase
+        .from('vehicle_cache')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('plate', placa.toUpperCase())
+        .single();
+
+    if (error && error.code !== 'PGRST116') { // PGRST116 = No rows found
+        console.error("Erro ao buscar cache da placa:", error);
+        return null;
+    }
+
+    if (data) {
+        const cachedAt = new Date(data.cached_at);
+        if (isBefore(cachedAt, cacheLimit)) {
+            // Cache expirado
+            return null;
+        }
+        return mapCacheToPlacaData(data);
+    }
+
+    return null;
+  }
+
+  /**
+   * Consulta dados da placa usando o cache ou a API externa.
    * @param placa Placa limpa (7 caracteres alfanuméricos).
    * @returns Dados do veículo ou null se não encontrado/erro.
    */
   static async consultarPlaca(placa: string): Promise<PlacaData | null> {
+    const placaLimpa = placa.replace(/[^A-Z0-9]/gi, '').toUpperCase();
+    
+    if (!VehicleService.validarPlaca(placaLimpa)) {
+        throw new Error('Placa inválida');
+    }
+
+    // 1. Obter usuário logado para RLS
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+        throw new Error('Usuário não autenticado para consulta de placa.');
+    }
+    const userId = user.id;
+
+    // 2. Tentar buscar no cache
+    const cachedData = await VehicleService.getFromCache(placaLimpa, userId);
+    if (cachedData) {
+        console.log(`Placa ${placaLimpa} encontrada no cache.`);
+        return cachedData;
+    }
+
+    // 3. Se não estiver no cache ou expirado, consultar API externa
     const controller = new AbortController();
     const TIMEOUT_MS = 120000; // 120 segundos
     let timeoutId: ReturnType<typeof setTimeout> | undefined = setTimeout(() => controller.abort("Timeout excedido"), TIMEOUT_MS);
@@ -22,13 +129,6 @@ export class VehicleService {
         throw new Error('ERRO DE CONFIGURAÇÃO: O token da API não está definido na variável de ambiente VITE_API_BRASIL_TOKEN.');
       }
       
-      // Remove formatação da placa
-      const placaLimpa = placa.replace(/[^A-Z0-9]/gi, '');
-      
-      if (!VehicleService.validarPlaca(placaLimpa)) {
-        throw new Error('Placa inválida');
-      }
-
       const response = await fetch(VehicleService.API_URL, {
         method: 'POST',
         headers: {
@@ -37,7 +137,7 @@ export class VehicleService {
         },
         body: JSON.stringify({
           "tipo": "fipe",
-          "placa": placaLimpa.toUpperCase(),
+          "placa": placaLimpa,
           "homolog": false
         }),
         signal: controller.signal,
@@ -63,7 +163,7 @@ export class VehicleService {
 
       const data = result.data;
       
-      return {
+      const placaData: PlacaData = {
           placa: data.placa || placaLimpa,
           marca: data.marca || '',
           modelo: data.modelo || '',
@@ -76,9 +176,14 @@ export class VehicleService {
           renavam: data.renavam || '',
           municipio: data.municipio || '',
           uf: data.uf || '',
-          fipeCode: data.codigoFipe || data.codigofipe || data.codigo_fipe || '', // CORRIGIDO: Adicionado data.codigoFipe
+          fipeCode: data.codigoFipe || data.codigofipe || data.codigo_fipe || '',
           fipeValue: data.valor?.toString() || '',
       };
+
+      // 4. Salvar no cache antes de retornar
+      await VehicleService.saveToCache(placaData, userId);
+      
+      return placaData;
 
     } catch (error) {
       if (timeoutId) {
