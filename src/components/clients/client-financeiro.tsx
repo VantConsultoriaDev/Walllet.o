@@ -20,12 +20,11 @@ import {
 } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Plus, Trash2, Calendar as CalendarIcon, ArrowUpDown, ArrowUp, ArrowDown, Repeat, Search, Check, ChevronsUpDown, Loader2, Filter, Pencil, DollarSign, X } from "lucide-react"
-import { format, addMonths, getMonth, getYear, setMonth, setYear, startOfMonth, endOfMonth, subMonths, setHours } from "date-fns"
+import { format, addMonths, getMonth, getYear, setMonth, setYear, startOfMonth, endOfMonth, subMonths, setHours, isBefore, isAfter } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
 import { cn } from "@/lib/utils"
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 import { Badge } from "@/components/ui/badge"
 import type { Boleto } from "@/types/agenda" // Import Boleto type
 import { useRepresentations } from "@/hooks/data/useRepresentations"
@@ -80,15 +79,15 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
 
     // --- Filter state ---
     const today = useMemo(() => new Date(), [])
-    const previousMonth = getMonth(subMonths(today, 1)) // Mês anterior
+    const currentMonth = getMonth(today) // Mês atual
     const [searchTerm, setSearchTerm] = useState("")
     
     // Date Range Filter (explicit range)
     const [explicitDateFrom, setExplicitDateFrom] = useState<Date | undefined>(undefined)
     const [explicitDateTo, setExplicitDateTo] = useState<Date | undefined>(undefined)
 
-    // Month/Year Filter (default to previous month)
-    const [selectedMonth, setSelectedMonth] = useState<number | "ALL">(previousMonth) // 0-11 or "ALL"
+    // Month/Year Filter (default to current month)
+    const [selectedMonth, setSelectedMonth] = useState<number | "ALL">(currentMonth) // 0-11 or "ALL"
     const [selectedYear, setSelectedYear] = useState<number>(getYear(today))
     
     // State to track which filter type is currently active/preferred
@@ -135,7 +134,8 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
         if (activeFilterType === "range" && explicitDateFrom) {
             return {
                 dateFrom: explicitDateFrom,
-                dateTo: explicitDateTo,
+                // CRITICAL FIX: Ensure dateTo includes the entire end day
+                dateTo: explicitDateTo ? setHours(explicitDateTo, 23, 59, 59) : undefined,
             }
         }
         return { dateFrom: undefined, dateTo: undefined }
@@ -163,9 +163,9 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
             setActiveFilterType("range")
             setSelectedMonth("ALL") // Deactivate month filter when range is set
         } else {
-            // If range is cleared, revert to month filter (default previous month)
+            // If range is cleared, revert to month filter (default current month)
             setActiveFilterType("month") 
-            setSelectedMonth(previousMonth)
+            setSelectedMonth(currentMonth)
             setSelectedYear(getYear(today))
         }
     }
@@ -199,13 +199,11 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
 
         // 2. Date range filter
         if (dateFrom) {
-            result = result.filter(b => b.vencimento >= dateFrom)
+            result = result.filter(b => !isBefore(b.vencimento, dateFrom))
         }
         if (dateTo) {
-            // Add one day to dateTo to include the entire end day
-            const endDayInclusive = new Date(dateTo);
-            endDayInclusive.setDate(endDayInclusive.getDate() + 1);
-            result = result.filter(b => b.vencimento < endDayInclusive)
+            // Use isAfter to check if the date is strictly after the end of the range
+            result = result.filter(b => !isAfter(b.vencimento, dateTo))
         }
 
         // 3. Sorting
@@ -376,7 +374,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
 
     const clearFilters = () => {
         setSearchTerm("")
-        setSelectedMonth(previousMonth) // Reset to default (previous month)
+        setSelectedMonth(currentMonth) // Reset to default (current month)
         setSelectedYear(getYear(today))
         setExplicitDateFrom(undefined)
         setExplicitDateTo(undefined)
@@ -418,7 +416,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
         }
     }
 
-    const hasActiveFilters = searchTerm || activeFilterType === "range" || selectedMonth !== previousMonth || selectedYear !== getYear(today)
+    const hasActiveFilters = searchTerm || activeFilterType === "range" || selectedMonth !== currentMonth || selectedYear !== getYear(today)
 
     if (representationsLoading || boletosLoading) {
         return (
@@ -503,41 +501,45 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
 
                     {/* Date Range Filter */}
                     <div className="flex gap-2 w-full md:w-auto">
-                        <Popover>
+                        <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
                             <PopoverTrigger asChild>
                                 <Button 
                                     variant={activeFilterType === "range" && explicitDateFrom ? "default" : "outline"} 
                                     className="gap-2 w-full md:w-auto"
-                                    onClick={() => handleDateRangeChange(explicitDateFrom, explicitDateTo)} // Trigger re-evaluation
                                 >
                                     <CalendarIcon className="h-4 w-4" />
                                     {explicitDateFrom ? format(explicitDateFrom, "dd/MM/yy") : "De"}
                                 </Button>
                             </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0">
+                            <PopoverContent className="w-auto p-0 z-[1000]">
                                 <Calendar 
                                     mode="single" 
                                     selected={explicitDateFrom} 
-                                    onSelect={(date) => handleDateRangeChange(date, explicitDateTo)} 
+                                    onSelect={(date) => {
+                                        handleDateRangeChange(date, explicitDateTo)
+                                        setIsCalendarOpen(false)
+                                    }} 
                                 />
                             </PopoverContent>
                         </Popover>
-                        <Popover>
+                        <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
                             <PopoverTrigger asChild>
                                 <Button 
                                     variant={activeFilterType === "range" && explicitDateTo ? "default" : "outline"} 
                                     className="gap-2 w-full md:w-auto"
-                                    onClick={() => handleDateRangeChange(explicitDateFrom, explicitDateTo)} // Trigger re-evaluation
                                 >
                                     <CalendarIcon className="h-4 w-4" />
                                     {explicitDateTo ? format(explicitDateTo, "dd/MM/yy") : "Até"}
                                 </Button>
                             </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0">
+                            <PopoverContent className="w-auto p-0 z-[1000]">
                                 <Calendar 
                                     mode="single" 
                                     selected={explicitDateTo} 
-                                    onSelect={(date) => handleDateRangeChange(explicitDateFrom, date)} 
+                                    onSelect={(date) => {
+                                        handleDateRangeChange(explicitDateFrom, date)
+                                        setIsCalendarOpen(false)
+                                    }} 
                                 />
                             </PopoverContent>
                         </Popover>
@@ -717,7 +719,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                                         {vencimento ? format(vencimento, "PPP", { locale: ptBR }) : <span>Selecione uma data</span>}
                                     </Button>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0">
+                                <PopoverContent className="w-auto p-0 z-[1000]">
                                     <Calendar
                                         mode="single"
                                         selected={vencimento}
@@ -747,7 +749,7 @@ export function ClientFinanceiro({ client, vehicles = [] }: ClientFinanceiroProp
                                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                     </Button>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-[300px] p-0 pointer-events-auto z-[100]" align="start">
+                                <PopoverContent className="w-[300px] p-0 pointer-events-auto z-[1000]" align="start">
                                     <div className="flex items-center border-b px-3">
                                         <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
                                         <input

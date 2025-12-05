@@ -66,8 +66,10 @@ export function EditBoletoModal({
     const [comissaoTipo, setComissaoTipo] = useState<"percentual" | "valor">("valor")
     const [openPlateSelect, setOpenPlateSelect] = useState(false)
     const [plateSearch, setPlateSearch] = useState("")
-    const [isCalendarOpen, setIsCalendarOpen] = useState(false)
-    const [isPaymentCalendarOpen, setIsPaymentCalendarOpen] = useState(false) // <-- Novo estado
+    
+    // Calendar state management
+    const [isVencimentoCalendarOpen, setIsVencimentoCalendarOpen] = useState(false)
+    const [isPaymentCalendarOpen, setIsPaymentCalendarOpen] = useState(false) 
 
     // Sync state from prop
     useEffect(() => {
@@ -191,7 +193,7 @@ export function EditBoletoModal({
                             </div>
                             <div className="grid gap-2">
                                 <Label>Vencimento</Label>
-                                <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                                <Popover open={isVencimentoCalendarOpen} onOpenChange={setIsVencimentoCalendarOpen}>
                                     <PopoverTrigger asChild>
                                         <Button
                                             variant={"outline"}
@@ -210,7 +212,7 @@ export function EditBoletoModal({
                                             selected={vencimento}
                                             onSelect={(date) => {
                                                 setVencimento(date)
-                                                setIsCalendarOpen(false)
+                                                setIsVencimentoCalendarOpen(false)
                                             }}
                                             initialFocus
                                         />
