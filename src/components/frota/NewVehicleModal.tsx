@@ -104,15 +104,18 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, onDelete, vehicl
         
         // Update formData with the raw float value converted back to string for storage
         const floatValue = parseCurrencyToFloat(formattedValue);
+        // Store as string or undefined if zero/empty
+        const rawStringValue = floatValue > 0 ? floatValue.toFixed(2) : undefined; 
+        
         setFormData(prev => ({ 
             ...prev, 
-            [field]: floatValue > 0 ? floatValue.toFixed(2) : "" 
+            [field]: rawStringValue 
         }));
     }
 
     // --- CONSULTA API PLACA ---
     const handlePlacaConsultation = useCallback(async (placa: string) => {
-        const placaLimpa = placa.replace(/[^A-Z0-9]/gi, '');
+        const placaLimpa = placa.replace(/[^A-Z0-9]/gi, '').toUpperCase();
         if (!VehicleService.validarPlaca(placaLimpa)) {
             setPlacaError('Placa inválida.');
             return;
@@ -165,12 +168,13 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, onDelete, vehicl
                     chassi: data.chassi ? forceUpperCase(data.chassi) : "",
                     renavam: data.renavam || "",
                     fipeCode: data.fipeCode || "", // <-- Garantindo que o fipeCode seja mapeado
-                    fipeValue: fipeValue, // Armazena o valor bruto (string)
+                    fipeValue: fipeValue || undefined, // Armazena o valor bruto (string) ou undefined
                     bodyType: data.categoria?.includes("CAMINHAO") ? data.categoria : "",
                 }))
                 toast({ title: "Sucesso", description: "Dados da placa carregados automaticamente." })
             } else {
                 setPlacaError('Placa não encontrada na base de dados externa. Preencha manualmente.');
+                // Limpar campos se a consulta falhar
                 setFormData(prev => ({
                     ...prev,
                     plate: placaLimpa,
@@ -181,7 +185,7 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, onDelete, vehicl
                     chassi: "",
                     renavam: "",
                     fipeCode: "",
-                    fipeValue: "",
+                    fipeValue: undefined,
                     bodyType: "",
                 }))
                 setFipeValueFormatted("")
@@ -200,7 +204,7 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, onDelete, vehicl
                 chassi: "",
                 renavam: "",
                 fipeCode: "",
-                fipeValue: "",
+                fipeValue: undefined,
                 bodyType: "",
             }))
             setFipeValueFormatted("")
@@ -224,23 +228,34 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, onDelete, vehicl
         }
 
         if (formData.plate && formData.brand && formData.model) {
-            // Se o ano não foi preenchido pela API ou manualmente, usamos o ano atual como fallback APENAS no submit
+            // 1. Garantir que o ano seja um número válido ou o ano atual
             const finalYear = formData.year || new Date().getFullYear(); 
 
-            // CRITICAL FIX: Only include ID if editing an existing vehicle (UUID)
-            const id = vehicleToEdit?.id;
-
-            onSubmit({
-                ...(id && { id }), // Conditionally include ID
-                type,
-                ...formData,
+            // 2. CRITICAL FIX: Mapear os dados finais, garantindo que os campos de moeda sejam strings ou undefined
+            const vehicleToSubmit: Vehicle = {
+                id: vehicleToEdit?.id || Math.random().toString(36).substr(2, 9), // Use existing ID or generate temp ID if new
                 clientId: formData.clientId,
+                type: type,
+                plate: formData.plate,
+                brand: formData.brand,
+                model: formData.model,
                 year: finalYear,
-                // Ensure values are stored as strings (or undefined)
-                fipeValue: formData.fipeValue || undefined,
-                bodyValue: formData.bodyValue || undefined,
-                value: formData.value || undefined,
-            } as Vehicle)
+                status: formData.status || "active",
+                
+                // Campos opcionais (garantindo que sejam string | undefined)
+                color: formData.color || undefined,
+                renavam: formData.renavam || undefined,
+                chassi: formData.chassi || undefined,
+                fipeCode: formData.fipeCode || undefined,
+                bodyType: formData.bodyType || undefined,
+                
+                // Campos de moeda (já estão como string de float ou undefined no formData)
+                fipeValue: formData.fipeValue,
+                bodyValue: formData.bodyValue,
+                value: formData.value,
+            } as Vehicle;
+
+            onSubmit(vehicleToSubmit)
             onOpenChange(false)
         } else {
             toast({ title: "Erro", description: "Preencha os campos obrigatórios (Placa, Marca, Modelo).", variant: "destructive" });
