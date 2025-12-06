@@ -153,11 +153,16 @@ export class VehicleService {
       if (!response.ok) {
         const errorBody = await response.json().catch(() => ({ message: response.statusText }));
         const errorMessage = errorBody.message || errorBody.error || response.statusText;
+        // Se for 404, tratamos como "não encontrado"
+        if (response.status === 404) {
+            return null;
+        }
         throw new Error(`Falha na comunicação com a API (${response.status}): ${errorMessage}`);
       }
       
       const result = await response.json();
       
+      // Verifica se a resposta é válida e contém dados
       if (!result || result.error || !result.data || Object.keys(result.data).length === 0) {
           return null;
       }
@@ -166,7 +171,9 @@ export class VehicleService {
       
       // Prioriza 'anoModelo' (camelCase) e 'valor' (FIPE)
       const anoModelo = data.anoModelo?.toString() || data.anoFabricacao?.toString() || data.ano?.toString() || '';
-      const valorFipe = data.valor?.toString() || '';
+      
+      // Garante que o valor FIPE seja uma string, mesmo que venha como número
+      const valorFipe = data.valor ? String(data.valor) : '';
 
       const placaData: PlacaData = {
           placa: data.placa || placaLimpa,
