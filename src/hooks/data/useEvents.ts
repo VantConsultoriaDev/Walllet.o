@@ -47,7 +47,7 @@ export function useEvents() {
         }
         setLoading(false)
         setIsRefetching(false)
-    }, [user, toast, events.length])
+    }, [user, toast]) // Removido events.length
 
     useEffect(() => {
         fetchEvents()

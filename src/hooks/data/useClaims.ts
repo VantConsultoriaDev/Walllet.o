@@ -122,7 +122,7 @@ export function useClaims() {
         setClaims(formattedClaims)
         setLoading(false)
         setIsRefetching(false)
-    }, [user, toast, claims.length])
+    }, [user, toast]) // Removido claims.length
 
     useEffect(() => {
         fetchClaims()

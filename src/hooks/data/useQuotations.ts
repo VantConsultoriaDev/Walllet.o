@@ -107,7 +107,7 @@ export function useQuotations() {
         setQuotations(formattedQuotations)
         setLoading(false)
         setIsRefetching(false)
-    }, [user, toast, quotations.length])
+    }, [user, toast]) // Removido quotations.length
 
     useEffect(() => {
         fetchQuotations()

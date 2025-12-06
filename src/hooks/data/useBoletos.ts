@@ -211,7 +211,7 @@ export function useBoletos() {
         setLoading(false);
         setIsRefetching(false);
         return formattedBoletos;
-    }, [user, toast, boletos.length, addExpectedCommissionTransaction]); // Dependências atualizadas
+    }, [user, toast, addExpectedCommissionTransaction]); // Removido boletos.length
 
     // --- Internal Add Logic ---
     const addBoletos = useCallback(async (newBoletos: Omit<Boleto, 'id' | 'representacao' | 'dueDate'>[]) => {

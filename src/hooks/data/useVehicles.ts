@@ -102,7 +102,7 @@ export function useVehicles() {
         }
         setLoading(false)
         setIsRefetching(false)
-    }, [user, toast, vehicles.length])
+    }, [user, toast]) // Removido vehicles.length
 
     useEffect(() => {
         fetchVehicles()
@@ -145,7 +145,8 @@ export function useVehicles() {
         
         // CRITICAL FIX: Ensure ID exists before attempting update
         if (!updatedVehicle.id) {
-            return { error: { message: "ID do veículo ausente para atualização." } }
+            return { error: { message: "ID do veículo ausente para atualização." }
+            }
         }
 
         const dbData = mapVehicleToDb(updatedVehicle)

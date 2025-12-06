@@ -162,7 +162,7 @@ export function useClients() {
         setLoading(false)
         setIsRefetching(false)
         return formattedClients
-    }, [user, toast, clients.length]) // Adicionando clients.length para re-executar fetchClients quando o array muda
+    }, [user, toast]) // Removido clients.length
 
     useEffect(() => {
         fetchClients()

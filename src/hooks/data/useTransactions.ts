@@ -104,7 +104,7 @@ export function useTransactions() {
         }
         
         return { data: false }; // Nenhuma transação esperada encontrada
-    }, [user]);
+    }, [user])
 
 
     // --- Fetching Logic ---
@@ -156,7 +156,7 @@ export function useTransactions() {
         }
         setLoading(false)
         setIsRefetching(false)
-    }, [user, toast, transactions.length]) // Mantendo transactions.length aqui para re-executar fetchTransactions quando o array muda
+    }, [user, toast]) // Removido transactions.length
 
     useEffect(() => {
         fetchTransactions()
@@ -263,7 +263,7 @@ export function useTransactions() {
         setTransactions(prev => [addedTransaction, ...prev])
         
         return { data: addedTransaction }
-    }, [user, transactions]) // Adicionando transactions como dependência para a verificação de existência
+    }, [user, transactions]) // Mantendo transactions como dependência para a verificação de existência
     
     const addExpectedCommissionTransaction = useCallback(async (
         boletoId: string,

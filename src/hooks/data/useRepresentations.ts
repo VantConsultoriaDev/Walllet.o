@@ -65,7 +65,7 @@ export function useRepresentations() {
         }
         setLoading(false)
         setIsRefetching(false)
-    }, [user, toast, partners.length])
+    }, [user, toast]) // Removido partners.length
 
     useEffect(() => {
         fetchPartners()
