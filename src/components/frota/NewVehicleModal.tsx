@@ -278,7 +278,7 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, onDelete, vehicl
                         type="number" 
                         value={formData.year || ""} 
                         onChange={e => setFormData({ ...formData, year: parseInt(e.target.value) })} 
-                        required 
+                        // REMOVIDO: required. O fallback é feito no handleSubmit.
                     />
                 </div>
                 <div className="space-y-2">
