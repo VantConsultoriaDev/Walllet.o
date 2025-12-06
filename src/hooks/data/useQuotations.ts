@@ -43,7 +43,7 @@ const mapCotacaoToDb = (cotacao: Partial<Cotacao>) => ({
 })
 
 export function useQuotations() {
-    const { user } = useAuth()
+    const { user, loading: authLoading } = useAuth() // Adicionando authLoading
     const { toast } = useToast()
     const [quotations, setQuotations] = useState<Cotacao[]>([])
     const [loading, setLoading] = useState(true)
@@ -51,7 +51,9 @@ export function useQuotations() {
 
     const fetchQuotations = useCallback(async () => {
         if (!user) {
-            setLoading(false)
+            if (!authLoading) {
+                setLoading(false)
+            }
             return
         }
 
@@ -108,11 +110,13 @@ export function useQuotations() {
         setQuotations(formattedQuotations)
         setLoading(false)
         setIsRefetching(false)
-    }, [user, toast]) // Removido quotations.length
+    }, [user, toast, authLoading]) // Adicionando authLoading
 
     useEffect(() => {
-        fetchQuotations()
-    }, [user, fetchQuotations])
+        if (!authLoading) {
+            fetchQuotations()
+        }
+    }, [authLoading, fetchQuotations])
 
     const addQuotation = async (newQuotation: Omit<Cotacao, 'id' | 'history' | 'createdAt' | 'updatedAt'>) => {
         if (!user) return { error: { message: "Usuário não autenticado" } }

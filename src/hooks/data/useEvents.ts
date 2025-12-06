@@ -5,7 +5,7 @@ import { useToast } from "@/hooks/use-toast"
 import type { Event } from "@/types/agenda"
 
 export function useEvents() {
-    const { user } = useAuth()
+    const { user, loading: authLoading } = useAuth() // Adicionando authLoading
     const { toast } = useToast()
     const [events, setEvents] = useState<Event[]>([])
     const [loading, setLoading] = useState(true)
@@ -13,7 +13,9 @@ export function useEvents() {
 
     const fetchEvents = useCallback(async () => {
         if (!user) {
-            setLoading(false)
+            if (!authLoading) {
+                setLoading(false)
+            }
             return
         }
 
@@ -47,11 +49,13 @@ export function useEvents() {
         }
         setLoading(false)
         setIsRefetching(false)
-    }, [user, toast]) // Removido events.length
+    }, [user, toast, authLoading]) // Adicionando authLoading
 
     useEffect(() => {
-        fetchEvents()
-    }, [user, fetchEvents])
+        if (!authLoading) {
+            fetchEvents()
+        }
+    }, [authLoading, fetchEvents])
 
     const addEvent = async (newEvent: Omit<Event, 'id' | 'client'> & { client: string }) => {
         if (!user) return { error: { message: "Usuário não autenticado" } }

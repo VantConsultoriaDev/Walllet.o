@@ -28,7 +28,7 @@ const mapPartnerToDb = (partner: Partial<Partner>) => ({
 })
 
 export function useRepresentations() {
-    const { user } = useAuth()
+    const { user, loading: authLoading } = useAuth() // Adicionando authLoading
     const { toast } = useToast()
     const [partners, setPartners] = useState<Partner[]>([])
     const [loading, setLoading] = useState(true)
@@ -36,7 +36,9 @@ export function useRepresentations() {
 
     const fetchPartners = useCallback(async () => {
         if (!user) {
-            setLoading(false)
+            if (!authLoading) {
+                setLoading(false)
+            }
             return
         }
 
@@ -65,11 +67,13 @@ export function useRepresentations() {
         }
         setLoading(false)
         setIsRefetching(false)
-    }, [user, toast]) // Removido partners.length
+    }, [user, toast, authLoading]) // Adicionando authLoading
 
     useEffect(() => {
-        fetchPartners()
-    }, [user, fetchPartners])
+        if (!authLoading) {
+            fetchPartners()
+        }
+    }, [authLoading, fetchPartners])
 
     const addPartner = async (newPartnerData: Omit<Partner, 'id' | 'contact' | 'email' | 'logo'> & { logo?: File | null }) => {
         if (!user) return { error: { message: "Usuário não autenticado" } }

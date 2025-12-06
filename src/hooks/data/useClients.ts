@@ -101,7 +101,7 @@ const mapDbToVehicle = (dbVehicle: any): Vehicle => ({
 
 
 export function useClients() {
-    const { user } = useAuth()
+    const { user, loading: authLoading } = useAuth() // Adicionando authLoading
     const { toast } = useToast()
     const [clients, setClients] = useState<Client[]>([])
     const [loading, setLoading] = useState(true)
@@ -109,26 +109,28 @@ export function useClients() {
 
     const fetchClients = useCallback(async (): Promise<Client[]> => {
         if (!user) {
-            setLoading(false)
+            // Se não há usuário, mas a autenticação terminou, definimos loading como false
+            if (!authLoading) {
+                setLoading(false)
+            }
             return []
         }
 
-        // Só mostra o loading spinner na primeira carga (loading=true)
-        // Em refetch, usamos isRefetching para um indicador mais sutil
+        // 1. Define loading state
         if (clients.length === 0) {
             setLoading(true)
         } else {
             setIsRefetching(true)
         }
 
-        // 1. Fetch all clients
+        // 2. Fetch data
         const { data: clientsData, error: clientsError } = await supabase
             .from('clients')
             .select('*')
             .eq('user_id', user.id)
             .order('created_at', { ascending: false })
 
-        // 2. Fetch all vehicles for the user
+        // 3. Fetch vehicles
         const { data: vehiclesData, error: vehiclesError } = await supabase
             .from('vehicles')
             .select('*')
@@ -152,7 +154,7 @@ export function useClients() {
 
         const allVehicles = vehiclesData ? vehiclesData.map(mapDbToVehicle) : []
         
-        // 3. Map vehicles to clients
+        // 4. Map vehicles to clients
         const formattedClients = clientsData.map(dbClient => {
             const clientVehicles = allVehicles.filter(v => v.clientId === dbClient.id)
             return mapDbToClient(dbClient, clientVehicles)
@@ -162,11 +164,14 @@ export function useClients() {
         setLoading(false)
         setIsRefetching(false)
         return formattedClients
-    }, [user, toast]) // Removido clients.length
+    }, [user, toast, authLoading]) // Adicionando authLoading como dependência
 
     useEffect(() => {
-        fetchClients()
-    }, [user, fetchClients])
+        // Só tenta buscar se a autenticação terminou e há um usuário, OU se a autenticação terminou e não há usuário (para definir loading=false)
+        if (!authLoading) {
+            fetchClients()
+        }
+    }, [authLoading, fetchClients])
 
     const addClient = async (newClientData: Omit<Client, 'id' | 'status' | 'vehicles'>) => {
         if (!user) return { error: { message: "Usuário não autenticado" } }

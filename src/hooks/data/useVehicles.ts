@@ -66,7 +66,7 @@ const mapVehicleToDb = (vehicle: Partial<Vehicle>) => ({
 })
 
 export function useVehicles() {
-    const { user } = useAuth()
+    const { user, loading: authLoading } = useAuth() // Adicionando authLoading
     const { toast } = useToast()
     const [vehicles, setVehicles] = useState<Vehicle[]>([])
     const [loading, setLoading] = useState(true)
@@ -74,7 +74,9 @@ export function useVehicles() {
 
     const fetchVehicles = useCallback(async () => {
         if (!user) {
-            setLoading(false)
+            if (!authLoading) {
+                setLoading(false)
+            }
             return
         }
 
@@ -103,11 +105,13 @@ export function useVehicles() {
         }
         setLoading(false)
         setIsRefetching(false)
-    }, [user, toast])
+    }, [user, toast, authLoading]) // Adicionando authLoading
 
     useEffect(() => {
-        fetchVehicles()
-    }, [user, fetchVehicles])
+        if (!authLoading) {
+            fetchVehicles()
+        }
+    }, [authLoading, fetchVehicles])
 
     const addVehicle = async (newVehicleData: Omit<Vehicle, 'id'>) => {
         if (!user) return { error: { message: "Usuário não autenticado" } }

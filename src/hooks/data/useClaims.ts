@@ -43,7 +43,7 @@ const mapClaimToDb = (claim: Partial<Claim>) => ({
 })
 
 export function useClaims() {
-    const { user } = useAuth()
+    const { user, loading: authLoading } = useAuth() // Adicionando authLoading
     const { toast } = useToast()
     const [claims, setClaims] = useState<Claim[]>([])
     const [loading, setLoading] = useState(true)
@@ -51,7 +51,9 @@ export function useClaims() {
 
     const fetchClaims = useCallback(async () => {
         if (!user) {
-            setLoading(false)
+            if (!authLoading) {
+                setLoading(false)
+            }
             return
         }
 
@@ -122,11 +124,13 @@ export function useClaims() {
         setClaims(formattedClaims)
         setLoading(false)
         setIsRefetching(false)
-    }, [user, toast]) // Removido claims.length
+    }, [user, toast, authLoading]) // Adicionando authLoading
 
     useEffect(() => {
-        fetchClaims()
-    }, [user, fetchClaims])
+        if (!authLoading) {
+            fetchClaims()
+        }
+    }, [authLoading, fetchClaims])
 
     const addClaim = async (newClaim: Omit<Claim, 'id' | 'history' | 'comments' | 'createdAt' | 'updatedAt' | 'thirdPartyName' | 'thirdPartyPlate'>) => {
         if (!user) return { error: { message: "Usuário não autenticado" } }

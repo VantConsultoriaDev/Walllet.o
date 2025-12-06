@@ -6,7 +6,7 @@ import type { Transaction } from "@/components/financeiro/new-transaction-modal"
 import { addMonths, format } from "date-fns" // Importando 'format'
 
 export function useTransactions() {
-    const { user } = useAuth()
+    const { user, loading: authLoading } = useAuth() // Adicionando authLoading
     const { toast } = useToast()
     const [transactions, setTransactions] = useState<Transaction[]>([])
     const [loading, setLoading] = useState(true)
@@ -111,7 +111,9 @@ export function useTransactions() {
 
     const fetchTransactions = useCallback(async () => {
         if (!user) {
-            setLoading(false)
+            if (!authLoading) {
+                setLoading(false)
+            }
             console.log("fetchTransactions: User not authenticated.")
             return
         }
@@ -156,11 +158,13 @@ export function useTransactions() {
         }
         setLoading(false)
         setIsRefetching(false)
-    }, [user, toast]) // Removido transactions.length
+    }, [user, toast, authLoading]) // Adicionando authLoading
 
     useEffect(() => {
-        fetchTransactions()
-    }, [user, fetchTransactions])
+        if (!authLoading) {
+            fetchTransactions()
+        }
+    }, [authLoading, fetchTransactions])
 
     // --- Add Logic ---
 

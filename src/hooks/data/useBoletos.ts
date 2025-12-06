@@ -123,7 +123,7 @@ export { calculateExpectedCommissionDate }; // Exportando para uso no Financeiro
 
 
 export function useBoletos() {
-    const { user } = useAuth()
+    const { user, loading: authLoading } = useAuth() // Adicionando authLoading
     const { toast } = useToast()
     // Desestruturando funções estáveis do useTransactions
     const { addCommissionTransaction, addExpectedCommissionTransaction, deleteExpectedCommissionTransaction } = useTransactions() 
@@ -134,7 +134,9 @@ export function useBoletos() {
     // --- Internal Fetching Logic ---
     const fetchBoletos = useCallback(async () => {
         if (!user) {
-            setLoading(false)
+            if (!authLoading) {
+                setLoading(false)
+            }
             return
         }
 
@@ -211,7 +213,7 @@ export function useBoletos() {
         setLoading(false);
         setIsRefetching(false);
         return formattedBoletos;
-    }, [user, toast, addExpectedCommissionTransaction]); // Removido boletos.length
+    }, [user, toast, addExpectedCommissionTransaction, authLoading]); // Adicionando authLoading
 
     // --- Internal Add Logic ---
     const addBoletos = useCallback(async (newBoletos: Omit<Boleto, 'id' | 'representacao' | 'dueDate'>[]) => {
@@ -580,8 +582,10 @@ export function useBoletos() {
 
     // Fetch all boletos on mount
     useEffect(() => {
-        fetchBoletos()
-    }, [user, fetchBoletos])
+        if (!authLoading) {
+            fetchBoletos()
+        }
+    }, [authLoading, fetchBoletos])
     
     // --- New Exported Functions ---
     
