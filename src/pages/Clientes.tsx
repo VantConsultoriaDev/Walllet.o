@@ -185,26 +185,41 @@ export default function Clientes() {
             clientId: selectedClient.id,
         }
 
-        if (vehicle.id && clients.some(c => c.vehicles.some(v => v.id === vehicle.id))) {
-            // Update existing vehicle
-            await updateVehicle(vehicleToSave)
+        let result;
+        const isEditing = vehicle.id && clients.some(c => c.vehicles.some(v => v.id === vehicle.id));
+
+        if (isEditing) {
+            result = await updateVehicle(vehicleToSave)
         } else {
-            // Add new vehicle
-            await addVehicle(vehicleToSave)
+            result = await addVehicle(vehicleToSave)
         }
         
-        // 1. Re-fetch clients to update the vehicle list in the global state
-        // fetchClients() updates the global 'clients' state in useClients hook
-        const updatedClients = await fetchClients()
-        
-        // 2. Find the updated client from the newly fetched global state
-        if (updatedClients && selectedClient) {
-            const updatedClient = updatedClients.find(c => c.id === selectedClient.id);
-            if (updatedClient) {
-                // CRITICAL FIX: Update the local selectedClient state with the fresh data
-                setSelectedClient(updatedClient);
-            }
+        if (result?.data) {
+            const savedVehicle = result.data as Vehicle;
+            
+            // 1. Atualiza o estado local do cliente imediatamente
+            setSelectedClient(prev => {
+                if (!prev) return null;
+
+                let updatedVehicles: Vehicle[];
+                if (isEditing) {
+                    // Edição: substitui o veículo existente
+                    updatedVehicles = prev.vehicles.map(v => v.id === savedVehicle.id ? savedVehicle : v);
+                } else {
+                    // Adição: adiciona o novo veículo
+                    updatedVehicles = [savedVehicle, ...prev.vehicles];
+                }
+
+                return {
+                    ...prev,
+                    vehicles: updatedVehicles
+                };
+            });
         }
+
+        // 2. Chama fetchClients em segundo plano para sincronizar o estado global
+        // Não precisamos esperar o retorno, pois o estado local já foi atualizado.
+        fetchClients();
     }
 
     const handleDeleteVehicle = async (vehicleId: string) => {
@@ -212,16 +227,17 @@ export default function Clientes() {
         
         await deleteVehicle(vehicleId);
         
-        // 1. Re-fetch clients to update the vehicle list in the global state
-        const updatedClients = await fetchClients();
+        // 1. Atualiza o estado local do cliente imediatamente
+        setSelectedClient(prev => {
+            if (!prev) return null;
+            return {
+                ...prev,
+                vehicles: prev.vehicles.filter(v => v.id !== vehicleId)
+            };
+        });
         
-        // 2. Update selected client state locally to reflect changes immediately
-        if (updatedClients && selectedClient) {
-            const updatedClient = updatedClients.find(c => c.id === selectedClient.id);
-            if (updatedClient) {
-                setSelectedClient(updatedClient);
-            }
-        }
+        // 2. Sincroniza o estado global em segundo plano
+        fetchClients();
     }
 
     const filteredClientsForGrid = useMemo(() => {

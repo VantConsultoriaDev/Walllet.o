@@ -102,7 +102,7 @@ export function useVehicles() {
         }
         setLoading(false)
         setIsRefetching(false)
-    }, [user, toast]) // Removido vehicles.length
+    }, [user, toast])
 
     useEffect(() => {
         fetchVehicles()
@@ -135,6 +135,7 @@ export function useVehicles() {
 
         const addedVehicle = mapDbToVehicle(data)
 
+        // Usando a forma funcional para garantir que o estado seja atualizado corretamente
         setVehicles(prev => [addedVehicle, ...prev])
         toast({ title: "Sucesso", description: "Veículo adicionado com sucesso." })
         return { data: addedVehicle }
