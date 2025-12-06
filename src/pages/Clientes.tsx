@@ -16,15 +16,15 @@ import type { Vehicle } from "@/hooks/data/useVehicles" // Importando Vehicle do
 import { Input } from "@/components/ui/input" // Importando Input
 
 export default function Clientes() {
-    const { clients, loading: clientsLoading, addClient, updateClient, fetchClients } = useClients()
-    const { addVehicle, updateVehicle, deleteVehicle, loading: vehiclesLoading } = useVehicles()
+    const { clients, addClient, updateClient, fetchClients } = useClients()
+    const { addVehicle, updateVehicle, deleteVehicle } = useVehicles()
     
     const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
     const [selectedClient, setSelectedClient] = useState<Client | null>(null)
     const [newClientModalOpen, setNewClientModalOpen] = useState(false)
     const [globalFilter, setGlobalFilter] = useState("") // Novo estado de busca global
 
-    const loading = clientsLoading || vehiclesLoading; // Mantido para referência
+    // Removendo loading e vehiclesLoading, confiando no useAppInitialization do MainLayout
 
     const filters: DataTableFilterConfig[] = [
         {
@@ -314,12 +314,7 @@ export default function Clientes() {
                 />
             ) : (
                 <>
-                    {/* Show loading only if the list is empty */}
-                    {loading && clients.length === 0 && (
-                        <div className="flex items-center justify-center py-12 text-muted-foreground">
-                            <Loader2 className="h-6 w-6 animate-spin mr-2" /> Carregando clientes...
-                        </div>
-                    )}
+                    {/* O MainLayout garante que os dados já foram carregados antes de renderizar aqui */}
                     {viewMode === "grid" ? (
                         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                             {filteredClientsForGrid.map((client, index) => (
@@ -347,8 +342,8 @@ export default function Clientes() {
                         />
                     )}
 
-                    {/* Show empty state only if not loading and list is empty */}
-                    {(!loading || clients.length > 0) && (viewMode === "grid" ? filteredClientsForGrid.length : clients.length) === 0 && (
+                    {/* Show empty state only if list is empty */}
+                    {(viewMode === "grid" ? filteredClientsForGrid.length : clients.length) === 0 && (
                         <div className="text-center py-12">
                             <p className="text-muted-foreground">Nenhum cliente encontrado.</p>
                         </div>

@@ -8,12 +8,12 @@ import { useRepresentations } from "@/hooks/data/useRepresentations"
 import { normalizeString } from "@/lib/utils"
 
 export default function Representacoes() {
-    const { partners, loading, addPartner, updatePartner } = useRepresentations()
+    const { partners, addPartner, updatePartner } = useRepresentations()
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [editingPartner, setEditingPartner] = useState<Partner | null>(null)
     const [searchTerm, setSearchTerm] = useState("")
 
-    const hasData = partners.length > 0;
+    // Removendo loading e hasData, confiando no useAppInitialization do MainLayout
 
     const handleNewRepresentacao = async (formData: NewRepresentacaoFormData) => {
         const partnerData = {
@@ -96,61 +96,55 @@ export default function Representacoes() {
                 </div>
             </div>
             
-            {loading && !hasData ? (
-                <div className="flex items-center justify-center py-12 text-muted-foreground">
-                    <Loader2 className="h-6 w-6 animate-spin mr-2" /> Carregando representações...
-                </div>
-            ) : (
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    {filteredPartners.map((partner) => (
-                        <Card
-                            key={partner.id}
-                            className="overflow-hidden cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02]"
-                            onClick={() => handleCardClick(partner)}
-                        >
-                            <CardHeader>
-                                {partner.logo && (
-                                    <div className="mb-4 flex justify-center">
-                                        <div className="h-24 w-24 rounded-lg border-2 border-border bg-muted/30 p-2 flex items-center justify-center">
-                                            <img
-                                                src={partner.logo}
-                                                alt={partner.name}
-                                                className="max-h-full max-w-full object-contain"
-                                            />
-                                        </div>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {filteredPartners.map((partner) => (
+                    <Card
+                        key={partner.id}
+                        className="overflow-hidden cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02]"
+                        onClick={() => handleCardClick(partner)}
+                    >
+                        <CardHeader>
+                            {partner.logo && (
+                                <div className="mb-4 flex justify-center">
+                                    <div className="h-24 w-24 rounded-lg border-2 border-border bg-muted/30 p-2 flex items-center justify-center">
+                                        <img
+                                            src={partner.logo}
+                                            alt={partner.name}
+                                            className="max-h-full max-w-full object-contain"
+                                        />
                                     </div>
-                                )}
-                                <CardTitle className="text-center">{partner.name}</CardTitle>
-                                <CardDescription className="text-center">{partner.type}</CardDescription>
-                            </CardHeader>
-                            <CardContent className="pt-0">
-                                {partner.commissionDay && (
-                                    <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                                        <Calendar className="h-4 w-4" />
-                                        Dia de Pagamento: <span className="font-medium text-foreground">{partner.commissionDay}</span>
-                                    </div>
-                                )}
-                            </CardContent>
-                            <CardFooter className="flex justify-center">
-                                {partner.website && (
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        asChild
-                                        onClick={(e) => e.stopPropagation()}
-                                    >
-                                        <a href={partner.website} target="_blank" rel="noreferrer">
-                                            <ExternalLink className="mr-2 h-4 w-4" /> Site
-                                        </a>
-                                    </Button>
-                                )}
-                            </CardFooter>
-                        </Card>
-                    ))}
-                </div>
-            )}
+                                </div>
+                            )}
+                            <CardTitle className="text-center">{partner.name}</CardTitle>
+                            <CardDescription className="text-center">{partner.type}</CardDescription>
+                        </CardHeader>
+                        <CardContent className="pt-0">
+                            {partner.commissionDay && (
+                                <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                                    <Calendar className="h-4 w-4" />
+                                    Dia de Pagamento: <span className="font-medium text-foreground">{partner.commissionDay}</span>
+                                </div>
+                            )}
+                        </CardContent>
+                        <CardFooter className="flex justify-center">
+                            {partner.website && (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    asChild
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    <a href={partner.website} target="_blank" rel="noreferrer">
+                                        <ExternalLink className="mr-2 h-4 w-4" /> Site
+                                    </a>
+                                </Button>
+                            )}
+                        </CardFooter>
+                    </Card>
+                ))}
+            </div>
             
-            {(!loading || hasData) && filteredPartners.length === 0 && (
+            {filteredPartners.length === 0 && (
                 <div className="text-center py-12">
                     <p className="text-muted-foreground">Nenhuma representação encontrada.</p>
                 </div>

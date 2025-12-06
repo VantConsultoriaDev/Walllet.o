@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Plus, ArrowDownCircle, DollarSign, Search, Wallet, TrendingUp, ArrowUpDown, Loader2, Pencil, Repeat, ArrowUp, ArrowDown, Filter } from "lucide-react"
+import { Plus, ArrowDownCircle, DollarSign, Search, Wallet, TrendingUp, ArrowUpDown, ArrowUp, ArrowDown, Filter, Pencil, Repeat, Loader2 } from "lucide-react"
 import { format, isWithinInterval, startOfMonth, endOfMonth, isBefore, subMonths, getMonth, getYear, setMonth, setYear, setHours, isAfter, isSameMonth, isSameYear } from "date-fns"
 import { ptBR as localePtBR } from "date-fns/locale" // Importação correta do locale
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -50,10 +50,10 @@ const MONTH_OPTIONS = [
 ]
 
 export default function Financeiro() {
-    const { transactions, loading: transactionsLoading, addTransaction, updateTransaction, deleteTransaction, fetchTransactions: fetchTransactionsData } = useTransactions()
-    const { boletos: allBoletos, loading: boletosLoading, updateBoletoStatus, deleteBoleto, deleteRecurrenceGroup, updateBoleto } = useBoletos()
+    const { transactions, addTransaction, updateTransaction, deleteTransaction, fetchTransactions: fetchTransactionsData } = useTransactions()
+    const { boletos: allBoletos, updateBoletoStatus, deleteBoleto, deleteRecurrenceGroup, updateBoleto } = useBoletos()
     const { partners } = useRepresentations()
-    const { vehicles: allVehicles, loading: vehiclesLoading } = useVehicles()
+    const { vehicles: allVehicles } = useVehicles()
 
     const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false)
     const [editingTransaction, setEditingTransaction] = useState<Transaction | undefined>(undefined)
@@ -63,7 +63,7 @@ export default function Financeiro() {
     const [isEditBoletoModalOpen, setIsEditBoletoModalOpen] = useState(false)
     const [selectedBoletoToEdit, setSelectedBoletoToEdit] = useState<Boleto | null>(null)
 
-    const loading = transactionsLoading || boletosLoading || vehiclesLoading;
+    // Removendo loading, confiando no useAppInitialization do MainLayout
 
     // --- Filter State ---
     const today = useMemo(() => new Date(), [])
@@ -515,168 +515,162 @@ export default function Financeiro() {
                     <CardTitle>Movimentações Detalhadas</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    {loading && allRows.length === 0 ? (
-                        <div className="flex items-center justify-center py-12 text-muted-foreground">
-                            <Loader2 className="h-6 w-6 animate-spin mr-2" /> Carregando dados financeiros...
-                        </div>
-                    ) : (
-                        <div className="rounded-md border overflow-x-auto">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow className="hover:bg-transparent border-b border-border">
-                                        <TableHead className="w-[40px]"></TableHead> {/* Coluna para ícones */}
-                                        <TableHead>Descrição / Cliente</TableHead>
-                                        <TableHead>Placa(s)</TableHead>
-                                        <TableHead>Categoria</TableHead>
-                                        <TableHead>
-                                            <Button variant="ghost" size="sm" className="h-8 px-2 hover:bg-transparent" onClick={() => handleSort("date")}>
-                                                Data Ref.
-                                                {getSortIcon("date")}
-                                            </Button>
-                                        </TableHead>
-                                        <TableHead className="text-right">
-                                            <Button variant="ghost" size="sm" className="h-8 px-2 hover:bg-transparent" onClick={() => handleSort("valor")}>
-                                                Valor Boleto
-                                                {getSortIcon("valor")}
-                                            </Button>
-                                        </TableHead>
-                                        <TableHead className="text-right">
-                                            <Button variant="ghost" size="sm" className="h-8 px-2 hover:bg-transparent" onClick={() => handleSort("comissao")}>
-                                                Valor Comissão
-                                                {getSortIcon("comissao")}
-                                            </Button>
-                                        </TableHead>
-                                        <TableHead className="w-[100px] text-center">Status</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {filteredRows.length > 0 ? (
-                                        filteredRows.map((row) => {
-                                            if (row.isBoleto) {
-                                                const boleto = row as Boleto & { isBoleto: true }
-                                                
-                                                // Calcula o valor da comissão (se for percentual)
-                                                let commissionAmount = 0;
-                                                if (boleto.comissaoRecorrente && boleto.comissaoTipo) {
-                                                    commissionAmount = boleto.comissaoTipo === 'percentual'
-                                                        ? (boleto.valor * boleto.comissaoRecorrente) / 100
-                                                        : boleto.comissaoRecorrente;
-                                                }
-                                                
-                                                // Data de referência: Se tiver comissão, usa a data esperada da comissão (com commissionDay). Senão, usa o vencimento do boleto.
-                                                const displayDate = boleto.comissaoRecorrente 
-                                                    ? calculateExpectedCommissionDate(boleto.vencimento, boleto.commissionDay) 
-                                                    : boleto.vencimento;
-
-                                                return (
-                                                    <TableRow 
-                                                        key={boleto.id} 
-                                                        className="cursor-pointer hover:bg-muted/50 h-16"
-                                                        onClick={() => handleOpenBoletoEditModal(boleto)} // Abre modal de edição de boleto
-                                                    >
-                                                        <TableCell className="w-[40px]">
-                                                            <div className="flex items-center gap-1">
-                                                                {boleto.isRecurring && (
-                                                                    <Repeat className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                                                                )}
-                                                                {boleto.comissaoRecorrente && (
-                                                                    <span className="text-xs font-medium text-primary" title={`Comissão: ${formatCurrency(commissionAmount)}`}>
-                                                                        💰
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            <div className="font-medium">
-                                                                {/* Exibe o nome do cliente (do boleto), limpando o sufixo se existir */}
-                                                                {cleanBoletoTitle(boleto.clientName)}
-                                                            </div>
-                                                            <div className="text-xs text-muted-foreground">{boleto.representacao}</div>
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            <div className="flex flex-wrap gap-1">
-                                                                {boleto.placas.map(p => (
-                                                                    <Badge key={p} variant="outline" className="text-[10px] px-1 h-5">
-                                                                        {p}
-                                                                    </Badge>
-                                                                ))}
-                                                            </div>
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">Receita</Badge>
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            {format(displayDate, "dd/MM/yyyy")}
-                                                        </TableCell>
-                                                        <TableCell className="text-right font-medium">
-                                                            {formatCurrency(boleto.valor)}
-                                                        </TableCell>
-                                                        <TableCell className="text-right font-medium text-green-600 dark:text-green-400">
-                                                            {commissionAmount > 0 ? formatCurrency(commissionAmount) : '-'}
-                                                        </TableCell>
-                                                        <TableCell className="text-center">
-                                                            {getStatusBadge(boleto.status)}
-                                                        </TableCell>
-                                                    </TableRow>
-                                                )
-                                            } else {
-                                                const transaction = row as Transaction & { isBoleto: false }
-                                                const isIncome = transaction.type === 'income'
-                                                
-                                                // Data de referência: Data da Transação
-                                                const displayDate = transaction.date;
-
-                                                return (
-                                                    <TableRow 
-                                                        key={transaction.id} 
-                                                        className="cursor-pointer hover:bg-muted/50 h-16" 
-                                                        onClick={() => openEditTransactionModal(transaction)} // Abre modal de edição de transação
-                                                    >
-                                                        <TableCell className="w-[40px]">
-                                                            <div className="flex items-center gap-1">
-                                                                {transaction.isRecurrent && <Repeat className="h-4 w-4 text-blue-600 dark:text-blue-400" />}
-                                                            </div>
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            <div className="font-medium">
-                                                                {transaction.description}
-                                                            </div>
-                                                            {transaction.representacaoNome && <div className="text-xs text-muted-foreground">{transaction.representacaoNome}</div>}
-                                                        </TableCell>
-                                                        <TableCell>-</TableCell>
-                                                        <TableCell>
-                                                            <Badge variant="secondary" className={isIncome ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300"}>
-                                                                {transaction.category}
-                                                            </Badge>
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            {format(displayDate, "dd/MM/yyyy")}
-                                                        </TableCell>
-                                                        <TableCell className={`text-right font-bold ${isIncome ? 'text-green-600' : 'text-red-600'}`}>
-                                                            {isIncome ? '+' : '-'} {formatCurrency(transaction.amount)}
-                                                        </TableCell>
-                                                        <TableCell className="text-right">-</TableCell>
-                                                        <TableCell className="text-center">
-                                                            <Badge variant="secondary" className={isIncome ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300"}>
-                                                                {isIncome ? 'Receita' : 'Despesa'}
-                                                            </Badge>
-                                                        </TableCell>
-                                                    </TableRow>
-                                                )
+                    <div className="rounded-md border overflow-x-auto">
+                        <Table>
+                            <TableHeader>
+                                <TableRow className="hover:bg-transparent border-b border-border">
+                                    <TableHead className="w-[40px]"></TableHead> {/* Coluna para ícones */}
+                                    <TableHead>Descrição / Cliente</TableHead>
+                                    <TableHead>Placa(s)</TableHead>
+                                    <TableHead>Categoria</TableHead>
+                                    <TableHead>
+                                        <Button variant="ghost" size="sm" className="h-8 px-2 hover:bg-transparent" onClick={() => handleSort("date")}>
+                                            Data Ref.
+                                            {getSortIcon("date")}
+                                        </Button>
+                                    </TableHead>
+                                    <TableHead className="text-right">
+                                        <Button variant="ghost" size="sm" className="h-8 px-2 hover:bg-transparent" onClick={() => handleSort("valor")}>
+                                            Valor Boleto
+                                            {getSortIcon("valor")}
+                                        </Button>
+                                    </TableHead>
+                                    <TableHead className="text-right">
+                                        <Button variant="ghost" size="sm" className="h-8 px-2 hover:bg-transparent" onClick={() => handleSort("comissao")}>
+                                            Valor Comissão
+                                            {getSortIcon("comissao")}
+                                        </Button>
+                                    </TableHead>
+                                    <TableHead className="w-[100px] text-center">Status</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {filteredRows.length > 0 ? (
+                                    filteredRows.map((row) => {
+                                        if (row.isBoleto) {
+                                            const boleto = row as Boleto & { isBoleto: true }
+                                            
+                                            // Calcula o valor da comissão (se for percentual)
+                                            let commissionAmount = 0;
+                                            if (boleto.comissaoRecorrente && boleto.comissaoTipo) {
+                                                commissionAmount = boleto.comissaoTipo === 'percentual'
+                                                    ? (boleto.valor * boleto.comissaoRecorrente) / 100
+                                                    : boleto.comissaoRecorrente;
                                             }
-                                            return null;
-                                        })
-                                    ) : (
-                                        <TableRow>
-                                            <TableCell colSpan={8} className="h-24 text-center">
-                                                Nenhuma movimentação encontrada no período.
-                                            </TableCell>
-                                        </TableRow>
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    )}
+                                            
+                                            // Data de referência: Se tiver comissão, usa a data esperada da comissão (com commissionDay). Senão, usa o vencimento do boleto.
+                                            const displayDate = boleto.comissaoRecorrente 
+                                                ? calculateExpectedCommissionDate(boleto.vencimento, boleto.commissionDay) 
+                                                : boleto.vencimento;
+
+                                            return (
+                                                <TableRow 
+                                                    key={boleto.id} 
+                                                    className="cursor-pointer hover:bg-muted/50 h-16"
+                                                    onClick={() => handleOpenBoletoEditModal(boleto)} // Abre modal de edição de boleto
+                                                >
+                                                    <TableCell className="w-[40px]">
+                                                        <div className="flex items-center gap-1">
+                                                            {boleto.isRecurring && (
+                                                                <Repeat className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                                            )}
+                                                            {boleto.comissaoRecorrente && (
+                                                                <span className="text-xs font-medium text-primary" title={`Comissão: ${formatCurrency(commissionAmount)}`}>
+                                                                    💰
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="font-medium">
+                                                            {/* Exibe o nome do cliente (do boleto), limpando o sufixo se existir */}
+                                                            {cleanBoletoTitle(boleto.clientName)}
+                                                        </div>
+                                                        <div className="text-xs text-muted-foreground">{boleto.representacao}</div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="flex flex-wrap gap-1">
+                                                            {boleto.placas.map(p => (
+                                                                <Badge key={p} variant="outline" className="text-[10px] px-1 h-5">
+                                                                    {p}
+                                                                </Badge>
+                                                            ))}
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">Receita</Badge>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {format(displayDate, "dd/MM/yyyy")}
+                                                    </TableCell>
+                                                    <TableCell className="text-right font-medium">
+                                                        {formatCurrency(boleto.valor)}
+                                                    </TableCell>
+                                                    <TableCell className="text-right font-medium text-green-600 dark:text-green-400">
+                                                        {commissionAmount > 0 ? formatCurrency(commissionAmount) : '-'}
+                                                    </TableCell>
+                                                    <TableCell className="text-center">
+                                                        {getStatusBadge(boleto.status)}
+                                                    </TableCell>
+                                                </TableRow>
+                                            )
+                                        } else {
+                                            const transaction = row as Transaction & { isBoleto: false }
+                                            const isIncome = transaction.type === 'income'
+                                            
+                                            // Data de referência: Data da Transação
+                                            const displayDate = transaction.date;
+
+                                            return (
+                                                <TableRow 
+                                                    key={transaction.id} 
+                                                    className="cursor-pointer hover:bg-muted/50 h-16" 
+                                                    onClick={() => openEditTransactionModal(transaction)} // Abre modal de edição de transação
+                                                >
+                                                    <TableCell className="w-[40px]">
+                                                        <div className="flex items-center gap-1">
+                                                            {transaction.isRecurrent && <Repeat className="h-4 w-4 text-blue-600 dark:text-blue-400" />}
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="font-medium">
+                                                            {transaction.description}
+                                                        </div>
+                                                        {transaction.representacaoNome && <div className="text-xs text-muted-foreground">{transaction.representacaoNome}</div>}
+                                                    </TableCell>
+                                                    <TableCell>-</TableCell>
+                                                    <TableCell>
+                                                        <Badge variant="secondary" className={isIncome ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300"}>
+                                                            {transaction.category}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {format(displayDate, "dd/MM/yyyy")}
+                                                    </TableCell>
+                                                    <TableCell className={`text-right font-bold ${isIncome ? 'text-green-600' : 'text-red-600'}`}>
+                                                        {isIncome ? '+' : '-'} {formatCurrency(transaction.amount)}
+                                                    </TableCell>
+                                                    <TableCell className="text-right">-</TableCell>
+                                                    <TableCell className="text-center">
+                                                        <Badge variant="secondary" className={isIncome ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300"}>
+                                                            {isIncome ? 'Receita' : 'Despesa'}
+                                                        </Badge>
+                                                    </TableCell>
+                                                </TableRow>
+                                            )
+                                        }
+                                        return null;
+                                    })
+                                ) : (
+                                    <TableRow>
+                                        <TableCell colSpan={8} className="h-24 text-center">
+                                            Nenhuma movimentação encontrada no período.
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
                 </CardContent>
             </Card>
 

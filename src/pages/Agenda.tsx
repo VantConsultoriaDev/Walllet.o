@@ -16,8 +16,8 @@ import { format } from "date-fns"
 import { ptBR as localePtBR } from "date-fns/locale" // Importação corrigida
 
 export default function Agenda() {
-    const { events, loading: eventsLoading, addEvent, updateEvent, deleteEvent } = useEvents()
-    const { boletos: allBoletos, loading: boletosLoading } = useBoletos()
+    const { events, addEvent, updateEvent, deleteEvent } = useEvents()
+    const { boletos: allBoletos } = useBoletos()
     
     const [date, setDate] = useState<Date | undefined>(new Date())
     const [currentMonth, setCurrentMonth] = useState(new Date())
@@ -33,8 +33,7 @@ export default function Agenda() {
     const [selectedEvent, setSelectedEvent] = useState<Event | null>(null)
     const [isEventModalOpen, setIsEventModalOpen] = useState(false)
 
-    const loading = eventsLoading || boletosLoading;
-    const hasData = events.length > 0 || allBoletos.length > 0;
+    // Removendo loading e hasData, confiando no useAppInitialization do MainLayout
 
     // Filter events for the selected date
     const selectedDateEvents = useMemo(() => {
@@ -260,12 +259,7 @@ export default function Agenda() {
                             </div>
 
                             {/* Unified List */}
-                            {loading && !hasData ? (
-                                <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground text-sm">
-                                    <Loader2 className="h-6 w-6 animate-spin mb-3 text-primary" />
-                                    <p>Carregando agenda...</p>
-                                </div>
-                            ) : selectedDateEvents.length > 0 ? (
+                            {selectedDateEvents.length > 0 ? (
                                 <div className="flex-1 overflow-y-auto pr-2 space-y-2">
                                     {selectedDateEvents
                                         .filter(event => taskUrgencyFilter === "todos" || event.urgency === taskUrgencyFilter)

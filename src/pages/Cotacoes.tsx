@@ -28,13 +28,13 @@ const COLUMNS: { status: CotacaoStatus; title: string; color: string }[] = [
 ]
 
 export default function Cotacoes() {
-    const { quotations, loading, addQuotation, updateQuotationStatus } = useQuotations()
+    const { quotations, addQuotation, updateQuotationStatus } = useQuotations()
     const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban")
     const [selectedCotacao, setSelectedCotacao] = useState<Cotacao | null>(null)
     const [isNewCotacaoModalOpen, setIsNewCotacaoModalOpen] = useState(false)
     const [globalFilter, setGlobalFilter] = useState("") // Novo estado de busca global
 
-    const hasData = quotations.length > 0;
+    // Removendo loading e hasData, confiando no useAppInitialization do MainLayout
 
     const filters: DataTableFilterConfig[] = [
         {
@@ -248,11 +248,7 @@ export default function Cotacoes() {
                 </div>
             </div>
 
-            {loading && !hasData ? (
-                <div className="flex-1 flex items-center justify-center h-full">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                </div>
-            ) : viewMode === "kanban" ? (
+            {viewMode === "kanban" ? (
                 <div className="flex-1 overflow-x-auto pb-4">
                     <div className="flex gap-4 h-full min-w-max">
                         {COLUMNS.map((column) => (

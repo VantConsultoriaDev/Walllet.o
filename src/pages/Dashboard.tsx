@@ -70,17 +70,19 @@ const initialKpis: Kpis = {
 }
 
 export default function Dashboard() {
-    const { clients, loading: clientsLoading } = useClients()
-    const { transactions, loading: transactionsLoading } = useTransactions()
-    const { quotations, loading: quotationsLoading } = useQuotations()
+    const { clients } = useClients()
+    const { transactions } = useTransactions()
+    const { quotations } = useQuotations()
     const [currentMetric, setCurrentMetric] = useState("vendas")
 
-    const loading = clientsLoading || transactionsLoading || quotationsLoading
-    const hasData = clients.length > 0 || transactions.length > 0 || quotations.length > 0
+    // Removendo loading e hasData, confiando no useAppInitialization do MainLayout
 
     const { kpis, chartData } = useMemo(() => {
-        // Use initialKpis if no data is loaded yet
-        if (loading && !hasData) return { kpis: initialKpis, chartData: [] as MonthlyDataItem[] }
+        // Se os dados ainda não foram carregados (o que não deve acontecer se o MainLayout estiver funcionando), 
+        // usamos os KPIs iniciais.
+        if (clients.length === 0 && transactions.length === 0 && quotations.length === 0) {
+             return { kpis: initialKpis, chartData: [] as MonthlyDataItem[] }
+        }
 
         const currentYear = new Date().getFullYear()
         const currentMonthIndex = new Date().getMonth()
@@ -89,14 +91,11 @@ export default function Dashboard() {
         const totalClients = clients.length
         const totalVehicles = clients.reduce((sum, client) => sum + client.vehicles.length, 0)
         
+        // Simplified count for demo purposes
         const newClientsThisMonth = clients.filter(c => {
-            return c.status === 'active' // Simplified count for demo purposes
+            return c.status === 'active' 
         }).length
 
-        const totalBilling = transactions
-            .filter(t => t.type === 'income')
-            .reduce((sum, t) => sum + t.amount, 0)
-        
         const totalCommission = transactions
             .filter(t => t.type === 'income' && t.category === 'Comissão')
             .reduce((sum, t) => sum + t.amount, 0)
@@ -185,7 +184,7 @@ export default function Dashboard() {
         }
 
         return { kpis, chartData: monthlyData }
-    }, [clients, transactions, quotations, loading, hasData])
+    }, [clients, transactions, quotations])
 
     const currentChartData = (chartData as MonthlyDataItem[]).map((item: MonthlyDataItem) => ({
         name: item.name,
@@ -193,7 +192,7 @@ export default function Dashboard() {
     }))
 
     return (
-        <div className="flex-1 space-y-6">
+        <div className="flex-1 space-y-6 p-4 pt-6 md:p-8">
             <motion.div
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -205,104 +204,99 @@ export default function Dashboard() {
                 </div>
             </motion.div>
 
-            {loading && !hasData ? (
-                <div className="flex items-center justify-center py-12 text-muted-foreground">
-                    <Loader2 className="h-6 w-6 animate-spin mr-2" /> Carregando dados do Dashboard...
+            {/* O MainLayout garante que os dados já foram carregados antes de renderizar aqui */}
+            <>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                    <KpiCard
+                        title="Vendas Mensais"
+                        value={kpis.vendasMensais.value}
+                        description={kpis.vendasMensais.description}
+                        icon={FileText}
+                        trend="up"
+                        trendValue="+12%" // Mocked trend
+                        gradient="from-purple-500 to-pink-500"
+                        index={0}
+                    />
+                    <KpiCard
+                        title="Novos Clientes"
+                        value={kpis.novosClientes.value}
+                        description={kpis.novosClientes.description}
+                        icon={Users}
+                        trend="up"
+                        trendValue="+8%" // Mocked trend
+                        gradient="from-blue-500 to-cyan-500"
+                        index={1}
+                        totalValue={kpis.novosClientes.totalValue}
+                        totalLabel={kpis.novosClientes.totalLabel}
+                    />
+                    <KpiCard
+                        title="Novas Placas"
+                        value={kpis.novasPlacas.value}
+                        description={kpis.novasPlacas.description}
+                        icon={Car}
+                        trend="up"
+                        trendValue="+15%" // Mocked trend
+                        gradient="from-orange-500 to-red-500"
+                        index={2}
+                        totalValue={kpis.novasPlacas.totalValue}
+                        totalLabel={kpis.novasPlacas.totalLabel} // CORRIGIDO AQUI
+                    />
+                    <KpiCard
+                        title="Faturamento"
+                        value={kpis.faturamento.value}
+                        description={kpis.faturamento.description}
+                        icon={DollarSign}
+                        trend="up"
+                        trendValue="+20%" // Mocked trend
+                        gradient="from-green-500 to-emerald-500"
+                        index={3}
+                    />
                 </div>
-            ) : (
-                <>
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+                    <DashboardChart
+                        data={currentChartData}
+                        dataKey="value"
+                        title={metricTitles[currentMetric as keyof typeof metricTitles]}
+                        onMetricChange={setCurrentMetric}
+                        currentMetric={currentMetric}
+                    />
+                    <motion.div
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.4 }}
+                        className="col-span-3 space-y-4"
+                    >
                         <KpiCard
-                            title="Vendas Mensais"
-                            value={kpis.vendasMensais.value}
-                            description={kpis.vendasMensais.description}
-                            icon={FileText}
+                            title="Comissionamento"
+                            value={kpis.comissionamento.value}
+                            description={kpis.comissionamento.description}
+                            icon={TrendingUp}
                             trend="up"
-                            trendValue="+12%" // Mocked trend
-                            gradient="from-purple-500 to-pink-500"
-                            index={0}
+                            trendValue="+18%" // Mocked trend
+                            gradient="from-indigo-500 to-violet-500"
                         />
                         <KpiCard
-                            title="Novos Clientes"
-                            value={kpis.novosClientes.value}
-                            description={kpis.novosClientes.description}
-                            icon={Users}
-                            trend="up"
-                            trendValue="+8%" // Mocked trend
-                            gradient="from-blue-500 to-cyan-500"
-                            index={1}
-                            totalValue={kpis.novosClientes.totalValue}
-                            totalLabel={kpis.novosClientes.totalLabel}
-                        />
-                        <KpiCard
-                            title="Novas Placas"
-                            value={kpis.novasPlacas.value}
-                            description={kpis.novasPlacas.description}
-                            icon={Car}
-                            trend="up"
-                            trendValue="+15%" // Mocked trend
-                            gradient="from-orange-500 to-red-500"
-                            index={2}
-                            totalValue={kpis.novasPlacas.totalValue}
-                            totalLabel={kpis.novasPlacas.totalLabel} // CORRIGIDO AQUI
-                        />
-                        <KpiCard
-                            title="Faturamento"
-                            value={kpis.faturamento.value}
-                            description={kpis.faturamento.description}
+                            title="Patrimônio Protegido"
+                            value={kpis.patrimonioProtegido.value}
+                            description={kpis.patrimonioProtegido.description}
                             icon={DollarSign}
                             trend="up"
-                            trendValue="+20%" // Mocked trend
-                            gradient="from-green-500 to-emerald-500"
-                            index={3}
+                            trendValue="+5%" // Mocked trend
+                            gradient="from-teal-500 to-green-500"
                         />
-                    </div>
-
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-                        <DashboardChart
-                            data={currentChartData}
-                            dataKey="value"
-                            title={metricTitles[currentMetric as keyof typeof metricTitles]}
-                            onMetricChange={setCurrentMetric}
-                            currentMetric={currentMetric}
+                        <KpiCard
+                            title="Cotações em Andamento"
+                            value={kpis.contratosVencidos.value}
+                            description={kpis.contratosVencidos.description}
+                            icon={AlertTriangle}
+                            trend="down"
+                            trendValue="+2" // Mocked trend
+                            gradient="from-yellow-500 to-orange-500"
                         />
-                        <motion.div
-                            initial={{ opacity: 0, x: 20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: 0.4 }}
-                            className="col-span-3 space-y-4"
-                        >
-                            <KpiCard
-                                title="Comissionamento"
-                                value={kpis.comissionamento.value}
-                                description={kpis.comissionamento.description}
-                                icon={TrendingUp}
-                                trend="up"
-                                trendValue="+18%" // Mocked trend
-                                gradient="from-indigo-500 to-violet-500"
-                            />
-                            <KpiCard
-                                title="Patrimônio Protegido"
-                                value={kpis.patrimonioProtegido.value}
-                                description={kpis.patrimonioProtegido.description}
-                                icon={DollarSign}
-                                trend="up"
-                                trendValue="+5%" // Mocked trend
-                                gradient="from-teal-500 to-green-500"
-                            />
-                            <KpiCard
-                                title="Cotações em Andamento"
-                                value={kpis.contratosVencidos.value}
-                                description={kpis.contratosVencidos.description}
-                                icon={AlertTriangle}
-                                trend="down"
-                                trendValue="+2" // Mocked trend
-                                gradient="from-yellow-500 to-orange-500"
-                            />
-                        </motion.div>
-                    </div>
-                </>
-            )}
+                    </motion.div>
+                </div>
+            </>
         </div>
     )
 }

@@ -33,7 +33,7 @@ const COLUMNS: { status: ClaimStatus; title: string; color: string }[] = [
 ]
 
 export default function Sinistros() {
-    const { claims, loading, addClaim, updateClaimStatus, addComment } = useClaims()
+    const { claims, addClaim, updateClaimStatus, addComment } = useClaims()
     const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban")
     const [selectedClaim, setSelectedClaim] = useState<Claim | null>(null)
     const [isModalOpen, setIsModalOpen] = useState(false)
@@ -43,7 +43,7 @@ export default function Sinistros() {
     const [dateTo, setDateTo] = useState<Date>()
     const [globalFilter, setGlobalFilter] = useState("") // Novo estado de busca global
 
-    const hasData = claims.length > 0;
+    // Removendo loading e hasData, confiando no useAppInitialization do MainLayout
 
     const filters: DataTableFilterConfig[] = [
         {
@@ -315,11 +315,7 @@ export default function Sinistros() {
                 </div>
             </div>
 
-            {loading && !hasData ? (
-                <div className="flex-1 flex items-center justify-center h-full">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                </div>
-            ) : viewMode === "kanban" ? (
+            {viewMode === "kanban" ? (
                 <div className="flex-1 overflow-x-auto pb-4">
                     <div className="flex gap-4 h-full min-w-max">
                         {COLUMNS.map((column) => (
