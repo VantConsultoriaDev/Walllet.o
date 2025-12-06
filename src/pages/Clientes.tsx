@@ -185,19 +185,23 @@ export default function Clientes() {
             clientId: selectedClient.id,
         }
 
-        if (vehicle.id) {
+        if (vehicle.id && clients.some(c => c.vehicles.some(v => v.id === vehicle.id))) {
+            // Update existing vehicle
             await updateVehicle(vehicleToSave)
         } else {
+            // Add new vehicle
             await addVehicle(vehicleToSave)
         }
         
         // 1. Re-fetch clients to update the vehicle list in the global state
+        // fetchClients() updates the global 'clients' state in useClients hook
         const updatedClients = await fetchClients()
         
         // 2. Find the updated client from the newly fetched global state
         if (updatedClients && selectedClient) {
             const updatedClient = updatedClients.find(c => c.id === selectedClient.id);
             if (updatedClient) {
+                // CRITICAL FIX: Update the local selectedClient state with the fresh data
                 setSelectedClient(updatedClient);
             }
         }
