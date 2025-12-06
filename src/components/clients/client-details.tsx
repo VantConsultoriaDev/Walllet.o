@@ -44,7 +44,8 @@ export function ClientDetails({ client, onBack, onStatusChange, onSave, onSaveVe
 
     // Calculate KPIs
     const totalAnnualValue = calculateClientAnnualValue(client.id)
-    const totalPatrimony = calculateClientTotalPatrimony(client.id)
+    // CORREÇÃO: Passando client.vehicles para o cálculo do patrimônio
+    const totalPatrimony = calculateClientTotalPatrimony(client.id, client.vehicles)
 
     useEffect(() => {
         setEditedClient(client)
@@ -101,17 +102,50 @@ export function ClientDetails({ client, onBack, onStatusChange, onSave, onSaveVe
             result = await onSaveVehicle(vehicleToSave)
         }
         
-        // The parent component (Clientes.tsx) handles the local state update and global fetch.
-        setEditingVehicle(undefined)
-        setIsAddingVehicle(false)
-        setActiveTab("frota") // <-- Mantém na aba Frota
+        if (result?.data) {
+            const savedVehicle = result.data as Vehicle;
+            
+            // 1. Atualiza o estado local do cliente imediatamente
+            setSelectedClient(prev => {
+                if (!prev) return null;
+
+                let updatedVehicles: Vehicle[];
+                if (isEditing) {
+                    // Edição: substitui o veículo existente
+                    updatedVehicles = prev.vehicles.map(v => v.id === savedVehicle.id ? savedVehicle : v);
+                } else {
+                    // Adição: adiciona o novo veículo
+                    updatedVehicles = [savedVehicle, ...prev.vehicles];
+                }
+
+                return {
+                    ...prev,
+                    vehicles: updatedVehicles
+                };
+            });
+        }
+
+        // 2. Chama fetchClients em segundo plano para sincronizar o estado global
+        // Não precisamos esperar o retorno, pois o estado local já foi atualizado.
+        fetchClients();
     }
 
-    const handleRemoveVehicle = async (vehicleId: string) => {
-        if (window.confirm("Tem certeza que deseja excluir este veículo?")) {
-            await onDeleteVehicle(vehicleId)
-            // The parent component (Clientes.tsx) handles the re-fetch and update of the 'client' prop.
-        }
+    const handleDeleteVehicle = async (vehicleId: string) => {
+        if (!selectedClient) return;
+        
+        await deleteVehicle(vehicleId);
+        
+        // 1. Atualiza o estado local do cliente imediatamente
+        setSelectedClient(prev => {
+            if (!prev) return null;
+            return {
+                ...prev,
+                vehicles: prev.vehicles.filter(v => v.id !== vehicleId)
+            };
+        });
+        
+        // 2. Sincroniza o estado global em segundo plano
+        fetchClients();
     }
 
     const statusVariant =

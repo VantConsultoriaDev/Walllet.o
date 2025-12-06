@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
 import type { Cotacao, CotacaoHistory, CotacaoStatus, Asset, Commission } from "@/types/cotacao"
+import type { Vehicle } from "./useVehicles" // Importando o tipo Vehicle
 
 // Helper function to map DB object to Cotacao type
 const mapDbToCotacao = (dbCotacao: any, history: CotacaoHistory[] = []): Cotacao => ({
@@ -204,19 +205,30 @@ export function useQuotations() {
     
     /**
      * Calcula o valor total do patrimônio segurado (apenas cotações com status 'cliente')
-     * para um cliente específico.
+     * para um cliente específico, incluindo a soma dos valores dos veículos cadastrados.
      */
-    const calculateClientTotalPatrimony = useCallback((clientId: string): number => {
+    const calculateClientTotalPatrimony = useCallback((clientId: string, clientVehicles: Vehicle[]): number => {
+        let totalValue = 0;
+        
+        // 1. Somar o valor de contrato (value) de todos os veículos ativos do cliente
+        const vehicleValue = clientVehicles.reduce((sum, v) => {
+            // Apenas veículos com status 'active' e que tenham um valor de contrato definido
+            if (v.status === 'active' && v.value) {
+                return sum + parseFloat(v.value);
+            }
+            return sum;
+        }, 0);
+        
+        totalValue += vehicleValue;
+
+        // 2. Somar o valor de outros ativos (residencial, carga, outros) de cotações CONCLUÍDAS ('cliente')
         const clientQuotations = quotations.filter(q => q.clientId === clientId && q.status === 'cliente');
         
-        return clientQuotations.reduce((sum, q) => {
+        const quotationValue = clientQuotations.reduce((sum, q) => {
             const asset = q.asset;
             let value = 0;
             
             switch (asset.type) {
-                case 'veiculo':
-                    value = asset.valorFipe;
-                    break;
                 case 'residencial':
                     value = asset.valorPatrimonio;
                     break;
@@ -226,10 +238,14 @@ export function useQuotations() {
                 case 'outros':
                     value = asset.valorSegurado;
                     break;
-                // Terceiros não representa patrimônio do cliente
+                // Veículos são contados na etapa 1 (clientVehicles)
             }
             return sum + value;
         }, 0);
+        
+        totalValue += quotationValue;
+        
+        return totalValue;
     }, [quotations]);
 
 
