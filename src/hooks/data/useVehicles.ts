@@ -51,15 +51,16 @@ const mapVehicleToDb = (vehicle: Partial<Vehicle>) => ({
     plate: vehicle.plate,
     brand: vehicle.brand,
     model: vehicle.model,
-    year: vehicle.year,
-    color: vehicle.color, // <-- Mapeando 'color'
-    renavam: vehicle.renavam,
-    chassi: vehicle.chassi,
-    fipe_code: vehicle.fipeCode,
-    fipe_value: vehicle.fipeValue,
-    body_type: vehicle.bodyType,
-    body_value: vehicle.bodyValue,
-    value: vehicle.value,
+    // Garantindo que campos opcionais sejam null se não existirem
+    year: vehicle.year || null, 
+    color: vehicle.color || null, 
+    renavam: vehicle.renavam || null,
+    chassi: vehicle.chassi || null,
+    fipe_code: vehicle.fipeCode || null,
+    fipe_value: vehicle.fipeValue || null,
+    body_type: vehicle.bodyType || null,
+    body_value: vehicle.bodyValue || null,
+    value: vehicle.value || null,
     status: vehicle.status,
     client_id: vehicle.clientId,
 })
@@ -117,7 +118,7 @@ export function useVehicles() {
         }
 
         // Note: We explicitly omit 'id' here as it's Omit<Vehicle, 'id'>
-        const dbData = mapVehicleToDb({ ...newVehicleData, status: 'active' })
+        const dbData = mapVehicleToDb({ ...newVehicleData, status: 'active' }, user.id) // Passando user.id para mapVehicleToDb
 
         const { data, error } = await supabase
             .from('vehicles')
@@ -150,7 +151,7 @@ export function useVehicles() {
             }
         }
 
-        const dbData = mapVehicleToDb(updatedVehicle)
+        const dbData = mapVehicleToDb(updatedVehicle, user.id) // Passando user.id para mapVehicleToDb
 
         const { error } = await supabase
             .from('vehicles')
