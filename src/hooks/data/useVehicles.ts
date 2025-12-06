@@ -118,13 +118,13 @@ export function useVehicles() {
         }
 
         // Note: We explicitly omit 'id' here as it's Omit<Vehicle, 'id'>
-        const dbData = mapVehicleToDb({ ...newVehicleData, status: 'active' }, user.id) // Passando user.id para mapVehicleToDb
+        const dbData = mapVehicleToDb({ ...newVehicleData, status: 'active' }) // CORRIGIDO: Removido user.id
 
         const { data, error } = await supabase
             .from('vehicles')
             .insert({
                 ...dbData,
-                user_id: user.id,
+                user_id: user.id, // Adicionado user.id aqui
             })
             .select()
             .single()
@@ -151,11 +151,14 @@ export function useVehicles() {
             }
         }
 
-        const dbData = mapVehicleToDb(updatedVehicle, user.id) // Passando user.id para mapVehicleToDb
+        const dbData = mapVehicleToDb(updatedVehicle) // CORRIGIDO: Removido user.id
 
         const { error } = await supabase
             .from('vehicles')
-            .update(dbData)
+            .update({
+                ...dbData,
+                user_id: user.id, // Adicionado user.id aqui
+            })
             .eq('id', updatedVehicle.id)
             .select()
 
