@@ -15,7 +15,9 @@ export default function ProtectedRoute() {
     }, [loading, user, navigate])
 
     if (loading) {
-        // Exibe um spinner enquanto o estado de autenticação está sendo determinado
+        // Se estiver carregando o estado de autenticação, renderiza um spinner mínimo
+        // O MainLayout só será renderizado após a autenticação, então este spinner
+        // é apenas para o momento entre o carregamento da página e a resolução da sessão.
         return (
             <div className="flex h-screen items-center justify-center">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -25,9 +27,9 @@ export default function ProtectedRoute() {
 
     if (!user) {
         // Se não houver usuário, o useEffect já disparou a navegação.
-        // Retornamos null para evitar renderização desnecessária enquanto o redirecionamento ocorre.
         return null 
     }
 
+    // Se autenticado, renderiza o Outlet (que levará ao MainLayout)
     return <Outlet />
 }
