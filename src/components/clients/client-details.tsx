@@ -12,12 +12,14 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Building2, User, Phone, FileText, Pencil, Save, X, Plus, Trash2, ArrowLeft, Car, Truck, Search, Filter, DollarSign } from "lucide-react"
+import { Building2, User, Phone, FileText, Pencil, Save, X, Plus, Trash2, ArrowLeft, Car, Truck, Search, Filter, DollarSign, TrendingUp, Shield } from "lucide-react"
 import { VehicleCard } from "@/components/frota/vehicle-card"
 import { ClientFinanceiro } from "./client-financeiro"
 import { NewVehicleModal } from "@/components/frota/NewVehicleModal" // <-- Importando o novo modal
 import type { Client } from "@/hooks/data/useClients" // Import Client type from hook
 import type { Vehicle, VehicleType } from "@/hooks/data/useVehicles" // Import Vehicle types from hook
+import { useBoletos } from "@/hooks/data/useBoletos" // Importando useBoletos
+import { useQuotations } from "@/hooks/data/useQuotations" // Importando useQuotations
 
 type ClientDetailsProps = {
     client: Client
@@ -29,6 +31,9 @@ type ClientDetailsProps = {
 }
 
 export function ClientDetails({ client, onBack, onStatusChange, onSave, onSaveVehicle, onDeleteVehicle }: ClientDetailsProps) {
+    const { calculateClientAnnualValue } = useBoletos()
+    const { calculateClientTotalPatrimony } = useQuotations()
+    
     const [isEditing, setIsEditing] = useState(false)
     const [editedClient, setEditedClient] = useState<Client>(client)
     const [isAddingVehicle, setIsAddingVehicle] = useState(false)
@@ -36,6 +41,10 @@ export function ClientDetails({ client, onBack, onStatusChange, onSave, onSaveVe
     const [searchTerm, setSearchTerm] = useState("")
     const [typeFilter, setTypeFilter] = useState<string>("ALL")
     const [activeTab, setActiveTab] = useState("geral") // <-- Novo estado para a aba ativa
+
+    // Calculate KPIs
+    const totalAnnualValue = calculateClientAnnualValue(client.id)
+    const totalPatrimony = calculateClientTotalPatrimony(client.id)
 
     useEffect(() => {
         setEditedClient(client)
@@ -76,16 +85,23 @@ export function ClientDetails({ client, onBack, onStatusChange, onSave, onSaveVe
     }
 
     const handleSaveVehicle = async (vehicle: Vehicle) => {
-        // Ensure clientId is set before saving
-        const vehicleWithClient = { ...vehicle, clientId: client.id }
+        if (!client) return;
+
+        const vehicleToSave = {
+            ...vehicle,
+            clientId: client.id,
+        }
+
+        let result;
+        const isEditing = vehicle.id && client.vehicles.some(v => v.id === vehicle.id);
+
+        if (isEditing) {
+            result = await onSaveVehicle(vehicleToSave)
+        } else {
+            result = await onSaveVehicle(vehicleToSave)
+        }
         
-        // 1. Call parent handler (which updates DB and fetches new data)
-        await onSaveVehicle(vehicleWithClient)
-        
-        // 2. Update local state immediately to reflect the change (assuming the parent hook will eventually update the 'client' prop)
-        // Since the parent hook (Clientes.tsx) calls fetchClients() after saving, the 'client' prop will update.
-        // We just need to ensure the modal closes and the tab stays correct.
-        
+        // The parent component (Clientes.tsx) handles the local state update and global fetch.
         setEditingVehicle(undefined)
         setIsAddingVehicle(false)
         setActiveTab("frota") // <-- Mantém na aba Frota
@@ -107,6 +123,13 @@ export function ClientDetails({ client, onBack, onStatusChange, onSave, onSaveVe
         client.status === "active" ? "Ativo" :
             client.status === "blocked" ? "Bloqueado" :
                 "Inativo"
+                
+    const formatCurrency = (value: number) => {
+        return new Intl.NumberFormat("pt-BR", {
+            style: "currency",
+            currency: "BRL",
+        }).format(value)
+    }
 
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 h-full flex flex-col">
@@ -204,9 +227,35 @@ export function ClientDetails({ client, onBack, onStatusChange, onSave, onSaveVe
                 </TabsList>
 
                 <TabsContent value="geral" className="flex-1 mt-6">
-                    <div className="grid gap-6 md:grid-cols-2">
+                    <div className="grid gap-6 md:grid-cols-3">
+                        {/* KPI Cards */}
+                        <div className="col-span-3 grid gap-4 md:grid-cols-2">
+                            <div className="p-6 rounded-xl border bg-card text-card-foreground shadow-sm flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                                        Valor Anual (Boletos)
+                                    </p>
+                                    <p className="text-2xl font-bold text-primary">
+                                        {formatCurrency(totalAnnualValue)}
+                                    </p>
+                                </div>
+                                <TrendingUp className="h-8 w-8 text-primary/50" />
+                            </div>
+                            <div className="p-6 rounded-xl border bg-card text-card-foreground shadow-sm flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                                        Patrimônio Segurado
+                                    </p>
+                                    <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                                        {formatCurrency(totalPatrimony)}
+                                    </p>
+                                </div>
+                                <Shield className="h-8 w-8 text-green-600/50 dark:text-green-400/50" />
+                            </div>
+                        </div>
+                        
                         {/* Left Column: Identification & Contact */}
-                        <div className="space-y-6">
+                        <div className="md:col-span-2 space-y-6">
                             {/* Identification Section */}
                             <div className="p-6 rounded-xl border bg-card text-card-foreground shadow-sm">
                                 <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4 flex items-center gap-2">

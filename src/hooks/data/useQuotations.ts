@@ -201,6 +201,45 @@ export function useQuotations() {
         toast({ title: "Sucesso", description: "Status da cotação atualizado." })
         return { data: updatedCotacao }
     }
+    
+    /**
+     * Calcula o valor total do patrimônio segurado (apenas cotações com status 'cliente')
+     * para um cliente específico.
+     */
+    const calculateClientTotalPatrimony = useCallback((clientId: string): number => {
+        const clientQuotations = quotations.filter(q => q.clientId === clientId && q.status === 'cliente');
+        
+        return clientQuotations.reduce((sum, q) => {
+            const asset = q.asset;
+            let value = 0;
+            
+            switch (asset.type) {
+                case 'veiculo':
+                    value = asset.valorFipe;
+                    break;
+                case 'residencial':
+                    value = asset.valorPatrimonio;
+                    break;
+                case 'carga':
+                    value = asset.valorTotal;
+                    break;
+                case 'outros':
+                    value = asset.valorSegurado;
+                    break;
+                // Terceiros não representa patrimônio do cliente
+            }
+            return sum + value;
+        }, 0);
+    }, [quotations]);
 
-    return { quotations, loading, isRefetching, fetchQuotations, addQuotation, updateQuotationStatus }
+
+    return { 
+        quotations, 
+        loading, 
+        isRefetching, 
+        fetchQuotations, 
+        addQuotation, 
+        updateQuotationStatus,
+        calculateClientTotalPatrimony, // Exportando a nova função
+    }
 }

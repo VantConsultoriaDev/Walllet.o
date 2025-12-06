@@ -582,6 +582,37 @@ export function useBoletos() {
     useEffect(() => {
         fetchBoletos()
     }, [user, fetchBoletos])
+    
+    // --- New Exported Functions ---
+    
+    /**
+     * Calcula o valor total anual (12 meses) de boletos para um cliente.
+     * Considera apenas boletos recorrentes ou boletos únicos no futuro.
+     */
+    const calculateClientAnnualValue = useCallback((clientId: string): number => {
+        const clientBoletos = boletos.filter(b => b.clientId === clientId);
+        
+        // Usamos um Set para rastrear grupos recorrentes já contados
+        const countedRecurrenceGroups = new Set<string>();
+        let totalAnnualValue = 0;
+        
+        clientBoletos.forEach(boleto => {
+            if (boleto.isRecurring && boleto.recurrenceGroupId) {
+                // Se for recorrente e o grupo ainda não foi contado
+                if (!countedRecurrenceGroups.has(boleto.recurrenceGroupId)) {
+                    // Contamos o valor do boleto 12 vezes (anual)
+                    totalAnnualValue += boleto.valor * 12;
+                    countedRecurrenceGroups.add(boleto.recurrenceGroupId);
+                }
+            } else {
+                // Se for boleto único, contamos apenas uma vez
+                totalAnnualValue += boleto.valor;
+            }
+        });
+
+        return totalAnnualValue;
+    }, [boletos]);
+
 
     return { 
         boletos, 
@@ -593,5 +624,6 @@ export function useBoletos() {
         deleteBoleto, 
         deleteRecurrenceGroup, 
         updateBoletoStatus,
+        calculateClientAnnualValue, // Exportando a nova função
     }
 }
