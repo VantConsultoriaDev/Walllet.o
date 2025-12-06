@@ -221,45 +221,60 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, onDelete, vehicl
         }
     }
 
+    const handleYearChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        let newYear: number | undefined;
+        
+        if (value === "") {
+            newYear = undefined;
+        } else {
+            const parsed = parseInt(value);
+            newYear = isNaN(parsed) ? undefined : parsed;
+        }
+
+        setFormData(prev => ({ ...prev, year: newYear }));
+    }
+
     const handleSubmit = () => {
         if (!formData.clientId) {
             toast({ title: "Erro", description: "ID do cliente não encontrado.", variant: "destructive" });
             return;
         }
 
-        if (formData.plate && formData.brand && formData.model) {
-            // 1. Garantir que o ano seja um número válido ou o ano atual
-            const finalYear = formData.year || new Date().getFullYear(); 
-
-            // 2. CRITICAL FIX: Mapear os dados finais, garantindo que os campos de moeda sejam strings ou undefined
-            const vehicleToSubmit: Vehicle = {
-                id: vehicleToEdit?.id || Math.random().toString(36).substr(2, 9), // Use existing ID or generate temp ID if new
-                clientId: formData.clientId,
-                type: type,
-                plate: formData.plate,
-                brand: formData.brand,
-                model: formData.model,
-                year: finalYear,
-                status: formData.status || "active",
-                
-                // Campos opcionais (garantindo que sejam string | undefined)
-                color: formData.color || undefined,
-                renavam: formData.renavam || undefined,
-                chassi: formData.chassi || undefined,
-                fipeCode: formData.fipeCode || undefined,
-                bodyType: formData.bodyType || undefined,
-                
-                // Campos de moeda (já estão como string de float ou undefined no formData)
-                fipeValue: formData.fipeValue,
-                bodyValue: formData.bodyValue,
-                value: formData.value,
-            } as Vehicle;
-
-            onSubmit(vehicleToSubmit)
-            onOpenChange(false)
-        } else {
+        if (!formData.plate || !formData.brand || !formData.model) {
             toast({ title: "Erro", description: "Preencha os campos obrigatórios (Placa, Marca, Modelo).", variant: "destructive" });
+            return;
         }
+
+        // 1. Garantir que o ano seja um número válido ou o ano atual
+        const finalYear = formData.year || new Date().getFullYear(); 
+
+        // 2. Mapear os dados finais
+        const vehicleToSubmit: Vehicle = {
+            id: vehicleToEdit?.id || Math.random().toString(36).substr(2, 9), // Use existing ID or generate temp ID if new
+            clientId: formData.clientId,
+            type: type,
+            plate: formData.plate,
+            brand: formData.brand,
+            model: formData.model,
+            year: finalYear,
+            status: formData.status || "active",
+            
+            // Campos opcionais (garantindo que sejam string | undefined)
+            color: formData.color || undefined,
+            renavam: formData.renavam || undefined,
+            chassi: formData.chassi || undefined,
+            fipeCode: formData.fipeCode || undefined,
+            bodyType: formData.bodyType || undefined,
+            
+            // Campos de moeda (já estão como string de float ou undefined no formData)
+            fipeValue: formData.fipeValue,
+            bodyValue: formData.bodyValue,
+            value: formData.value,
+        } as Vehicle;
+
+        onSubmit(vehicleToSubmit)
+        onOpenChange(false)
     }
 
     const handleConfirmDelete = (confirmed: boolean) => {
@@ -292,8 +307,7 @@ export function NewVehicleModal({ open, onOpenChange, onSubmit, onDelete, vehicl
                     <Input 
                         type="number" 
                         value={formData.year || ""} 
-                        onChange={e => setFormData({ ...formData, year: parseInt(e.target.value) })} 
-                        // REMOVIDO: required. O fallback é feito no handleSubmit.
+                        onChange={handleYearChange} 
                     />
                 </div>
                 <div className="space-y-2">
