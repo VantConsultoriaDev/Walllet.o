@@ -1,16 +1,42 @@
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
 import type { Transaction } from "@/components/financeiro/new-transaction-modal"
-import { addMonths, format } from "date-fns" // Importando 'format'
+import { addMonths, format } from "date-fns"
+import { useDashboardDataContext } from "./DashboardDataProvider" // Importando o contexto central
+
+// Helper function to map DB object to Transaction type
+const mapDbToTransaction = (dbTransaction: any): Transaction => ({
+    id: dbTransaction.id,
+    description: dbTransaction.description,
+    amount: parseFloat(dbTransaction.amount),
+    type: dbTransaction.type,
+    category: dbTransaction.category,
+    date: new Date(dbTransaction.date),
+    isRecurrent: dbTransaction.is_recurrent,
+    installments: dbTransaction.installments,
+    recurrenceId: dbTransaction.recurrence_id,
+    representacaoId: dbTransaction.representacao_id,
+    // NOTE: representacaoNome is not stored in DB, must be derived or ignored here
+    representacaoNome: undefined, 
+})
 
 export function useTransactions() {
-    const { user, loading: authLoading } = useAuth() // Adicionando authLoading
+    const { user } = useAuth()
     const { toast } = useToast()
-    const [transactions, setTransactions] = useState<Transaction[]>([])
-    const [loading, setLoading] = useState(true)
-    const [isRefetching, setIsRefetching] = useState(false)
+    const { data, loading, isRefetching, refetchData } = useDashboardDataContext() // Consumindo o contexto central
+
+    // Mapeia os dados brutos para o formato Transaction[]
+    const transactions: Transaction[] = useMemo(() => {
+        if (!data?.transactions) return []
+        return data.transactions.map(mapDbToTransaction)
+    }, [data])
+
+    // A função fetchTransactions agora apenas chama o refetchData do provedor
+    const fetchTransactions = useCallback(async () => {
+        await refetchData()
+    }, [refetchData])
 
     // --- Core CRUD Functions (Defined first for stability) ---
 
@@ -27,7 +53,6 @@ export function useTransactions() {
             .update({
                 ...updateData,
                 amount: numericAmount.toFixed(2),
-                // CORREÇÃO: Usar format para garantir YYYY-MM-DD local
                 date: format(updatedTransaction.date, 'yyyy-MM-dd'),
             })
             .eq('id', id)
@@ -39,13 +64,15 @@ export function useTransactions() {
             return { error }
         }
 
-        setTransactions(prev => prev.map(t => t.id === id ? updatedTransaction : t))
+        // Força o recarregamento de todos os dados para sincronizar o estado global
+        await refetchData()
+        
         // Note: We skip the toast here if called internally by addExpectedCommissionTransaction
         if (!updatedTransaction.description.includes("Comissão Esperada Boleto")) {
             toast({ title: "Sucesso", description: "Transação atualizada com sucesso." })
         }
         return { data: updatedTransaction }
-    }, [user, toast])
+    }, [user, toast, refetchData])
 
     const deleteTransaction = useCallback(async (id: string) => {
         if (!user) return { error: { message: "Usuário não autenticado" } }
@@ -61,10 +88,12 @@ export function useTransactions() {
             return { error }
         }
 
-        setTransactions(prev => prev.filter(t => t.id !== id))
+        // Força o recarregamento de todos os dados para sincronizar o estado global
+        await refetchData()
+        
         toast({ title: "Sucesso", description: "Transação excluída com sucesso." })
         return { data: true }
-    }, [user, toast])
+    }, [user, toast, refetchData])
     
     const deleteExpectedCommissionTransaction = useCallback(async (boletoId: string) => {
         if (!user) return { error: { message: "Usuário não autenticado" } }
@@ -98,73 +127,15 @@ export function useTransactions() {
                 return { error: deleteError };
             }
             
-            // 3. Deletar do estado local
-            setTransactions(prev => prev.filter(t => !idsToDelete.includes(t.id)));
+            // 3. Força o recarregamento de todos os dados para sincronizar o estado global
+            await refetchData()
+            
             return { data: true };
         }
         
         return { data: false }; // Nenhuma transação esperada encontrada
-    }, [user])
+    }, [user, refetchData])
 
-
-    // --- Fetching Logic ---
-
-    const fetchTransactions = useCallback(async () => {
-        if (!user) {
-            if (!authLoading) {
-                setLoading(false)
-            }
-            console.log("fetchTransactions: User not authenticated.")
-            return
-        }
-
-        console.log("fetchTransactions: Starting data fetch...")
-
-        // Only show full loading spinner if the list is empty
-        if (transactions.length === 0) {
-            setLoading(true)
-        } else {
-            setIsRefetching(true)
-        }
-
-        const { data, error } = await supabase
-            .from('transactions')
-            .select('*')
-            .eq('user_id', user.id)
-            .order('date', { ascending: false })
-
-        if (error) {
-            console.error("fetchTransactions Error:", error)
-            toast({
-                title: "Erro ao carregar transações",
-                description: error.message,
-                variant: "destructive",
-            })
-            setTransactions([])
-        } else {
-            // Convert date strings back to Date objects
-            const formattedData = data.map(t => ({
-                ...t,
-                date: new Date(t.date),
-                amount: parseFloat(t.amount),
-            })) as Transaction[]
-            
-            console.log(`fetchTransactions: Successfully loaded ${formattedData.length} transactions.`)
-            formattedData.filter(t => t.category === 'Comissão Esperada').forEach(t => {
-                console.log(`[Expected Commission] ID: ${t.id}, Date: ${t.date.toISOString().split('T')[0]}, Amount: ${t.amount}`);
-            });
-
-            setTransactions(formattedData)
-        }
-        setLoading(false)
-        setIsRefetching(false)
-    }, [user, toast, authLoading]) // Adicionando authLoading
-
-    useEffect(() => {
-        if (!authLoading) {
-            fetchTransactions()
-        }
-    }, [authLoading, fetchTransactions])
 
     // --- Add Logic ---
 
@@ -174,13 +145,12 @@ export function useTransactions() {
         // Ensure amount is a number before formatting
         const numericAmount = typeof newTransaction.amount === 'number' ? newTransaction.amount : parseFloat(newTransaction.amount as any);
 
-        const { data, error } = await supabase
+        const { error } = await supabase
             .from('transactions')
             .insert({
                 ...newTransaction,
                 user_id: user.id,
                 amount: numericAmount.toFixed(2), // Ensure amount is stored as numeric/string
-                // CORREÇÃO: Usar format para garantir YYYY-MM-DD local
                 date: format(newTransaction.date, 'yyyy-MM-dd'),
             })
             .select()
@@ -192,16 +162,12 @@ export function useTransactions() {
             return { error }
         }
 
-        const addedTransaction: Transaction = {
-            ...data,
-            date: new Date(data.date),
-            amount: parseFloat(data.amount),
-        }
-
-        setTransactions(prev => [addedTransaction, ...prev])
+        // Força o recarregamento de todos os dados para sincronizar o estado global
+        await refetchData()
+        
         // Note: We skip the toast here if called from addCommissionTransaction to avoid spamming the user.
-        return { data: addedTransaction }
-    }, [user, toast])
+        return { data: true }
+    }, [user, toast, refetchData])
 
     const addCommissionTransaction = useCallback(async (
         boletoId: string,
@@ -214,13 +180,13 @@ export function useTransactions() {
         if (!user) return { error: { message: "Usuário não autenticado" } }
 
         const descriptionPrefix = `Comissão Boleto #${boletoId}`;
-        const commissionDateString = format(commissionDueDate, 'yyyy-MM-dd'); // Usando format
+        const commissionDateString = format(commissionDueDate, 'yyyy-MM-dd');
         
-        // Usamos o estado atual de transactions (capturado pelo useCallback) para verificar a existência
+        // Usamos o estado atual de transactions (consumido via useMemo) para verificar a existência
         const existingTransaction = transactions.find(t => 
             t.description.includes(descriptionPrefix) && 
-            format(t.date, 'yyyy-MM-dd') === commissionDateString && // Usando format para comparação
-            t.category === 'Comissão' // Confirmação
+            format(t.date, 'yyyy-MM-dd') === commissionDateString &&
+            t.category === 'Comissão'
         );
 
         if (existingTransaction) {
@@ -234,20 +200,20 @@ export function useTransactions() {
             description: `${descriptionPrefix} - ${clientName}`,
             amount: numericAmount,
             type: "income",
-            category: "Comissão", // Categoria para CONFIRMADA
-            date: commissionDueDate, // Usa a data calculada
+            category: "Comissão",
+            date: commissionDueDate,
             isRecurrent: false,
             representacaoId: representacaoId,
             representacaoNome: representacaoNome,
         }
 
-        const { data, error } = await supabase
+        const { error } = await supabase
             .from('transactions')
             .insert({
                 ...newTransaction,
                 user_id: user.id,
                 amount: numericAmount.toFixed(2),
-                date: format(newTransaction.date, 'yyyy-MM-dd'), // Usando format
+                date: format(newTransaction.date, 'yyyy-MM-dd'),
             })
             .select()
             .single()
@@ -257,52 +223,41 @@ export function useTransactions() {
             return { error }
         }
 
-        const addedTransaction: Transaction = {
-            ...data,
-            date: new Date(data.date),
-            amount: parseFloat(data.amount),
-        }
-
-        // CRITICAL FIX: Adiciona ao estado local imediatamente
-        setTransactions(prev => [addedTransaction, ...prev])
+        // Força o recarregamento de todos os dados para sincronizar o estado global
+        await refetchData()
         
-        return { data: addedTransaction }
-    }, [user, transactions]) // Mantendo transactions como dependência para a verificação de existência
+        return { data: true }
+    }, [user, transactions, refetchData])
     
     const addExpectedCommissionTransaction = useCallback(async (
         boletoId: string,
         clientName: string,
         amount: number,
-        expectedDueDate: Date, // Data de vencimento da comissão esperada
+        expectedDueDate: Date,
         representacaoId?: string,
         representacaoNome?: string
     ) => {
         if (!user) return { error: { message: "Usuário não autenticado" } }
 
-        // Verifica se a transação de comissão ESPERADA já existe para este boleto
         const descriptionPrefix = `Comissão Esperada Boleto #${boletoId}`;
-        const expectedDateString = format(expectedDueDate, 'yyyy-MM-dd'); // Usando format
+        const expectedDateString = format(expectedDueDate, 'yyyy-MM-dd');
         
         const numericAmount = typeof amount === 'number' ? amount : parseFloat(amount as any);
 
         // 1. Tenta encontrar uma transação existente com a mesma descrição e data
         let existingTransaction = transactions.find(t => 
             t.description.includes(descriptionPrefix) && 
-            format(t.date, 'yyyy-MM-dd') === expectedDateString && // Usando format para comparação
-            t.category === 'Comissão Esperada' // Nova categoria
+            format(t.date, 'yyyy-MM-dd') === expectedDateString &&
+            t.category === 'Comissão Esperada'
         );
 
         if (existingTransaction) {
-            // Se a transação esperada já existe, verifica se o valor mudou.
             if (existingTransaction.amount !== numericAmount) {
-                // Se o valor mudou, atualiza a transação existente.
                 const updatedTransaction = { ...existingTransaction, amount: numericAmount };
-                // Chamada para a função de atualização definida acima
                 await updateTransaction(updatedTransaction); 
                 console.log(`Comissão ESPERADA para Boleto #${boletoId} atualizada.`);
                 return { data: updatedTransaction };
             }
-            // console.log(`Comissão ESPERADA para Boleto #${boletoId} já existe e valor é o mesmo. Pulando criação.`);
             return { data: existingTransaction };
         }
 
@@ -310,20 +265,20 @@ export function useTransactions() {
             description: `${descriptionPrefix} - ${clientName}`,
             amount: numericAmount,
             type: "income",
-            category: "Comissão Esperada", // Nova Categoria
+            category: "Comissão Esperada",
             date: expectedDueDate,
             isRecurrent: false,
             representacaoId: representacaoId,
             representacaoNome: representacaoNome,
         }
 
-        const { data, error } = await supabase
+        const { error } = await supabase
             .from('transactions')
             .insert({
                 ...newTransaction,
                 user_id: user.id,
                 amount: numericAmount.toFixed(2),
-                date: format(newTransaction.date, 'yyyy-MM-dd'), // Usando format
+                date: format(newTransaction.date, 'yyyy-MM-dd'),
             })
             .select()
             .single()
@@ -333,15 +288,11 @@ export function useTransactions() {
             return { error }
         }
 
-        const addedTransaction: Transaction = {
-            ...data,
-            date: new Date(data.date),
-            amount: parseFloat(data.amount),
-        }
-
-        setTransactions(prev => [addedTransaction, ...prev])
-        return { data: addedTransaction }
-    }, [user, transactions, updateTransaction])
+        // Força o recarregamento de todos os dados para sincronizar o estado global
+        await refetchData()
+        
+        return { data: true }
+    }, [user, transactions, updateTransaction, refetchData])
 
     return { 
         transactions, 
@@ -353,6 +304,6 @@ export function useTransactions() {
         addExpectedCommissionTransaction, 
         updateTransaction, 
         deleteTransaction,
-        deleteExpectedCommissionTransaction // Exportando a nova função
+        deleteExpectedCommissionTransaction
     }
 }

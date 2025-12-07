@@ -1,68 +1,45 @@
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
 import type { Event } from "@/types/agenda"
+import { useDashboardDataContext } from "./DashboardDataProvider" // Importando o contexto central
+
+// Helper function to map DB object to Event type
+const mapDbToEvent = (dbEvent: any): Event => ({
+    id: dbEvent.id,
+    title: dbEvent.title,
+    date: new Date(dbEvent.date),
+    type: dbEvent.type,
+    urgency: dbEvent.urgency,
+    category: dbEvent.category,
+    client: dbEvent.client_name || "N/A", // Map client_name to client
+    description: dbEvent.description,
+    completed: dbEvent.completed,
+})
 
 export function useEvents() {
-    const { user, loading: authLoading } = useAuth() // Adicionando authLoading
+    const { user } = useAuth()
     const { toast } = useToast()
-    const [events, setEvents] = useState<Event[]>([])
-    const [loading, setLoading] = useState(true)
-    const [isRefetching, setIsRefetching] = useState(false)
+    const { data, loading, isRefetching, refetchData } = useDashboardDataContext() // Consumindo o contexto central
 
+    // Mapeia os dados brutos para o formato Event[]
+    const events: Event[] = useMemo(() => {
+        if (!data?.events) return []
+        return data.events.map(mapDbToEvent).sort((a, b) => a.date.getTime() - b.date.getTime())
+    }, [data])
+
+    // A função fetchEvents agora apenas chama o refetchData do provedor
     const fetchEvents = useCallback(async () => {
-        if (!user) {
-            if (!authLoading) {
-                setLoading(false)
-            }
-            return
-        }
-
-        if (events.length === 0) {
-            setLoading(true)
-        } else {
-            setIsRefetching(true)
-        }
-
-        const { data, error } = await supabase
-            .from('events')
-            .select('*')
-            .eq('user_id', user.id)
-            .order('date', { ascending: true })
-
-        if (error) {
-            toast({
-                title: "Erro ao carregar agenda",
-                description: error.message,
-                variant: "destructive",
-            })
-            setEvents([])
-        } else {
-            // Convert date strings back to Date objects
-            const formattedData = data.map(e => ({
-                ...e,
-                date: new Date(e.date),
-                client: e.client_name || "N/A" // Map client_name to client
-            })) as Event[]
-            setEvents(formattedData)
-        }
-        setLoading(false)
-        setIsRefetching(false)
-    }, [user, toast, authLoading]) // Adicionando authLoading
-
-    useEffect(() => {
-        if (!authLoading) {
-            fetchEvents()
-        }
-    }, [authLoading, fetchEvents])
+        await refetchData()
+    }, [refetchData])
 
     const addEvent = async (newEvent: Omit<Event, 'id' | 'client'> & { client: string }) => {
         if (!user) return { error: { message: "Usuário não autenticado" } }
 
         const { client, ...eventData } = newEvent;
 
-        const { data, error } = await supabase
+        const { error } = await supabase
             .from('events')
             .insert({
                 ...eventData,
@@ -78,15 +55,11 @@ export function useEvents() {
             return { error }
         }
 
-        const addedEvent: Event = {
-            ...data,
-            date: new Date(data.date),
-            client: data.client_name,
-        }
-
-        setEvents(prev => [...prev, addedEvent])
+        // Força o recarregamento de todos os dados para sincronizar o estado global
+        await refetchData()
+        
         toast({ title: "Sucesso", description: "Compromisso adicionado com sucesso." })
-        return { data: addedEvent }
+        return { data: true }
     }
 
     const updateEvent = async (updatedEvent: Event) => {
@@ -109,7 +82,9 @@ export function useEvents() {
             return { error }
         }
 
-        setEvents(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e))
+        // Força o recarregamento de todos os dados para sincronizar o estado global
+        await refetchData()
+        
         toast({ title: "Sucesso", description: "Compromisso atualizado com sucesso." })
         return { data: updatedEvent }
     }
@@ -127,7 +102,9 @@ export function useEvents() {
             return { error }
         }
 
-        setEvents(prev => prev.filter(e => e.id !== id))
+        // Força o recarregamento de todos os dados para sincronizar o estado global
+        await refetchData()
+        
         toast({ title: "Sucesso", description: "Compromisso excluído com sucesso." })
         return { data: true }
     }

@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
 import type { Partner } from "@/components/representacoes/new-representacao-modal"
+import { useDashboardDataContext } from "./DashboardDataProvider" // Importando o contexto central
 
 // Helper function to map DB object to Partner type
 const mapDbToPartner = (dbPartner: any): Partner => ({
@@ -28,52 +29,20 @@ const mapPartnerToDb = (partner: Partial<Partner>) => ({
 })
 
 export function useRepresentations() {
-    const { user, loading: authLoading } = useAuth() // Adicionando authLoading
+    const { user } = useAuth()
     const { toast } = useToast()
-    const [partners, setPartners] = useState<Partner[]>([])
-    const [loading, setLoading] = useState(true)
-    const [isRefetching, setIsRefetching] = useState(false)
+    const { data, loading, isRefetching, refetchData } = useDashboardDataContext() // Consumindo o contexto central
 
+    // Mapeia os dados brutos para o formato Partner[]
+    const partners: Partner[] = useMemo(() => {
+        if (!data?.representations) return []
+        return data.representations.map(mapDbToPartner)
+    }, [data])
+
+    // A função fetchPartners agora apenas chama o refetchData do provedor
     const fetchPartners = useCallback(async () => {
-        if (!user) {
-            if (!authLoading) {
-                setLoading(false)
-            }
-            return
-        }
-
-        if (partners.length === 0) {
-            setLoading(true)
-        } else {
-            setIsRefetching(true)
-        }
-
-        const { data, error } = await supabase
-            .from('representations')
-            .select('*')
-            .eq('user_id', user.id)
-            .order('created_at', { ascending: false })
-
-        if (error) {
-            toast({
-                title: "Erro ao carregar representações",
-                description: error.message,
-                variant: "destructive",
-            })
-            setPartners([])
-        } else {
-            const formattedData = data.map(mapDbToPartner)
-            setPartners(formattedData)
-        }
-        setLoading(false)
-        setIsRefetching(false)
-    }, [user, toast, authLoading]) // Adicionando authLoading
-
-    useEffect(() => {
-        if (!authLoading) {
-            fetchPartners()
-        }
-    }, [authLoading, fetchPartners])
+        await refetchData()
+    }, [refetchData])
 
     const addPartner = async (newPartnerData: Omit<Partner, 'id' | 'contact' | 'email' | 'logo'> & { logo?: File | null }) => {
         if (!user) return { error: { message: "Usuário não autenticado" } }
@@ -88,7 +57,7 @@ export function useRepresentations() {
             email: "", // Default empty
         })
 
-        const { data, error } = await supabase
+        const { error } = await supabase
             .from('representations')
             .insert({
                 ...dbData,
@@ -102,11 +71,11 @@ export function useRepresentations() {
             return { error }
         }
 
-        const addedPartner = mapDbToPartner(data)
-
-        setPartners(prev => [addedPartner, ...prev])
+        // Força o recarregamento de todos os dados para sincronizar o estado global
+        await refetchData()
+        
         toast({ title: "Sucesso", description: "Representação adicionada com sucesso." })
-        return { data: addedPartner }
+        return { data: true }
     }
 
     const updatePartner = async (updatedPartner: Partner) => {
@@ -125,7 +94,9 @@ export function useRepresentations() {
             return { error }
         }
 
-        setPartners(prev => prev.map(p => p.id === updatedPartner.id ? updatedPartner : p))
+        // Força o recarregamento de todos os dados para sincronizar o estado global
+        await refetchData()
+        
         toast({ title: "Sucesso", description: "Representação atualizada com sucesso." })
         return { data: updatedPartner }
     }

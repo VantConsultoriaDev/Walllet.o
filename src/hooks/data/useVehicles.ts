@@ -2,25 +2,26 @@ import { useState, useEffect, useCallback } from "react"
 import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
+import { useDashboardDataContext } from "./DashboardDataProvider" // Importando o contexto central
 
 export type VehicleType = "CAVALO" | "TRUCK" | "CARRETA" | "CARRO" | "MOTO"
 
 export type Vehicle = {
     id: string
-    clientId: string // Added clientId
+    clientId: string
     type: VehicleType
     plate: string
     brand: string
     model: string
-    year: number // <-- Novo campo
-    color?: string // <-- Novo campo
+    year: number
+    color?: string
     renavam?: string
     chassi?: string
     fipeCode?: string
     fipeValue?: string
-    bodyType?: string // Carroceria (Truck)
-    bodyValue?: string // Valor Carroceria (Truck)
-    value?: string // Valor Contrato (ou Valor Carreta)
+    bodyType?: string
+    bodyValue?: string
+    value?: string
     status: "active" | "inactive" | "maintenance"
 }
 
@@ -32,7 +33,7 @@ const mapDbToVehicle = (dbVehicle: any): Vehicle => ({
     brand: dbVehicle.brand,
     model: dbVehicle.model,
     year: dbVehicle.year,
-    color: dbVehicle.color, // <-- Mapeando 'color'
+    color: dbVehicle.color,
     renavam: dbVehicle.renavam,
     chassi: dbVehicle.chassi,
     fipeCode: dbVehicle.fipe_code,
@@ -41,7 +42,7 @@ const mapDbToVehicle = (dbVehicle: any): Vehicle => ({
     bodyValue: dbVehicle.body_value,
     value: dbVehicle.value,
     status: dbVehicle.status,
-    clientId: dbVehicle.client_id, // Keep client_id for mapping
+    clientId: dbVehicle.client_id,
 })
 
 // Helper function to map Vehicle type to DB object
@@ -50,7 +51,6 @@ const mapVehicleToDb = (vehicle: Partial<Vehicle>) => ({
     plate: vehicle.plate,
     brand: vehicle.brand,
     model: vehicle.model,
-    // Garantindo que campos opcionais sejam null se não existirem
     year: vehicle.year || null, 
     color: vehicle.color || null, 
     renavam: vehicle.renavam || null,
@@ -65,31 +65,19 @@ const mapVehicleToDb = (vehicle: Partial<Vehicle>) => ({
 })
 
 export function useVehicles() {
-    const { user, loading: authLoading } = useAuth()
+    const { user } = useAuth()
     const { toast } = useToast()
-    // O estado 'vehicles' agora será mantido apenas para operações CRUD locais, 
-    // mas o array principal de veículos será obtido via useClients.
-    const [vehicles, setVehicles] = useState<Vehicle[]>([]) 
-    const [loading, setLoading] = useState(false) // Definido como false, pois o carregamento principal é feito em useClients
-    const [isRefetching, setIsRefetching] = useState(false)
+    const { refetchData } = useDashboardDataContext() // Consumindo o contexto central
 
-    // Função de fetch agora apenas retorna um array vazio, pois o useClients faz o trabalho.
-    // Mantemos a estrutura para compatibilidade com useAppInitialization (que será removida).
+    // Mantemos o retorno mínimo, pois os dados são gerenciados por useClients
+    const vehicles: Vehicle[] = [] 
+    const loading = false
+    const isRefetching = false
+
     const fetchVehicles = useCallback(async () => {
-        if (!user) {
-            setLoading(false)
-            return
-        }
-        // NOTE: We rely on useClients to fetch the main list of vehicles via JOIN.
-        // This function is kept minimal to avoid redundant API calls.
-        setLoading(false)
-    }, [user])
-
-    useEffect(() => {
-        // Removemos a chamada de fetch aqui, pois ela é redundante.
-        // O useClients.fetchClients() é quem deve ser chamado para sincronizar.
-        // No entanto, mantemos a função fetchVehicles para ser chamada manualmente se necessário.
-    }, [])
+        // Apenas chama o refetchData do provedor principal
+        await refetchData()
+    }, [refetchData])
 
     const addVehicle = async (newVehicleData: Omit<Vehicle, 'id'>) => {
         if (!user) return { error: { message: "Usuário não autenticado" } }
@@ -114,12 +102,11 @@ export function useVehicles() {
             return { error }
         }
 
-        const addedVehicle = mapDbToVehicle(data)
-
-        // Não atualizamos o estado local de 'vehicles' aqui, pois ele não é a fonte primária de dados.
-        // O componente chamador (Clientes.tsx) deve chamar fetchClients para sincronizar.
+        // Força o recarregamento de todos os dados para sincronizar o estado global
+        await refetchData()
+        
         toast({ title: "Sucesso", description: "Veículo adicionado com sucesso." })
-        return { data: addedVehicle }
+        return { data: mapDbToVehicle(data) }
     }
 
     const updateVehicle = async (updatedVehicle: Vehicle) => {
@@ -132,7 +119,7 @@ export function useVehicles() {
 
         const dbData = mapVehicleToDb(updatedVehicle)
 
-        const { error } = await supabase
+        const { data, error } = await supabase
             .from('vehicles')
             .update({
                 ...dbData,
@@ -140,15 +127,18 @@ export function useVehicles() {
             })
             .eq('id', updatedVehicle.id)
             .select()
+            .single()
 
         if (error) {
             toast({ title: "Erro", description: `Falha ao atualizar veículo: ${error.message}`, variant: "destructive" })
             return { error }
         }
 
-        // Não atualizamos o estado local de 'vehicles' aqui.
+        // Força o recarregamento de todos os dados para sincronizar o estado global
+        await refetchData()
+        
         toast({ title: "Sucesso", description: "Veículo atualizado com sucesso." })
-        return { data: updatedVehicle }
+        return { data: mapDbToVehicle(data) }
     }
 
     const deleteVehicle = async (id: string) => {
@@ -164,11 +154,12 @@ export function useVehicles() {
             return { error }
         }
 
-        // Não atualizamos o estado local de 'vehicles' aqui.
+        // Força o recarregamento de todos os dados para sincronizar o estado global
+        await refetchData()
+        
         toast({ title: "Sucesso", description: "Veículo excluído com sucesso." })
         return { data: true }
     }
 
-    // Retornamos vehicles como um array vazio, pois ele não é a fonte primária.
-    return { vehicles: [], loading, isRefetching, fetchVehicles, addVehicle, updateVehicle, deleteVehicle }
+    return { vehicles, loading, isRefetching, fetchVehicles, addVehicle, updateVehicle, deleteVehicle }
 }

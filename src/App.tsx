@@ -12,6 +12,7 @@ import Cotacoes from "@/pages/Cotacoes"
 import Representacoes from "@/pages/Representacoes"
 import Login from "@/pages/Login"
 import { Toaster } from "@/components/ui/toaster"
+import { DashboardDataProvider } from "@/hooks/data/DashboardDataProvider" // Importando o novo provedor
 
 function App() {
   console.log('App component rendering...');
@@ -22,7 +23,9 @@ function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route element={<ProtectedRoute />}>
-              <Route element={<MainLayout />}>
+              <Route element={<DashboardDataProvider> {/* Envolvendo rotas protegidas */}
+                <MainLayout />
+              </DashboardDataProvider>}>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/agenda" element={<Agenda />} />

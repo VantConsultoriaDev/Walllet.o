@@ -1,30 +1,51 @@
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
 import type { Claim, ClaimHistory, ClaimComment, ClaimStatus, ThirdParty } from "@/types/sinistro"
+import { useDashboardDataContext } from "./DashboardDataProvider" // Importando o contexto central
 
 // Helper function to map DB object to Claim type
-const mapDbToClaim = (dbClaim: any, history: ClaimHistory[] = [], comments: ClaimComment[] = []): Claim => ({
-    id: dbClaim.id,
-    clientId: dbClaim.client_id,
-    clientName: dbClaim.client_name,
-    clientPlate: dbClaim.client_plate,
-    driverName: dbClaim.driver_name,
-    driverCpf: dbClaim.driver_cpf,
-    thirdParties: dbClaim.third_parties_data || [],
-    thirdPartyName: dbClaim.third_parties_data?.[0]?.name, // Legacy/convenience field
-    thirdPartyPlate: dbClaim.third_parties_data?.[0]?.asset?.plate, // Legacy/convenience field
-    type: dbClaim.type,
-    date: new Date(dbClaim.date),
-    time: dbClaim.time,
-    status: dbClaim.status,
-    description: dbClaim.description,
-    history: history,
-    comments: comments,
-    createdAt: new Date(dbClaim.created_at),
-    updatedAt: new Date(dbClaim.updated_at),
-})
+const mapDbToClaim = (dbClaim: any): Claim => {
+    // Mapeia e ordena o histórico
+    const claimHistory = (dbClaim.history || []).map((h: any) => ({
+        id: h.id,
+        date: new Date(h.created_at || h.date),
+        fromStatus: h.from_status || h.fromStatus,
+        toStatus: h.to_status || h.toStatus,
+        updatedBy: h.updated_by || h.updatedBy,
+        notes: h.notes,
+    } as ClaimHistory)).sort((a: ClaimHistory, b: ClaimHistory) => b.date.getTime() - a.date.getTime()); // Ordena por data decrescente
+
+    // Mapeia e ordena os comentários
+    const claimComments = (dbClaim.comments || []).map((c: any) => ({
+        id: c.id,
+        text: c.text,
+        createdAt: new Date(c.created_at || c.createdAt),
+        createdBy: c.created_by || c.createdBy,
+    } as ClaimComment)).sort((a: ClaimComment, b: ClaimComment) => a.createdAt.getTime() - b.createdAt.getTime()); // Ordena por data crescente
+
+    return {
+        id: dbClaim.id,
+        clientId: dbClaim.client_id,
+        clientName: dbClaim.client_name,
+        clientPlate: dbClaim.client_plate,
+        driverName: dbClaim.driver_name,
+        driverCpf: dbClaim.driver_cpf,
+        thirdParties: dbClaim.third_parties_data || [],
+        thirdPartyName: dbClaim.third_parties_data?.[0]?.name, // Legacy/convenience field
+        thirdPartyPlate: dbClaim.third_parties_data?.[0]?.asset?.plate, // Legacy/convenience field
+        type: dbClaim.type,
+        date: new Date(dbClaim.date),
+        time: dbClaim.time,
+        status: dbClaim.status,
+        description: dbClaim.description,
+        history: claimHistory,
+        comments: claimComments,
+        createdAt: new Date(dbClaim.created_at),
+        updatedAt: new Date(dbClaim.updated_at),
+    }
+}
 
 // Helper function to map Claim type to DB object for insertion/update
 const mapClaimToDb = (claim: Partial<Claim>) => ({
@@ -43,101 +64,27 @@ const mapClaimToDb = (claim: Partial<Claim>) => ({
 })
 
 export function useClaims() {
-    const { user, loading: authLoading } = useAuth() // Adicionando authLoading
+    const { user } = useAuth()
     const { toast } = useToast()
-    const [claims, setClaims] = useState<Claim[]>([])
-    const [loading, setLoading] = useState(true)
-    const [isRefetching, setIsRefetching] = useState(false)
+    const { data, loading, isRefetching, refetchData } = useDashboardDataContext() // Consumindo o contexto central
 
+    // Mapeia os dados brutos para o formato Claim[]
+    const claims: Claim[] = useMemo(() => {
+        if (!data?.claims) return []
+        return data.claims.map(mapDbToClaim)
+    }, [data])
+
+    // A função fetchClaims agora apenas chama o refetchData do provedor
     const fetchClaims = useCallback(async () => {
-        if (!user) {
-            if (!authLoading) {
-                setLoading(false)
-            }
-            return
-        }
-
-        if (claims.length === 0) {
-            setLoading(true)
-        } else {
-            setIsRefetching(true)
-        }
-
-        // 1. Fetch all claims
-        const { data: claimsData, error: claimsError } = await supabase
-            .from('claims')
-            .select('*')
-            .eq('user_id', user.id)
-            .order('created_at', { ascending: false })
-
-        if (claimsError) {
-            toast({ title: "Erro ao carregar sinistros", description: claimsError.message, variant: "destructive" })
-            setClaims([])
-            setLoading(false)
-            setIsRefetching(false)
-            return
-        }
-
-        // 2. Fetch all history entries
-        const { data: historyData } = await supabase
-            .from('claim_history')
-            .select('*')
-            .eq('user_id', user.id)
-            .order('created_at', { ascending: false })
-        
-        const allHistory = historyData || []
-
-        // 3. Fetch all comments
-        const { data: commentsData } = await supabase
-            .from('claim_comments')
-            .select('*')
-            .eq('user_id', user.id)
-            .order('created_at', { ascending: true })
-        
-        const allComments = commentsData || []
-
-        // 4. Map claims and attach history/comments
-        const formattedClaims = claimsData.map(dbClaim => {
-            const claimHistory = allHistory
-                .filter(h => h.claim_id === dbClaim.id)
-                .map(h => ({
-                    id: h.id,
-                    date: new Date(h.created_at),
-                    fromStatus: h.from_status,
-                    toStatus: h.to_status,
-                    updatedBy: h.updated_by,
-                    notes: h.notes,
-                } as ClaimHistory))
-            
-            const claimComments = allComments
-                .filter(c => c.claim_id === dbClaim.id)
-                .map(c => ({
-                    id: c.id,
-                    text: c.text,
-                    createdAt: new Date(c.created_at),
-                    createdBy: c.created_by,
-                } as ClaimComment))
-            
-            return mapDbToClaim(dbClaim, claimHistory, claimComments)
-        })
-
-        setClaims(formattedClaims)
-        setLoading(false)
-        setIsRefetching(false)
-    }, [user, toast, authLoading]) // Adicionando authLoading
-
-    useEffect(() => {
-        if (!authLoading) {
-            fetchClaims()
-        }
-    }, [authLoading, fetchClaims])
+        await refetchData()
+    }, [refetchData])
 
     const addClaim = async (newClaim: Omit<Claim, 'id' | 'history' | 'comments' | 'createdAt' | 'updatedAt' | 'thirdPartyName' | 'thirdPartyPlate'>) => {
         if (!user) return { error: { message: "Usuário não autenticado" } }
 
         const dbData = mapClaimToDb({ ...newClaim, status: 'aberto' })
 
-        const { data, error } = await supabase
+        const { error } = await supabase
             .from('claims')
             .insert({
                 ...dbData,
@@ -151,11 +98,11 @@ export function useClaims() {
             return { error }
         }
 
-        const addedClaim = mapDbToClaim(data, [], [])
-
-        setClaims(prev => [addedClaim, ...prev])
+        // Força o recarregamento de todos os dados para sincronizar o estado global
+        await refetchData()
+        
         toast({ title: "Sucesso", description: "Sinistro adicionado com sucesso." })
-        return { data: addedClaim }
+        return { data: true }
     }
 
     const updateClaimStatus = async (claimId: string, newStatus: ClaimStatus, notes?: string) => {
@@ -181,7 +128,7 @@ export function useClaims() {
         }
 
         // 2. Insert history entry
-        const { data: historyEntry, error: historyError } = await supabase
+        const { error: historyError } = await supabase
             .from('claim_history')
             .insert({
                 claim_id: claimId,
@@ -198,26 +145,11 @@ export function useClaims() {
             console.error("Falha ao registrar histórico:", historyError.message)
         }
 
-        // 3. Update local state
-        const newHistoryEntry: ClaimHistory = {
-            id: historyEntry?.id || 'temp-id',
-            date: new Date(historyEntry?.created_at || new Date()),
-            fromStatus: oldClaim.status,
-            toStatus: newStatus,
-            updatedBy: historyEntry?.updated_by || user.name || user.email,
-            notes: notes,
-        }
-
-        const updatedClaim: Claim = {
-            ...oldClaim,
-            status: newStatus,
-            updatedAt: new Date(updatedClaimData.updated_at),
-            history: [newHistoryEntry, ...oldClaim.history]
-        }
-
-        setClaims(prev => prev.map(c => c.id === claimId ? updatedClaim : c))
+        // 3. Força o recarregamento de todos os dados para sincronizar o estado global
+        await refetchData()
+        
         toast({ title: "Sucesso", description: "Status do sinistro atualizado." })
-        return { data: updatedClaim }
+        return { data: updatedClaimData }
     }
 
     const addComment = async (claimId: string, text: string) => {
@@ -239,20 +171,10 @@ export function useClaims() {
             return { error }
         }
 
-        const newComment: ClaimComment = {
-            id: data.id,
-            text: data.text,
-            createdAt: new Date(data.created_at),
-            createdBy: data.created_by,
-        }
-
-        setClaims(prev => prev.map(c => {
-            if (c.id === claimId) {
-                return { ...c, comments: [newComment, ...c.comments] }
-            }
-            return c
-        }))
-        return { data: newComment }
+        // Força o recarregamento de todos os dados para sincronizar o estado global
+        await refetchData()
+        
+        return { data: data }
     }
 
     return { claims, loading, isRefetching, fetchClaims, addClaim, updateClaimStatus, addComment }

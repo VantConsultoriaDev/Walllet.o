@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react"
 import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
+import { useDashboardDataContext } from "./DashboardDataProvider" // Importando o contexto central
 
 // Definindo o tipo Vehicle localmente
 export type VehicleType = "CAVALO" | "TRUCK" | "CARRETA" | "CARRO" | "MOTO"
@@ -105,71 +106,28 @@ const mapClientToDb = (client: Partial<Client>) => ({
 
 
 export function useClients() {
-    const { user, loading: authLoading } = useAuth()
+    const { user } = useAuth()
     const { toast } = useToast()
-    const [clients, setClients] = useState<Client[]>([])
-    const [loading, setLoading] = useState(true)
-    const [isRefetching, setIsRefetching] = useState(false)
+    const { data, loading, isRefetching, refetchData } = useDashboardDataContext() // Consumindo o contexto central
+    
+    // Mapeia os dados brutos para o formato Client[]
+    const clients: Client[] = useMemo(() => {
+        if (!data?.clients) return []
+        return data.clients.map(mapDbToClient)
+    }, [data])
 
-    const fetchClients = useCallback(async (): Promise<Client[]> => {
-        if (!user) {
-            if (!authLoading) {
-                setLoading(false)
-            }
-            return []
-        }
-
-        if (clients.length === 0) {
-            setLoading(true)
-        } else {
-            setIsRefetching(true)
-        }
-
-        // 1. Fetch clients and their associated vehicles in a single query (JOIN)
-        const { data: clientsData, error: clientsError } = await supabase
-            .from('clients')
-            .select(`
-                *,
-                vehicles (
-                    id, client_id, type, plate, brand, model, year, color, renavam, chassi, fipe_code, fipe_value, body_type, body_value, value, status
-                )
-            `)
-            .eq('user_id', user.id)
-            .order('created_at', { ascending: false })
-
-        if (clientsError) {
-            toast({
-                title: "Erro ao carregar clientes",
-                description: clientsError.message,
-                variant: "destructive",
-            })
-            setClients([])
-            setLoading(false)
-            setIsRefetching(false)
-            return []
-        }
-
-        // 2. Map data
-        const formattedClients = clientsData.map(mapDbToClient)
-
-        setClients(formattedClients)
-        setLoading(false)
-        setIsRefetching(false)
-        return formattedClients
-    }, [user, toast, authLoading])
-
-    useEffect(() => {
-        if (!authLoading) {
-            fetchClients()
-        }
-    }, [authLoading, fetchClients])
+    // A função fetchClients agora apenas chama o refetchData do provedor
+    const fetchClients = useCallback(async () => {
+        await refetchData()
+        return clients // Retorna o estado atualizado (embora o estado seja atualizado pelo provedor)
+    }, [refetchData, clients])
 
     const addClient = async (newClientData: Omit<Client, 'id' | 'status' | 'vehicles'>) => {
         if (!user) return { error: { message: "Usuário não autenticado" } }
 
         const dbData = mapClientToDb({ ...newClientData, status: 'active' })
 
-        const { data, error } = await supabase
+        const { data: insertedData, error } = await supabase
             .from('clients')
             .insert({
                 ...dbData,
@@ -183,9 +141,11 @@ export function useClients() {
             return { error }
         }
 
-        const addedClient = mapDbToClient(data) // New client starts with no vehicles
+        // Força o recarregamento de todos os dados para sincronizar o estado global
+        await refetchData()
+        
+        const addedClient = mapDbToClient(insertedData)
 
-        setClients(prev => [addedClient, ...prev])
         toast({ title: "Sucesso", description: "Cliente adicionado com sucesso." })
         return { data: addedClient }
     }
@@ -206,7 +166,9 @@ export function useClients() {
             return { error }
         }
 
-        setClients(prev => prev.map(c => c.id === updatedClient.id ? updatedClient : c))
+        // Força o recarregamento de todos os dados para sincronizar o estado global
+        await refetchData()
+        
         toast({ title: "Sucesso", description: "Cliente atualizado com sucesso." })
         return { data: updatedClient }
     }
