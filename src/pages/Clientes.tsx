@@ -314,38 +314,45 @@ export default function Clientes() {
                 />
             ) : (
                 <>
-                    {/* O MainLayout garante que os dados já foram carregados antes de renderizar aqui */}
-                    {viewMode === "grid" ? (
-                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                            {filteredClientsForGrid.map((client, index) => (
-                                <div
-                                    key={client.id}
-                                    style={{
-                                        animation: `fadeInUp 0.5s ease-out ${index * 0.1}s both`
-                                    }}
-                                >
-                                    <ClientCard
-                                        {...client}
-                                        onClick={() => setSelectedClient(client)}
-                                    />
-                                </div>
-                            ))}
-                        </div>
+                    {/* Renderiza a lista ou grid se houver clientes ou se o filtro global estiver ativo */}
+                    {(clients.length > 0 || globalFilter) ? (
+                        viewMode === "grid" ? (
+                            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                                {filteredClientsForGrid.map((client, index) => (
+                                    <div
+                                        key={client.id}
+                                        style={{
+                                            animation: `fadeInUp 0.5s ease-out ${index * 0.1}s both`
+                                        }}
+                                    >
+                                        <ClientCard
+                                            {...client}
+                                            onClick={() => setSelectedClient(client)}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <DataTable 
+                                columns={columns} 
+                                data={filteredClientsForGrid} // Usando a lista filtrada para o DataTable
+                                filters={filters} 
+                                onRowClick={setSelectedClient} 
+                                globalFilter={globalFilter} // Passando o filtro global
+                                setGlobalFilter={setGlobalFilter} // Permitindo que o DataTableToolbar gerencie o filtro
+                            />
+                        )
                     ) : (
-                        <DataTable 
-                            columns={columns} 
-                            data={clients} 
-                            filters={filters} 
-                            onRowClick={setSelectedClient} 
-                            globalFilter={globalFilter} // Passando o filtro global
-                            setGlobalFilter={setGlobalFilter} // Permitindo que o DataTableToolbar gerencie o filtro
-                        />
-                    )}
-
-                    {/* Show empty state only if list is empty */}
-                    {(viewMode === "grid" ? filteredClientsForGrid.length : clients.length) === 0 && (
+                        // Estado vazio: Apenas se a lista de clientes estiver realmente vazia e não houver filtro ativo
                         <div className="text-center py-12">
                             <p className="text-muted-foreground">Nenhum cliente encontrado.</p>
+                        </div>
+                    )}
+                    
+                    {/* Show empty state only if list is empty */}
+                    {(clients.length > 0 && filteredClientsForGrid.length === 0) && (
+                        <div className="text-center py-12">
+                            <p className="text-muted-foreground">Nenhum resultado encontrado para "{globalFilter}".</p>
                         </div>
                     )}
                 </>
