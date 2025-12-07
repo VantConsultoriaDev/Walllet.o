@@ -162,7 +162,7 @@ export default function Agenda() {
     }
 
     return (
-        <div className="flex-1 space-y-4 p-4 pt-6 md:p-8 h-[calc(100vh-4rem)] overflow-hidden flex flex-col">
+        <div className="flex-1 space-y-4 p-4 pt-6 md:p-8 h-full overflow-y-auto flex flex-col">
             <div className="flex flex-col md:flex-row md:items-center justify-between space-y-2 md:space-y-0 shrink-0 gap-4">
                 <div className="space-y-1">
                     <h2 className="text-3xl font-bold tracking-tight">Agenda</h2>
@@ -187,7 +187,7 @@ export default function Agenda() {
             </div>
 
             {searchQuery && (
-                <Card className="mb-4 border-primary/20 bg-primary/5">
+                <Card className="mb-4 border-primary/20 bg-primary/5 shrink-0">
                     <CardContent className="p-4">
                         <p className="text-sm font-medium text-muted-foreground mb-2">Resultados da busca:</p>
                         <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
@@ -214,12 +214,12 @@ export default function Agenda() {
                 </Card>
             )}
 
-            <div className="grid gap-4 md:grid-cols-12 h-full overflow-hidden pb-4">
+            <div className="grid gap-4 md:grid-cols-12 flex-1 overflow-hidden pb-4">
                 {/* Left Column: Content (Appointments & Tasks) */}
                 <div className="col-span-7 flex flex-col gap-4 h-full overflow-hidden">
 
                     <Card className="flex-1 flex flex-col overflow-hidden border-none shadow-md bg-card/50 backdrop-blur-sm">
-                        <CardHeader className="pb-2">
+                        <CardHeader className="pb-2 shrink-0">
                             <CardTitle className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <CalendarIcon className="h-5 w-5 text-primary" />
@@ -245,7 +245,7 @@ export default function Agenda() {
                         </CardHeader>
                         <CardContent className="flex-1 overflow-hidden flex flex-col gap-4">
                             {/* Quick Add Input */}
-                            <div className="flex gap-2">
+                            <div className="flex gap-2 shrink-0">
                                 <Input
                                     placeholder="Adicionar nova tarefa rápida..."
                                     value={newTaskTitle}
@@ -314,7 +314,7 @@ export default function Agenda() {
                                                         </p>
                                                     </div>
 
-                                                    <div className="flex items-center gap-2 ml-2">
+                                                    <div className="flex items-center gap-2 ml-2 shrink-0">
                                                         <Badge variant="outline" className={cn("text-[10px] h-5 capitalize", event.completed && "opacity-50")}>
                                                             {event.category}
                                                         </Badge>
@@ -345,7 +345,7 @@ export default function Agenda() {
 
                 {/* Right Column: Custom Calendar */}
                 <Card className="col-span-5 h-full flex flex-col border-none shadow-md bg-card/50 backdrop-blur-sm">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 shrink-0">
                         <CardTitle className="capitalize">
                             {currentMonth.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
                         </CardTitle>
@@ -360,7 +360,7 @@ export default function Agenda() {
                     </CardHeader>
                     <CardContent className="flex-1 p-4 overflow-hidden flex flex-col">
                         {/* Weekday Headers */}
-                        <div className="grid grid-cols-7 mb-2">
+                        <div className="grid grid-cols-7 mb-2 shrink-0">
                             {['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map(day => (
                                 <div key={day} className="h-8 flex items-center justify-center text-xs font-medium text-muted-foreground">
                                     {day}

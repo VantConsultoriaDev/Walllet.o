@@ -21,7 +21,8 @@ export default function MainLayout() {
             </div>
             <div className="flex flex-col flex-1 min-w-0">
                 <Header />
-                <main className="flex flex-1 flex-col gap-4 p-0 lg:gap-6 lg:p-0 overflow-auto">
+                {/* O conteúdo principal deve ser o elemento de rolagem, ocupando o restante da altura da tela */}
+                <main className="flex flex-1 flex-col gap-4 p-0 lg:gap-6 lg:p-0 overflow-y-auto">
                     {isLoading ? (
                         <AppLoadingPlaceholder />
                     ) : (
@@ -32,7 +33,7 @@ export default function MainLayout() {
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: -10 }}
                                 transition={{ duration: 0.2 }}
-                                className="flex-1 flex flex-col" // Ensure it takes full height/width
+                                className="flex-1 flex flex-col" // Garante que o conteúdo da rota ocupe 100% do espaço disponível
                             >
                                 <Outlet />
                             </motion.div>

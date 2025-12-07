@@ -262,8 +262,8 @@ export default function Clientes() {
 
 
     return (
-        <div className="flex-1 space-y-4 p-4 pt-6 md:p-8" >
-            <div className="flex items-center justify-between space-y-2">
+        <div className="flex-1 space-y-4 p-4 pt-6 md:p-8 h-full overflow-y-auto" >
+            <div className="flex items-center justify-between space-y-2 shrink-0">
                 <h2 className="text-3xl font-bold tracking-tight">Clientes</h2>
                 <div className="flex items-center space-x-2">
                     <div className="relative w-full md:w-64 mr-2">
@@ -294,7 +294,7 @@ export default function Clientes() {
                         </Button>
                     </div>
                     <Button
-                        className="group transition-all duration-300 hover:scale-105 hover:shadow-lg"
+                        className="group transition-all duration-300 hover:scale-105 hover:shadow-lg shrink-0"
                         onClick={() => setNewClientModalOpen(true)}
                     >
                         <Plus className="mr-2 h-4 w-4 transition-transform group-hover:rotate-90" />
