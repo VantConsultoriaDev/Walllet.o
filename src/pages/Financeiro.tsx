@@ -378,8 +378,8 @@ export default function Financeiro() {
     // --- Render ---
 
     return (
-        <div className="flex-1 space-y-4 p-4 pt-6 md:p-8 animate-in fade-in duration-500">
-            <div className="flex items-center justify-between space-y-2">
+        <div className="flex-1 space-y-4 p-4 pt-6 md:p-8 h-full flex flex-col overflow-y-auto animate-in fade-in duration-500">
+            <div className="flex items-center justify-between space-y-2 shrink-0">
                 <h2 className="text-3xl font-bold tracking-tight">Financeiro</h2>
                 <div className="flex items-center space-x-2">
                     <Button
@@ -396,7 +396,7 @@ export default function Financeiro() {
             </div>
 
             {/* Filters */}
-            <div className="flex flex-col md:flex-row items-center gap-3">
+            <div className="flex flex-col md:flex-row items-center gap-3 shrink-0">
                 {/* Month/Year Filter */}
                 <div className="flex gap-2 w-full md:w-auto">
                     <Select
@@ -463,7 +463,7 @@ export default function Financeiro() {
             </div>
 
             {/* Summary Cards */}
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 shrink-0">
                 <Card className="shadow-sm hover:shadow-md transition-shadow">
                     <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium pr-2">Faturamento (Boletos Pagos)</CardTitle>
@@ -510,11 +510,11 @@ export default function Financeiro() {
             </div>
 
             {/* Unified List */}
-            <Card className="col-span-4">
-                <CardHeader>
+            <Card className="col-span-4 flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
                     <CardTitle>Movimentações Detalhadas</CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="flex-1 overflow-y-auto">
                     <div className="rounded-md border overflow-x-auto">
                         <Table>
                             <TableHeader>

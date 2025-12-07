@@ -1,334 +1,4 @@
-import { useState, useEffect } from "react"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Separator } from "@/components/ui/separator"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Building2, User, Phone, FileText, Pencil, Save, X, Plus, Trash2, ArrowLeft, Car, Truck, Search, Filter, DollarSign, TrendingUp, Shield, ChevronDown, ChevronUp } from "lucide-react"
-import { VehicleCard } from "@/components/frota/vehicle-card"
-import { ClientFinanceiro } from "./client-financeiro"
-import { NewVehicleModal } from "@/components/frota/NewVehicleModal" // <-- Importando o novo modal
-import type { Client } from "@/hooks/data/useClients" // Import Client type from hook
-import type { Vehicle, VehicleType } from "@/hooks/data/useVehicles" // Import Vehicle types from hook
-import { useBoletos } from "@/hooks/data/useBoletos" // Importando useBoletos
-import { useQuotations, type PatrimonyItem } from "@/hooks/data/useQuotations" // Importando useQuotations e PatrimonyItem
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { cn } from "@/lib/utils"
-
-type ClientDetailsProps = {
-    client: Client
-    onBack: () => void
-    onStatusChange?: (clientId: string, newStatus: "active" | "inactive" | "blocked") => void
-    onSave?: (updatedClient: Client) => void
-    onSaveVehicle: (vehicle: Vehicle) => Promise<void>
-    onDeleteVehicle: (vehicleId: string) => Promise<void>
-}
-
-export function ClientDetails({ client, onBack, onStatusChange, onSave, onSaveVehicle, onDeleteVehicle }: ClientDetailsProps) {
-    const { calculateClientAnnualValue } = useBoletos()
-    const { calculateClientTotalPatrimony } = useQuotations()
-    
-    const [isEditing, setIsEditing] = useState(false)
-    const [editedClient, setEditedClient] = useState<Client>(client)
-    const [isAddingVehicle, setIsAddingVehicle] = useState(false)
-    const [editingVehicle, setEditingVehicle] = useState<Vehicle | undefined>(undefined)
-    const [searchTerm, setSearchTerm] = useState("")
-    const [typeFilter, setTypeFilter] = useState<string>("ALL")
-    const [activeTab, setActiveTab] = useState("geral")
-    const [showPatrimonyBreakdown, setShowPatrimonyBreakdown] = useState(false) // Novo estado para o breakdown
-
-    // Calculate KPIs
-    const totalAnnualValue = calculateClientAnnualValue(client.id)
-    const { total: totalPatrimony, breakdown: patrimonyBreakdown } = calculateClientTotalPatrimony(client.id, client.vehicles)
-
-    useEffect(() => {
-        setEditedClient(client)
-    }, [client])
-
-    const filteredVehicles = editedClient.vehicles.filter(vehicle => {
-        const matchesSearch =
-            (vehicle.plate?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
-            (vehicle.brand?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
-            (vehicle.model?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
-            (vehicle.year?.toString() || "").includes(searchTerm) ||
-            (vehicle.renavam?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
-            (vehicle.chassi?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
-            (vehicle.color?.toLowerCase() || "").includes(searchTerm.toLowerCase())
-
-        const matchesType = typeFilter === "ALL" || vehicle.type === typeFilter
-
-        return matchesSearch && matchesType
-    })
-
-    const handleSave = () => {
-        if (onSave) {
-            onSave(editedClient)
-            setIsEditing(false)
-        }
-    }
-
-    const handleCancel = () => {
-        setEditedClient(client)
-        setIsEditing(false)
-        setIsAddingVehicle(false)
-        setEditingVehicle(undefined)
-    }
-
-    const handleOpenVehicleModal = (vehicle?: Vehicle) => {
-        setEditingVehicle(vehicle)
-        setIsAddingVehicle(true)
-    }
-
-    const handleSaveVehicle = async (vehicle: Vehicle) => {
-        await onSaveVehicle(vehicle);
-    }
-
-    const handleRemoveVehicle = async (vehicleId: string) => {
-        await onDeleteVehicle(vehicleId);
-    }
-
-    const statusVariant =
-        client.status === "active" ? "default" :
-            client.status === "blocked" ? "destructive" :
-                "secondary"
-
-    const statusLabel =
-        client.status === "active" ? "Ativo" :
-            client.status === "blocked" ? "Bloqueado" :
-                "Inativo"
-                
-    const formatCurrency = (value: number) => {
-        return new Intl.NumberFormat("pt-BR", {
-            style: "currency",
-            currency: "BRL",
-        }).format(value)
-    }
-
-    return (
-        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 h-full flex flex-col">
-            {/* Header */}
-            <div className="flex items-center justify-between shrink-0">
-                <div className="flex items-center gap-4">
-                    <Button variant="ghost" size="icon" onClick={onBack} className="h-10 w-10 rounded-full">
-                        <ArrowLeft className="h-6 w-6" />
-                    </Button>
-                    <div className="flex items-center gap-4">
-                        <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center">
-                            {client.clientType === "PJ" ? (
-                                <Building2 className="h-7 w-7 text-primary" />
-                            ) : (
-                                <User className="h-7 w-7 text-primary" />
-                            )}
-                        </div>
-                        <div>
-                            <div className="flex items-center gap-3">
-                                {isEditing ? (
-                                    <Input
-                                        value={editedClient.name}
-                                        onChange={(e) => setEditedClient({ ...editedClient, name: e.target.value })}
-                                        className="h-9 text-xl font-bold w-[300px]"
-                                    />
-                                ) : (
-                                    <h2 className="text-2xl font-bold tracking-tight">{client.name}</h2>
-                                )}
-                            </div>
-                            <p className="text-muted-foreground">
-                                {client.clientType === "PJ" ? "Pessoa Jurídica" : "Pessoa Física"}
-                            </p>
-                        </div>
-                    </div>
-                </div>
-                <div className="flex items-center gap-3">
-                    {!isEditing && onStatusChange && (
-                        <Select
-                            value={client.status}
-                            onValueChange={(value) => onStatusChange(client.id, value as "active" | "inactive" | "blocked")}
-                        >
-                            <SelectTrigger className="w-[140px]">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="active">Ativo</SelectItem>
-                                <SelectItem value="inactive">Inativo</SelectItem>
-                                <SelectItem value="blocked">Bloqueado</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    )}
-                    {!isEditing && !onStatusChange && (
-                        <Badge variant={statusVariant} className="text-sm px-3 py-1">
-                            {statusLabel}
-                        </Badge>
-                    )}
-
-                    {!isEditing && onSave && (
-                        <Button onClick={() => setIsEditing(true)}>
-                            <Pencil className="mr-2 h-4 w-4" />
-                            Editar Cliente
-                        </Button>
-                    )}
-                    {isEditing && (
-                        <div className="flex gap-2">
-                            <Button variant="outline" onClick={handleCancel}>
-                                <X className="mr-2 h-4 w-4" />
-                                Cancelar
-                            </Button>
-                            <Button onClick={handleSave}>
-                                <Save className="mr-2 h-4 w-4" />
-                                Salvar Alterações
-                            </Button>
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            <Separator />
-
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-                <TabsList className="w-full justify-start h-12 bg-muted/20 p-1">
-                    <TabsTrigger value="geral" className="data-[state=active]:bg-background px-6">
-                        <User className="mr-2 h-4 w-4" />
-                        Dados Gerais
-                    </TabsTrigger>
-                    <TabsTrigger value="frota" className="data-[state=active]:bg-background px-6">
-                        <Truck className="mr-2 h-4 w-4" />
-                        Frota ({client.vehicles.length})
-                    </TabsTrigger>
-                    <TabsTrigger value="financeiro" className="data-[state=active]:bg-background px-6">
-                        <DollarSign className="mr-2 h-4 w-4" />
-                        Financeiro
-                    </TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="geral" className="flex-1 mt-6">
-                    <div className="grid gap-6 md:grid-cols-3">
-                        {/* KPI Cards */}
-                        <div className="col-span-3 grid gap-4 md:grid-cols-2">
-                            <div className="p-6 rounded-xl border bg-card text-card-foreground shadow-sm flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-1">
-                                        Valor Anual (Boletos)
-                                    </p>
-                                    <p className="text-2xl font-bold text-primary">
-                                        {formatCurrency(totalAnnualValue)}
-                                    </p>
-                                </div>
-                                <TrendingUp className="h-8 w-8 text-primary/50" />
-                            </div>
-                            <div className="p-6 rounded-xl border bg-card text-card-foreground shadow-sm flex flex-col justify-between">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-1">
-                                            Patrimônio Segurado
-                                        </p>
-                                        <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                                            {formatCurrency(totalPatrimony)}
-                                        </p>
-                                    </div>
-                                    <Shield className="h-8 w-8 text-green-600/50 dark:text-green-400/50" />
-                                </div>
-                                
-                                {/* Breakdown Toggle */}
-                                {patrimonyBreakdown.length > 0 && (
-                                    <Button 
-                                        variant="ghost" 
-                                        size="sm" 
-                                        className="mt-3 w-full justify-start text-xs text-muted-foreground hover:bg-green-50 dark:hover:bg-green-900/10"
-                                        onClick={() => setShowPatrimonyBreakdown(!showPatrimonyBreakdown)}
-                                    >
-                                        {showPatrimonyBreakdown ? (
-                                            <ChevronUp className="mr-2 h-3 w-3" />
-                                        ) : (
-                                            <ChevronDown className="mr-2 h-3 w-3" />
-                                        )}
-                                        Ver Detalhes ({patrimonyBreakdown.length} itens)
-                                    </Button>
-                                )}
-                            </div>
-                        </div>
-                        
-                        {/* Patrimony Breakdown Details */}
-                        {showPatrimonyBreakdown && patrimonyBreakdown.length > 0 && (
-                            <div className="col-span-3 p-4 rounded-xl border bg-muted/20 shadow-inner animate-in fade-in slide-in-from-top-2">
-                                <h4 className="text-sm font-semibold mb-3 text-muted-foreground">Composição do Patrimônio Segurado:</h4>
-                                <ScrollArea className="h-48">
-                                    <div className="space-y-2 pr-4">
-                                        {patrimonyBreakdown.map((item) => (
-                                            <div key={item.id} className="flex justify-between items-center text-sm p-2 rounded-md hover:bg-muted/50">
-                                                <div className="flex items-center gap-2">
-                                                    {item.type === 'vehicle' ? (
-                                                        <Car className="h-4 w-4 text-blue-500" />
-                                                    ) : (
-                                                        <FileText className="h-4 w-4 text-purple-500" />
-                                                    )}
-                                                    <span className="font-medium">{item.description}</span>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <Badge variant="secondary" className="text-[10px]">{item.source}</Badge>
-                                                    <span className="font-bold text-green-600 dark:text-green-400">
-                                                        {formatCurrency(item.value)}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </ScrollArea>
-                            </div>
-                        )}
-
-                        {/* Left Column: Identification & Contact */}
-                        <div className="md:col-span-2 space-y-6">
-                            {/* Identification Section */}
-                            <div className="p-6 rounded-xl border bg-card text-card-foreground shadow-sm">
-                                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4 flex items-center gap-2">
-                                    <FileText className="h-4 w-4" /> Identificação
-                                </h3>
-                                <div className="grid gap-4">
-                                    {client.clientType === "PF" ? (
-                                        <div className="space-y-1">
-                                            <Label className="text-muted-foreground">CPF</Label>
-                                            {isEditing ? (
-                                                <Input
-                                                    value={editedClient.cpf}
-                                                    onChange={(e) => setEditedClient({ ...editedClient, cpf: e.target.value })}
-                                                />
-                                            ) : (
-                                                <p className="font-medium text-lg">{client.cpf}</p>
-                                            )}
-                                        </div>
-                                    ) : (
-                                        <>
-                                            <div className="space-y-1">
-                                                <Label className="text-muted-foreground">CNPJ</Label>
-                                                {isEditing ? (
-                                                    <Input
-                                                        value={editedClient.cnpj}
-                                                        onChange={(e) => setEditedClient({ ...editedClient, cnpj: e.target.value })}
-                                                    />
-                                                ) : (
-                                                    <p className="font-medium text-lg">{client.cnpj}</p>
-                                                )}
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div className="space-y-1">
-                                                    <Label className="text-muted-foreground">Nome Fantasia</Label>
-                                                    {isEditing ? (
-                                                        <Input
-                                                            value={editedClient.nomeFantasia}
-                                                            onChange={(e) => setEditedClient({ ...editedClient, nomeFantasia: e.target.value })}
-                                                        />
-                                                    ) : (
-                                                        <p className="font-medium">{client.nomeFantasia || "-"}</p>
-                                                    )}
-                                                </div>
-                                                <div className="space-y-1">
+<div className="space-y-1">
                                                     <Label className="text-muted-foreground">Razão Social</Label>
                                                     {isEditing ? (
                                                         <Input
@@ -425,9 +95,9 @@ export function ClientDetails({ client, onBack, onStatusChange, onSave, onSaveVe
                     </div>
                 </TabsContent>
 
-                <TabsContent value="frota" className="flex-1 mt-6">
+                <TabsContent value="frota" className="flex-1 mt-6 overflow-y-auto">
                     <div className="p-6 rounded-xl border bg-card text-card-foreground shadow-sm min-h-[400px]">
-                        <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center justify-between mb-6 shrink-0">
                             <div>
                                 <h3 className="text-lg font-semibold flex items-center gap-2">
                                     Veículos Cadastrados
@@ -445,7 +115,7 @@ export function ClientDetails({ client, onBack, onStatusChange, onSave, onSaveVe
                             </Button>
                         </div>
 
-                        <div className="flex flex-col md:flex-row gap-4 mb-6">
+                        <div className="flex flex-col md:flex-row gap-4 mb-6 shrink-0">
                             <div className="relative flex-1">
                                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                                 <Input
@@ -472,7 +142,7 @@ export function ClientDetails({ client, onBack, onStatusChange, onSave, onSaveVe
                         </div>
 
                         {filteredVehicles.length > 0 ? (
-                            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 overflow-y-auto">
                                 {filteredVehicles.map((vehicle, index) => (
                                     <div key={vehicle.id} className="relative group">
                                         <VehicleCard
@@ -514,7 +184,7 @@ export function ClientDetails({ client, onBack, onStatusChange, onSave, onSaveVe
                     </div>
                 </TabsContent>
 
-                <TabsContent value="financeiro" className="flex-1 mt-6">
+                <TabsContent value="financeiro" className="flex-1 mt-6 overflow-y-auto">
                     <div className="p-6 rounded-xl border bg-card text-card-foreground shadow-sm min-h-[400px]">
                         <ClientFinanceiro client={client} vehicles={client.vehicles} />
                     </div>
@@ -526,7 +196,7 @@ export function ClientDetails({ client, onBack, onStatusChange, onSave, onSaveVe
                 open={isAddingVehicle}
                 onOpenChange={setIsAddingVehicle}
                 onSubmit={handleSaveVehicle}
-                onDelete={handleRemoveVehicle} // <-- Passando a função de exclusão
+                onDelete={handleDeleteVehicle} // <-- Passando a função de exclusão
                 vehicleToEdit={editingVehicle}
                 clientId={client.id}
             />

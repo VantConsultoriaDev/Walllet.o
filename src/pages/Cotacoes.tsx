@@ -206,7 +206,7 @@ export default function Cotacoes() {
 
     return (
         <div className="flex-1 flex flex-col h-full p-4 pt-6 md:p-8 animate-in fade-in duration-500">
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center justify-between mb-6 shrink-0">
                 <h2 className="text-3xl font-bold tracking-tight">Cotações</h2>
                 <div className="flex items-center gap-2">
                     {/* Search Input */}
