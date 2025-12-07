@@ -7,10 +7,9 @@ import type { Vehicle } from "./useVehicles"
 import { useDashboardDataContext } from "./DashboardDataProvider" // Importando o contexto central
 
 // Helper function to map DB object to Cotacao type
-const mapDbToCotacao = (dbCotacao: any, history: CotacaoHistory[] = []): Cotacao => {
-    // Se o histórico não veio aninhado (o que pode acontecer se a função RPC não retornar), 
-    // usamos o histórico passado como argumento (que será vazio na primeira carga).
-    const finalHistory = (dbCotacao.history || history).map((h: any) => ({
+const mapDbToCotacao = (dbCotacao: any): Cotacao => {
+    // O histórico agora é esperado dentro do objeto dbCotacao (retorno da RPC)
+    const finalHistory = (dbCotacao.history || []).map((h: any) => ({
         id: h.id,
         date: new Date(h.created_at || h.date),
         fromStatus: h.from_status || h.fromStatus,
