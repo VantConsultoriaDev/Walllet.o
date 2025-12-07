@@ -42,6 +42,15 @@ const mapCotacaoToDb = (cotacao: Partial<Cotacao>) => ({
     updated_at: new Date().toISOString(),
 })
 
+export type PatrimonyItem = {
+    id: string;
+    type: 'vehicle' | 'quotation';
+    description: string;
+    value: number;
+    source: string;
+    status: string;
+}
+
 export function useQuotations() {
     const { user, loading: authLoading } = useAuth() // Adicionando authLoading
     const { toast } = useToast()
@@ -210,57 +219,82 @@ export function useQuotations() {
     /**
      * Calcula o valor total do patrimônio segurado (apenas cotações com status 'cliente')
      * para um cliente específico, incluindo a soma dos valores dos veículos cadastrados.
+     * Retorna o total e a lista de itens que compõem esse total.
      */
-    const calculateClientTotalPatrimony = useCallback((clientId: string, clientVehicles: Vehicle[]): number => {
+    const calculateClientTotalPatrimony = useCallback((clientId: string, clientVehicles: Vehicle[]): { total: number, breakdown: PatrimonyItem[] } => {
         let totalValue = 0;
+        const breakdown: PatrimonyItem[] = [];
         
         // 1. Somar o valor de contrato (value) ou FIPE (fipeValue) de todos os veículos ativos do cliente
-        const vehicleValue = clientVehicles.reduce((sum, v) => {
+        clientVehicles.forEach(v => {
             // Apenas veículos com status 'active'
             if (v.status === 'active') {
                 let value = 0;
+                let source = "N/A";
                 
                 // Prioridade: 1. Valor Contrato (value)
                 if (v.value) {
                     value = parseFloat(v.value);
+                    source = "Valor Contrato";
                 } 
                 // 2. Valor FIPE (fipeValue) como fallback
                 else if (v.fipeValue) {
                     value = parseFloat(v.fipeValue);
+                    source = "Valor FIPE";
                 }
                 
-                return sum + value;
+                if (value > 0) {
+                    totalValue += value;
+                    breakdown.push({
+                        id: v.id,
+                        type: 'vehicle',
+                        description: `${v.plate} - ${v.brand} ${v.model} (${v.year})`,
+                        value: value,
+                        source: source,
+                        status: v.status,
+                    });
+                }
             }
-            return sum;
-        }, 0);
-        
-        totalValue += vehicleValue;
+        });
 
         // 2. Somar o valor de outros ativos (residencial, carga, outros) de cotações CONCLUÍDAS ('cliente')
         const clientQuotations = quotations.filter(q => q.clientId === clientId && q.status === 'cliente');
         
-        const quotationValue = clientQuotations.reduce((sum, q) => {
+        clientQuotations.forEach(q => {
             const asset = q.asset;
             let value = 0;
+            let description = "";
             
             switch (asset.type) {
                 case 'residencial':
                     value = asset.valorPatrimonio;
+                    description = `Residencial: ${asset.endereco}`;
                     break;
                 case 'carga':
                     value = asset.valorTotal;
+                    description = `Carga: R$ ${asset.valorTotal.toLocaleString('pt-BR')}`;
                     break;
                 case 'outros':
                     value = asset.valorSegurado;
+                    description = `Outros: ${asset.descricao}`;
                     break;
                 // Veículos são contados na etapa 1 (clientVehicles)
             }
-            return sum + value;
-        }, 0);
+            
+            if (value > 0) {
+                totalValue += value;
+                breakdown.push({
+                    id: q.id,
+                    type: 'quotation',
+                    description: description,
+                    value: value,
+                    source: `Cotação #${q.id}`,
+                    status: q.status,
+                });
+            }
+        });
         
-        totalValue += quotationValue;
-        
-        return totalValue;
+        return { total: totalValue, breakdown };
     }, [quotations]);
 
 

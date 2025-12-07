@@ -12,14 +12,16 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Building2, User, Phone, FileText, Pencil, Save, X, Plus, Trash2, ArrowLeft, Car, Truck, Search, Filter, DollarSign, TrendingUp, Shield } from "lucide-react"
+import { Building2, User, Phone, FileText, Pencil, Save, X, Plus, Trash2, ArrowLeft, Car, Truck, Search, Filter, DollarSign, TrendingUp, Shield, ChevronDown, ChevronUp } from "lucide-react"
 import { VehicleCard } from "@/components/frota/vehicle-card"
 import { ClientFinanceiro } from "./client-financeiro"
 import { NewVehicleModal } from "@/components/frota/NewVehicleModal" // <-- Importando o novo modal
 import type { Client } from "@/hooks/data/useClients" // Import Client type from hook
 import type { Vehicle, VehicleType } from "@/hooks/data/useVehicles" // Import Vehicle types from hook
 import { useBoletos } from "@/hooks/data/useBoletos" // Importando useBoletos
-import { useQuotations } from "@/hooks/data/useQuotations" // Importando useQuotations
+import { useQuotations, type PatrimonyItem } from "@/hooks/data/useQuotations" // Importando useQuotations e PatrimonyItem
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { cn } from "@/lib/utils"
 
 type ClientDetailsProps = {
     client: Client
@@ -40,12 +42,12 @@ export function ClientDetails({ client, onBack, onStatusChange, onSave, onSaveVe
     const [editingVehicle, setEditingVehicle] = useState<Vehicle | undefined>(undefined)
     const [searchTerm, setSearchTerm] = useState("")
     const [typeFilter, setTypeFilter] = useState<string>("ALL")
-    const [activeTab, setActiveTab] = useState("geral") // <-- Novo estado para a aba ativa
+    const [activeTab, setActiveTab] = useState("geral")
+    const [showPatrimonyBreakdown, setShowPatrimonyBreakdown] = useState(false) // Novo estado para o breakdown
 
     // Calculate KPIs
     const totalAnnualValue = calculateClientAnnualValue(client.id)
-    // CORREÇÃO: Passando client.vehicles para o cálculo do patrimônio
-    const totalPatrimony = calculateClientTotalPatrimony(client.id, client.vehicles)
+    const { total: totalPatrimony, breakdown: patrimonyBreakdown } = calculateClientTotalPatrimony(client.id, client.vehicles)
 
     useEffect(() => {
         setEditedClient(client)
@@ -59,7 +61,7 @@ export function ClientDetails({ client, onBack, onStatusChange, onSave, onSaveVe
             (vehicle.year?.toString() || "").includes(searchTerm) ||
             (vehicle.renavam?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
             (vehicle.chassi?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
-            (vehicle.color?.toLowerCase() || "").includes(searchTerm.toLowerCase()) // <-- Incluindo busca por cor
+            (vehicle.color?.toLowerCase() || "").includes(searchTerm.toLowerCase())
 
         const matchesType = typeFilter === "ALL" || vehicle.type === typeFilter
 
@@ -85,17 +87,12 @@ export function ClientDetails({ client, onBack, onStatusChange, onSave, onSaveVe
         setIsAddingVehicle(true)
     }
 
-    // A função onSaveVehicle é passada como prop e lida com a atualização do estado global no hook pai (Clientes.tsx)
-    // A lógica de atualização do estado local do cliente (editedClient) é removida daqui para evitar duplicação e erros de sincronização.
     const handleSaveVehicle = async (vehicle: Vehicle) => {
         await onSaveVehicle(vehicle);
-        // Após salvar, o useEffect reagirá à mudança na prop 'client' (que é atualizada pelo hook pai)
     }
 
-    // A função onDeleteVehicle é passada como prop e lida com a exclusão no hook pai (Clientes.tsx)
     const handleRemoveVehicle = async (vehicleId: string) => {
         await onDeleteVehicle(vehicleId);
-        // Após deletar, o useEffect reagirá à mudança na prop 'client'
     }
 
     const statusVariant =
@@ -225,19 +222,67 @@ export function ClientDetails({ client, onBack, onStatusChange, onSave, onSaveVe
                                 </div>
                                 <TrendingUp className="h-8 w-8 text-primary/50" />
                             </div>
-                            <div className="p-6 rounded-xl border bg-card text-card-foreground shadow-sm flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-1">
-                                        Patrimônio Segurado
-                                    </p>
-                                    <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                                        {formatCurrency(totalPatrimony)}
-                                    </p>
+                            <div className="p-6 rounded-xl border bg-card text-card-foreground shadow-sm flex flex-col justify-between">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                                            Patrimônio Segurado
+                                        </p>
+                                        <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                                            {formatCurrency(totalPatrimony)}
+                                        </p>
+                                    </div>
+                                    <Shield className="h-8 w-8 text-green-600/50 dark:text-green-400/50" />
                                 </div>
-                                <Shield className="h-8 w-8 text-green-600/50 dark:text-green-400/50" />
+                                
+                                {/* Breakdown Toggle */}
+                                {patrimonyBreakdown.length > 0 && (
+                                    <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        className="mt-3 w-full justify-start text-xs text-muted-foreground hover:bg-green-50 dark:hover:bg-green-900/10"
+                                        onClick={() => setShowPatrimonyBreakdown(!showPatrimonyBreakdown)}
+                                    >
+                                        {showPatrimonyBreakdown ? (
+                                            <ChevronUp className="mr-2 h-3 w-3" />
+                                        ) : (
+                                            <ChevronDown className="mr-2 h-3 w-3" />
+                                        )}
+                                        Ver Detalhes ({patrimonyBreakdown.length} itens)
+                                    </Button>
+                                )}
                             </div>
                         </div>
                         
+                        {/* Patrimony Breakdown Details */}
+                        {showPatrimonyBreakdown && patrimonyBreakdown.length > 0 && (
+                            <div className="col-span-3 p-4 rounded-xl border bg-muted/20 shadow-inner animate-in fade-in slide-in-from-top-2">
+                                <h4 className="text-sm font-semibold mb-3 text-muted-foreground">Composição do Patrimônio Segurado:</h4>
+                                <ScrollArea className="h-48">
+                                    <div className="space-y-2 pr-4">
+                                        {patrimonyBreakdown.map((item) => (
+                                            <div key={item.id} className="flex justify-between items-center text-sm p-2 rounded-md hover:bg-muted/50">
+                                                <div className="flex items-center gap-2">
+                                                    {item.type === 'vehicle' ? (
+                                                        <Car className="h-4 w-4 text-blue-500" />
+                                                    ) : (
+                                                        <FileText className="h-4 w-4 text-purple-500" />
+                                                    )}
+                                                    <span className="font-medium">{item.description}</span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <Badge variant="secondary" className="text-[10px]">{item.source}</Badge>
+                                                    <span className="font-bold text-green-600 dark:text-green-400">
+                                                        {formatCurrency(item.value)}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </ScrollArea>
+                            </div>
+                        )}
+
                         {/* Left Column: Identification & Contact */}
                         <div className="md:col-span-2 space-y-6">
                             {/* Identification Section */}
