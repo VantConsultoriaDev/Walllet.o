@@ -214,11 +214,22 @@ export function useQuotations() {
     const calculateClientTotalPatrimony = useCallback((clientId: string, clientVehicles: Vehicle[]): number => {
         let totalValue = 0;
         
-        // 1. Somar o valor de contrato (value) de todos os veículos ativos do cliente
+        // 1. Somar o valor de contrato (value) ou FIPE (fipeValue) de todos os veículos ativos do cliente
         const vehicleValue = clientVehicles.reduce((sum, v) => {
-            // Apenas veículos com status 'active' e que tenham um valor de contrato definido
-            if (v.status === 'active' && v.value) {
-                return sum + parseFloat(v.value);
+            // Apenas veículos com status 'active'
+            if (v.status === 'active') {
+                let value = 0;
+                
+                // Prioridade: 1. Valor Contrato (value)
+                if (v.value) {
+                    value = parseFloat(v.value);
+                } 
+                // 2. Valor FIPE (fipeValue) como fallback
+                else if (v.fipeValue) {
+                    value = parseFloat(v.fipeValue);
+                }
+                
+                return sum + value;
             }
             return sum;
         }, 0);
