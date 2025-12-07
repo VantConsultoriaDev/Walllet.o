@@ -85,67 +85,17 @@ export function ClientDetails({ client, onBack, onStatusChange, onSave, onSaveVe
         setIsAddingVehicle(true)
     }
 
+    // A função onSaveVehicle é passada como prop e lida com a atualização do estado global no hook pai (Clientes.tsx)
+    // A lógica de atualização do estado local do cliente (editedClient) é removida daqui para evitar duplicação e erros de sincronização.
     const handleSaveVehicle = async (vehicle: Vehicle) => {
-        if (!client) return;
-
-        const vehicleToSave = {
-            ...vehicle,
-            clientId: client.id,
-        }
-
-        let result;
-        const isEditing = vehicle.id && client.vehicles.some(v => v.id === vehicle.id);
-
-        if (isEditing) {
-            result = await onSaveVehicle(vehicleToSave)
-        } else {
-            result = await onSaveVehicle(vehicleToSave)
-        }
-        
-        if (result?.data) {
-            const savedVehicle = result.data as Vehicle;
-            
-            // 1. Atualiza o estado local do cliente imediatamente
-            setSelectedClient(prev => {
-                if (!prev) return null;
-
-                let updatedVehicles: Vehicle[];
-                if (isEditing) {
-                    // Edição: substitui o veículo existente
-                    updatedVehicles = prev.vehicles.map(v => v.id === savedVehicle.id ? savedVehicle : v);
-                } else {
-                    // Adição: adiciona o novo veículo
-                    updatedVehicles = [savedVehicle, ...prev.vehicles];
-                }
-
-                return {
-                    ...prev,
-                    vehicles: updatedVehicles
-                };
-            });
-        }
-
-        // 2. Chama fetchClients em segundo plano para sincronizar o estado global
-        // Não precisamos esperar o retorno, pois o estado local já foi atualizado.
-        fetchClients();
+        await onSaveVehicle(vehicle);
+        // Após salvar, o useEffect reagirá à mudança na prop 'client' (que é atualizada pelo hook pai)
     }
 
-    const handleDeleteVehicle = async (vehicleId: string) => {
-        if (!selectedClient) return;
-        
-        await deleteVehicle(vehicleId);
-        
-        // 1. Atualiza o estado local do cliente imediatamente
-        setSelectedClient(prev => {
-            if (!prev) return null;
-            return {
-                ...prev,
-                vehicles: prev.vehicles.filter(v => v.id !== vehicleId)
-            };
-        });
-        
-        // 2. Sincroniza o estado global em segundo plano
-        fetchClients();
+    // A função onDeleteVehicle é passada como prop e lida com a exclusão no hook pai (Clientes.tsx)
+    const handleRemoveVehicle = async (vehicleId: string) => {
+        await onDeleteVehicle(vehicleId);
+        // Após deletar, o useEffect reagirá à mudança na prop 'client'
     }
 
     const statusVariant =
