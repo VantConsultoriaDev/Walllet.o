@@ -5,7 +5,7 @@ import { useQuotations } from "@/hooks/data/useQuotations"
 import { useClaims } from "@/hooks/data/useClaims"
 import { useEvents } from "@/hooks/data/useEvents"
 import { useBoletos } from "@/hooks/data/useBoletos"
-import { useVehicles } from "@/hooks/data/useVehicles"
+// import { useVehicles } from "@/hooks/data/useVehicles" // REMOVIDO
 import { useMemo } from "react"
 
 /**
@@ -21,11 +21,11 @@ export function useAppInitialization() {
     const { loading: claimsLoading } = useClaims()
     const { loading: eventsLoading } = useEvents()
     const { loading: boletosLoading } = useBoletos()
-    const { loading: vehiclesLoading } = useVehicles()
+    // const { loading: vehiclesLoading } = useVehicles() // REMOVIDO
 
     const isLoading = useMemo(() => {
-        return clientsLoading || repsLoading || transactionsLoading || quotationsLoading || claimsLoading || eventsLoading || boletosLoading || vehiclesLoading
-    }, [clientsLoading, repsLoading, transactionsLoading, quotationsLoading, claimsLoading, eventsLoading, boletosLoading, vehiclesLoading])
+        return clientsLoading || repsLoading || transactionsLoading || quotationsLoading || claimsLoading || eventsLoading || boletosLoading // || vehiclesLoading
+    }, [clientsLoading, repsLoading, transactionsLoading, quotationsLoading, claimsLoading, eventsLoading, boletosLoading])
 
     return { isLoading }
 }

@@ -24,7 +24,7 @@ import { NewTransactionModal, type Transaction } from "@/components/financeiro/n
 import { RecurrenceActionDialog } from "@/components/financeiro/recurrence-action-dialog"
 import { useRepresentations } from "@/hooks/data/useRepresentations"
 import { EditBoletoModal } from "@/components/clients/edit-boleto-modal"
-import { useVehicles } from "@/hooks/data/useVehicles"
+import { useVehicles } from "@/hooks/data/useVehicles" // Importação mantida para obter a lista de veículos para o modal de edição de boleto
 
 // Define o tipo de dado para a tabela (Boletos + Despesas)
 type FinanceiroRow = Boleto & { isBoleto: true } | (Transaction & { isBoleto: false })
